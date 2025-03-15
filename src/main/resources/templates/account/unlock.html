@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spring Authorization Login Help</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
+    <script>
+        var formSubmitted = false;
+        function showLoading() {
+            var form = document.getElementById('form')
+            console.log('form action: ', form.getAttribute('action'))
+
+            if (formSubmitted == true) {
+                console.log('form was already submitted');
+                var button = document.getElementById("unlockMyAccount");
+                button.disabled = true;
+                console.log('disable unlockMyAccount button after clicking');
+                return false;
+            }
+
+            var emailAddress = document.getElementById("emailAddress")
+            console.log('emailAddress.value.length: ', emailAddress.value.length);
+            if (emailAddress.value.length > 0) {
+                var x = document.getElementById("spinId");
+                console.log('show div')
+                x.className = "spinner-border spinner-border-sm";
+                formSubmitted = true;
+
+                var errorDiv = document.getElementById("errorDiv")
+                if (errorDiv) {
+                    console.log('hide errorDiv')
+                    errorDiv.innerHTML = '';
+                }
+
+                return true;
+            }
+            else {
+                return false;
+            }
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+    <div>
+        <form id="form" class="form-signin w-100 m-auto" method="post" th:action="@{/emailUserToUnLockAccount}">
+            <h1 class="h3 mb-3 fw-normal">Unlock account</h1>
+            <p>To unlock your account enter your email address.</p>
+            <div th:if="${message}" class="alert alert-primary" role="alert">
+                <span th:text="${message}"></span>
+                <span>You can close this window.</span>
+            </div>
+            <div id="errorDiv" th:if="${error}" class="alert alert-danger" role="alert">
+                <span th:text="${error}"></span>
+            </div>
+            <div th:if="!${message}">
+                <div class="form-floating">
+                    <input type="email" id="email" name="email" class="form-control" required autofocus>
+                    <label for="email">Email</label>
+                </div>
+                <button id="unlockMyAccount" class="btn-primary m-1 btn-lg" title="Unlock my account" onclick="showLoading();">
+                    <span id="spinId" class="d-none" role="status" aria-hidden="true"></span>
+                    Unlock my account
+                </button>
+            </div>
+            <div class="mt-3">
+                <div class="mt-2"><a href="/issuer" style="color: dimgrey !important;">Go back to Sign-in page</a></div>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

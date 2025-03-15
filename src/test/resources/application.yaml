@@ -60,6 +60,15 @@ account-rest-service:
   emailActivateLink: /active/email/{email}/password-secret
   validateEmailLoginSecret: /{email}/password-secret/{secret}
   updatePassword: /password-secret
+  emailSecretUnlockAccount: /locked/email/{email}/password-secret
+  lockAccount: /locked/true/{authenticationId}
+  unLockAccount: /locked/false
+
+attempt-rest-service:
+  root: http://localhost:8080
+  context: /attempts
+  failed: /login/failed
+  success: /login/success
 
 ISSUER_URI: http://my-server:9001
 private-client-url: http://127.0.0.1:8090
@@ -84,7 +93,9 @@ requestFilters:
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
   # email my username, emailActivationLink, email my secret for password reset
   - out: /accounts/email/(.)*/authentication-id, /accounts/active/email/(.)*/password-secret,
-      /accounts/email/(.)*/password-secret, /accounts/password-secret
+      /accounts/email/(.)*/password-secret, /accounts/password-secret, 
+      /accounts/locked/email/(.)*/password-secret, /accounts/locked/false,
+      /attempts/login/failed, /attempts/login/success
     outHttpMethods: put
     accessToken:
       option: request
@@ -110,3 +121,5 @@ authzmanager: http://localhost:9093
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
 AUTHZMANAGER_INITIAL_SECRET: hello
+  
+  /accounts/locked/email/{email}/password-secret

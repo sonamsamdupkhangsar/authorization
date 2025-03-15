@@ -44,6 +44,9 @@ public class TokenFilter {
     @Value("${server.servlet.context-path}${auth-server.oauth2token.path:}")
     private String accessTokenPath;
 
+    @Value("${server.servlet.context-path}")
+    private String servletContextPath;
+
     public TokenFilter(WebClient.Builder webClientBuilder, RequestCache requestCache) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
@@ -53,7 +56,14 @@ public class TokenFilter {
         return (request, next) -> {
 
             LOG.info("outbound request path: {}", request.url().getPath());
-            if (request.url().getPath().equals(accessTokenPath)) {
+            LOG.info("accessTokenPath: {}", accessTokenPath);
+
+            String requestPathWithServeletContextPath = request.url().getPath();
+            if (!request.url().getPath().startsWith(servletContextPath)) {
+                requestPathWithServeletContextPath = servletContextPath + requestPathWithServeletContextPath;
+            }
+
+            if (requestPathWithServeletContextPath.equals(accessTokenPath)) {
                 LOG.debug("no need to request access token when going to that path: {}", request.url().getPath());
                 ClientRequest clientRequest = ClientRequest.from(request).build();
                 return next.exchange(clientRequest);

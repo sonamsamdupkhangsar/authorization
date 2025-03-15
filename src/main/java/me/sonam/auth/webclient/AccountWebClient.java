@@ -6,11 +6,13 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.util.Map;
 
+/**
+ * This contains the methods available for the account-rest-service as Java class methods
+ */
 public class AccountWebClient {
     private static final Logger LOG = LoggerFactory.getLogger(AccountWebClient.class);
 
@@ -21,16 +23,24 @@ public class AccountWebClient {
     private final String emailActiveLink;
     private final String validateEmailLoginSecret;
     private final String updatePassword;
+    private final String emailSecretUnlockAccount;
+    private final String lockAccount;
+    private final String unLockAccount;
 
     public AccountWebClient(WebClient.Builder webClientBuilder,
                             String emailUserName, String emailMySecret, String emailActiveLink,
-                            String validateEmailLoginSecret, String updatePassword) {
+                            String validateEmailLoginSecret, String updatePassword,
+                            String emailSecretUnlockAccount, String lockAccount,
+                            String unLockAccount) {
         this.webClientBuilder = webClientBuilder;
         this.emailUserName = emailUserName;
         this.emailMySecret = emailMySecret;
         this.emailActiveLink = emailActiveLink;
         this.validateEmailLoginSecret = validateEmailLoginSecret;
         this.updatePassword = updatePassword;
+        this.emailSecretUnlockAccount = emailSecretUnlockAccount;
+        this.lockAccount = lockAccount;
+        this.unLockAccount = unLockAccount;
     }
 
     public Mono<String> emailAccountActivationLink(String email) {
@@ -87,6 +97,41 @@ public class AccountWebClient {
         LOG.info("email {}, username endpoint: {}", email, endpoint);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+                .retrieve();
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    /**
+     * this is for emailing a secret to unlock account
+     * @param email
+     * @return
+     */
+    public Mono<Map<String, String>> emailSecretForAccountUnlock(String email) {
+        LOG.info("email secret to unlock account using account-rest-service");
+
+        String endpoint = emailSecretUnlockAccount.replace("{email}", email);
+
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+                .retrieve();
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    public Mono<Map<String, String>> lockAccount(String authenticationId) {
+        LOG.info("lock account using authenticationId");
+
+        String endpoint = lockAccount.replace("{authenticationId}", authenticationId);
+
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+                .retrieve();
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    public Mono<Map<String, String>> unLockAccount(String email, String secret) {
+        LOG.info("unlock account using email '{}' and secret: '{}'", email, secret);
+
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(unLockAccount)
+                .bodyValue(Map.of("email", email,
+                        "secret", secret))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
     }
