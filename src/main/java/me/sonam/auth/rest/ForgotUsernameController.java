@@ -132,6 +132,8 @@ public class ForgotUsernameController {
 
     @GetMapping("/emailAccountActivateLink")
     public String emailAccountActivateLink() {
+        LOG.info("returning emailAccountActivateLink page");
+
         return "emailAccountActivateLink";
     }
 

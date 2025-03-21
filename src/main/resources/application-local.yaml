@@ -24,6 +24,7 @@ USER_REST_SERVICE: http://user-rest-service
 ORGANIZATION_REST_SERVICE: http://organization-rest-service
 ACCOUNT_REST_SERVICE: http://account-rest-service
 API_GATEWAY: http://api-gateway:8080
+ATTEMPT_REST_SERVICE: http://attempt-rest-service
 
 # ISSUER_URL here is used for pulling the public certs from authorization-server for token validation
 ISSUER_ADDRESS: http://api-gateway:9001

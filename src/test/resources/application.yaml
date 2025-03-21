@@ -60,15 +60,17 @@ account-rest-service:
   emailActivateLink: /active/email/{email}/password-secret
   validateEmailLoginSecret: /{email}/password-secret/{secret}
   updatePassword: /password-secret
-  emailSecretUnlockAccount: /locked/email/{email}/password-secret
-  lockAccount: /locked/true/{authenticationId}
-  unLockAccount: /locked/false
+  emailSecretUnlockAccount: /lock/email/{email}/password-secret
+  lockAccount: /lock/true/{authenticationId}
+  unLockAccount: /lock/false
+  isAccountLocked: /lock/true/{authenticationId}
 
 attempt-rest-service:
   root: http://localhost:8080
   context: /attempts
   failed: /login/failed
   success: /login/success
+  delete: /{username}
 
 ISSUER_URI: http://my-server:9001
 private-client-url: http://127.0.0.1:8090
@@ -78,7 +80,8 @@ requestFilters:
   # get user info during authentication, user exists in organization during authentication,
   #  validate emailLoginSecret during password change
   - out: /users/authentication-id/(.)*,
-      /organizations/(.)*/users/(.)*, /accounts/(.)*/password-secret/(.)*
+      /organizations/(.)*/users/(.)*, /accounts/(.)*/password-secret/(.)*,
+      /accounts/lock/true/(.)*
     outHttpMethods: get
     accessToken:
       option: request
@@ -94,13 +97,21 @@ requestFilters:
   # email my username, emailActivationLink, email my secret for password reset
   - out: /accounts/email/(.)*/authentication-id, /accounts/active/email/(.)*/password-secret,
       /accounts/email/(.)*/password-secret, /accounts/password-secret, 
-      /accounts/locked/email/(.)*/password-secret, /accounts/locked/false,
-      /attempts/login/failed, /attempts/login/success
+      /accounts/lock/email/(.)*/password-secret, /accounts/lock/false,
+      /attempts/login/failed, /attempts/login/success,
+      /accounts/lock/true/(.)*
     outHttpMethods: put
     accessToken:
       option: request
       scopes: ${REQUEST_SCOPES}
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
+  - out: /attempts/(.)*
+    outHttpMethods: delete
+    accessToken:
+      option: request
+      scopes: ${REQUEST_SCOPES}
+      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
+
 
 # this is used for getting accesstoken by header filter
 auth-server:
@@ -122,4 +133,4 @@ authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
 AUTHZMANAGER_INITIAL_SECRET: hello
   
-  /accounts/locked/email/{email}/password-secret
+  /accounts/lock/email/{email}/password-secret

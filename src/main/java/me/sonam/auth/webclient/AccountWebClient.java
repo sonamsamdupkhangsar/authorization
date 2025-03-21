@@ -1,5 +1,6 @@
 package me.sonam.auth.webclient;
 
+import me.sonam.auth.service.exception.BadCredentialsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,12 +27,13 @@ public class AccountWebClient {
     private final String emailSecretUnlockAccount;
     private final String lockAccount;
     private final String unLockAccount;
+    private final String isAccountLockedEndpoint;
 
     public AccountWebClient(WebClient.Builder webClientBuilder,
                             String emailUserName, String emailMySecret, String emailActiveLink,
                             String validateEmailLoginSecret, String updatePassword,
                             String emailSecretUnlockAccount, String lockAccount,
-                            String unLockAccount) {
+                            String unLockAccount, String isAccountLockedEndpoint) {
         this.webClientBuilder = webClientBuilder;
         this.emailUserName = emailUserName;
         this.emailMySecret = emailMySecret;
@@ -41,6 +43,7 @@ public class AccountWebClient {
         this.emailSecretUnlockAccount = emailSecretUnlockAccount;
         this.lockAccount = lockAccount;
         this.unLockAccount = unLockAccount;
+        this.isAccountLockedEndpoint = isAccountLockedEndpoint;
     }
 
     public Mono<String> emailAccountActivationLink(String email) {
@@ -120,6 +123,7 @@ public class AccountWebClient {
         LOG.info("lock account using authenticationId");
 
         String endpoint = lockAccount.replace("{authenticationId}", authenticationId);
+        LOG.info("lock account using endpoint: {}", endpoint);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
                 .retrieve();
@@ -129,10 +133,41 @@ public class AccountWebClient {
     public Mono<Map<String, String>> unLockAccount(String email, String secret) {
         LOG.info("unlock account using email '{}' and secret: '{}'", email, secret);
 
+        LOG.debug("unlock account endpoint {}", unLockAccount);
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(unLockAccount)
                 .bodyValue(Map.of("email", email,
                         "secret", secret))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    public Mono<Boolean> isAccountLocked(String authenticationId) {
+        LOG.info("check if account is locked for authenticationId: {}", authenticationId);
+        LOG.info("isAccountLockedEndpoint {}", isAccountLockedEndpoint);
+        final String endpoint = isAccountLockedEndpoint.replace("{authenticationId}", authenticationId);
+
+        return webClientBuilder.build().get().uri(endpoint)
+                .retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Boolean>>() {})
+                .flatMap(map -> {
+                    LOG.info("map contains {}", map);
+
+                    if (!map.containsKey("message")) {
+                        return Mono.error(new BadCredentialsException("is account locked endpoint gave invalid response," +
+                                " expecting message key with " +
+                                "value of true or false string "+ map));
+                    }
+                    else {
+                        if(!map.get("message").equals(true) && !map.get("message").equals(false)) {
+                            return Mono.error(new BadCredentialsException("is account locked endpoint gave invalid response," +
+                                    " expecting message value to be true or false: "+ map));
+                        }
+                    }
+
+                    Boolean value = map.get("message");
+                    return Mono.just(value);
+                }).onErrorResume(throwable -> {
+                    LOG.error("error occured calling isAccountLocked endpoint {}", endpoint, throwable);
+                    return Mono.error(throwable);
+                });
     }
 }

@@ -125,10 +125,11 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/myauthenticate").permitAll()
                                 .requestMatchers("/password/*/*").permitAll()
                                 .requestMatchers("/password").permitAll()
-                                .requestMatchers("/account/unlock").permitAll()
-                                .requestMatchers("/account/unlock-secret").permitAll()
-                                .requestMatchers("/emailUserToUnLockAccount").permitAll()
-                                .requestMatchers("/unLockAccount").permitAll()
+                                .requestMatchers("/emailAccountActivateLink").permitAll()
+                                .requestMatchers("/accounts/lock").permitAll()
+                                .requestMatchers("/accounts/lock/secret").permitAll()
+                                .requestMatchers("/accounts/lock/email").permitAll()
+                                .requestMatchers("/accounts/lock/email/secret").permitAll()
 
 
                 .anyRequest().authenticated()

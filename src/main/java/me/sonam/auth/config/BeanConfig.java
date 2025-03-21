@@ -33,6 +33,8 @@ public class BeanConfig {
     private String lockAccount;
     @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.unLockAccount}")
     private String unLockAccount;
+    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.isAccountLocked}")
+    private String isAccountLockedEndpoint;
 
     @Value("${authentication-rest-service.root}${authentication-rest-service.authenticate}")
     private String authenticateEndpoint;
@@ -42,6 +44,10 @@ public class BeanConfig {
 
     @Value("${attempt-rest-service.root}${attempt-rest-service.context}${attempt-rest-service.failed}")
     private String loginAttemptFail;
+
+    @Value("${attempt-rest-service.root}${attempt-rest-service.context}${attempt-rest-service.delete}")
+    private String deleteAttempt;
+
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
     private String organizationEndpoint;
@@ -72,7 +78,7 @@ public class BeanConfig {
     public AccountWebClient accountWebClient() {
         return new AccountWebClient(webClientBuilder, emailUsername, emailMySecret, emailActiveLink,
                 validateEmailLoginSecret, updatePassword,  emailSecretUnlockAccount, lockAccount,
-                unLockAccount);
+                unLockAccount, isAccountLockedEndpoint);
     }
 
     @Bean
@@ -82,7 +88,7 @@ public class BeanConfig {
 
     @Bean
     public LoginAttemptWebClient loginAttemptWebClient() {
-        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess);
+        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt);
     }
 
     @Bean

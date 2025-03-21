@@ -5,10 +5,7 @@ import me.sonam.auth.jpa.entity.ClientUser;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
 import me.sonam.auth.service.exception.BadCredentialsException;
-import me.sonam.auth.webclient.AuthenticationWebClient;
-import me.sonam.auth.webclient.LoginAttemptWebClient;
-import me.sonam.auth.webclient.OrganizationWebClient;
-import me.sonam.auth.webclient.UserWebClient;
+import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +58,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
     private final AuthenticationWebClient authenticationWebClient;
     @Autowired
     private final UserWebClient userWebClient;
+    @Autowired
+    private AccountWebClient accountWebClient;
 
     @Value("${authzmanager-id}")
     private UUID authzManagerId;
@@ -71,13 +70,14 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                  LoginAttemptWebClient loginAttemptWebClient,
                                  OrganizationWebClient organizationWebClient,
                                  AuthenticationWebClient authenticationWebClient,
-                                 UserWebClient userWebClient) {
+                                 UserWebClient userWebClient, AccountWebClient accountWebClient) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
         this.loginAttemptWebClient = loginAttemptWebClient;
         this.organizationWebClient = organizationWebClient;
         this.authenticationWebClient = authenticationWebClient;
         this.userWebClient = userWebClient;
+        this.accountWebClient = accountWebClient;
     }
 
     @Override
@@ -117,13 +117,25 @@ public class AuthenticationCallout implements AuthenticationProvider {
              throw new BadCredentialsException("clientId not found in request cache");
          }
 
-        LOG.info("authorities: {}, details: {}, credentials: {}", authentication.getAuthorities(),
-                authentication.getDetails(), authentication.getCredentials());
-         LOG.info("get registeredClient from clientId: {}", clientId);
-         RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
-         UUID clientUuidId = UUID.fromString(registeredClient.getId());
-         LOG.info("got clientUuid: {}", clientUuidId);
-        return checkUserAndClient(authentication, clientUuidId).block();
+
+         return accountWebClient.isAccountLocked(authenticationId)
+                 .flatMap(aBoolean -> {
+                     if (aBoolean) {
+                         LOG.info("account is locked for authenticationId {}", authenticationId);
+                         return Mono.error(new BadCredentialsException("account is locked"));
+                     }
+                     return Mono.just(aBoolean);
+                 })
+                .flatMap(aBoolean -> {
+                    LOG.info("authorities: {}, details: {}, credentials: {}", authentication.getAuthorities(),
+                            authentication.getDetails(), authentication.getCredentials());
+                    LOG.info("get registeredClient from clientId: {}", clientId);
+                    RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
+                    UUID clientUuidId = UUID.fromString(registeredClient.getId());
+                    LOG.info("got clientUuid: {}", clientUuidId);
+                    return checkUserAndClient(authentication, clientUuidId);
+                })
+                 .block();
     }
 
     private Mono<UsernamePasswordAuthenticationToken> checkUserAndClient(Authentication authentication, UUID clientId) {
@@ -175,7 +187,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
                             return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
                                     .doOnNext(s -> LOG.trace("authentication failed: {}", authenticationId, throwable))
-                                    .flatMap(s -> Mono.error(new BadCredentialsException("authentication failed:  "+s)));
+                                    .flatMap(s -> Mono.error(new BadCredentialsException(s)));
                         }
                         return Mono.error(throwable);
                     })
