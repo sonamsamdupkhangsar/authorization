@@ -45,8 +45,8 @@
 <body>
 <div class="container">
     <div>
-        <form id="form" class="form-signin w-100 m-auto" method="post" th:action="@{/emailAccountActivateLink}">
-            <h1 class="h3 mb-3 fw-normal">Email account activation link</h1>
+        <form id="form" class="form-signin w-100 m-auto" method="post" th:action="@{/username}">
+            <h1 class="h3 mb-3 fw-normal">Email username help</h1>
             <div th:if="${message}" class="alert alert-primary" role="alert">
                 <span th:text="${message}"></span>
                 <span>You can close this window.</span>
@@ -61,7 +61,7 @@
                 </div>
                 <button id="emailUsername" class="btn-primary m-1 btn-lg" title="Email username" onclick="showLoading();">
                     <span id="spinId" class="d-none" role="status" aria-hidden="true"></span>
-                    Email account activation link
+                    Email my username
                 </button>
             </div>
             <div class="mt-3">

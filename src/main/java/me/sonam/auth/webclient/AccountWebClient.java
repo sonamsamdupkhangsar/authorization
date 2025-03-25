@@ -81,7 +81,11 @@ public class AccountWebClient {
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
                 .retrieve();
-        return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {
+        }).flatMap(map -> {
+                LOG.info("received response {}", map);
+                return Mono.just(map);
+        });
     }
 
     public Mono<Map<String, String>> updateAuthenticationPassword(String email, String secret, String password) {

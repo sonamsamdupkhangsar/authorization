@@ -24,6 +24,8 @@ public class ForgotUsernameController {
     private static final Logger LOG = LoggerFactory.getLogger(ForgotUsernameController.class);
 
     private final AccountWebClient accountWebClient;
+    private final String USERNAME_PAGE = "username";
+    private final String EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE = "account/active";
 
     public ForgotUsernameController(AccountWebClient accountWebClient) {
         this.accountWebClient = accountWebClient;
@@ -32,112 +34,38 @@ public class ForgotUsernameController {
     @GetMapping("/loginHelp")
     public String getLoginHelp() {
         LOG.info("return login help page");
-        return "/loginHelp";
+        return "loginHelp";
     }
 
 
-    /**
-     * @param email
-     * @param secret
-     * @param model
-     * @return
-     */
-    @GetMapping("/password/{email}/{secret}")
-    public Mono<String> passwordChange(@PathVariable("email") String email, @PathVariable("secret")String secret, Model model) {
-        LOG.info("validating email '{}' and secret", email);
-
-       return accountWebClient.validateEmailLoginSecret(email, secret)
-                .flatMap(stringStringMap -> {
-                    LOG.info("email and secret validated successfully");
-                    model.addAttribute("email", email);
-                    model.addAttribute("secret", secret);
-                    model.addAttribute("message", "email and secret validated successfully");
-
-                    return Mono.just("/passwordChange");
-                })
-                .onErrorResume(throwable -> {
-                    setErrorInModel(throwable, model, "failed to validate email login secret");
-                    return Mono.just("/passwordChange");
-                });
-
-    }
-
-    @PostMapping("/password/{email}/{secret}")
-    public Mono<String> passwordChange(@RequestParam String password , @PathVariable("email") String email, @PathVariable("secret") String secret, Model model) {
-        LOG.info("change password: password: {}", password);
-
-        return accountWebClient.updateAuthenticationPassword(email, secret, password)
-                .flatMap(stringStringMap -> {
-                    LOG.info("password has been changed: {}", stringStringMap);
-                    model.addAttribute("message", "password has been updated successfully");
-                    return Mono.just("/passwordChange");
-                })
-                .onErrorResume(throwable -> {
-                    setErrorInModel(throwable, model, "failed to update password");
-                    return Mono.just("/passwordChange");
-                });
-
-    }
-
-    @GetMapping("/forgotUsername")
+    @GetMapping("/username")
     public String forgotUsername() {
         LOG.info("returning forgotUsername");
-        return "forgotUsername";
+        return USERNAME_PAGE;
     }
 
-    @PostMapping("/forgotUsername")
+    @PostMapping("/username")
     public Mono<String> emailUsername(String emailAddress, Model model) {
         LOG.info("email username for email: {}", emailAddress);
 
       return  accountWebClient.emailUsername(emailAddress).flatMap(s -> {
                 LOG.info("add message attribute");
                 model.addAttribute("message", "Your username has been sent to your email address.");
-                return Mono.just("forgotUsername");
+                return Mono.just(USERNAME_PAGE);
             }).onErrorResume(throwable -> {
                 setErrorInModel(throwable,model, "failed to call email username account-rest-service: "+ throwable.getMessage());
-                return Mono.just("forgotUsername");
+                return Mono.just(USERNAME_PAGE);
         });
     }
 
-
-    @GetMapping("/forgotPassword")
-    public String forgotPassword() {
-        LOG.info("returning forgotPassword");
-        return "forgotPassword";
-    }
-
-    /**
-     * this is called to change password by user when they don't remember it anymore.
-     * This will call account-rest-service method to start the process for password change.
-     * Account-rest-service will create accesscode for password change process and send
-     * them a link with the code to click in the email.
-     * @param email
-     * @param model
-     * @return
-     */
-    @PostMapping("/forgotPassword")
-    public Mono<String> passwordChange(String email, Model model) {
-        LOG.info("password change for email: {}", email);
-
-        return accountWebClient.emailMySecret(email).flatMap(s -> {
-            LOG.info("secret sent to email for password change");
-            model.addAttribute("message", "Check your email for changing your password.");
-            return Mono.just("forgotPassword");
-        }).onErrorResume(throwable -> {
-            LOG.error("error occurred in sending secret for password change", throwable);
-            setErrorInModel(throwable, model, "error on calling emailMySecret endpoint  with error ");
-            return Mono.just("forgotPassword");
-        });
-    }
-
-    @GetMapping("/emailAccountActivateLink")
+    @GetMapping("/accounts/active")
     public String emailAccountActivateLink() {
         LOG.info("returning emailAccountActivateLink page");
 
-        return "emailAccountActivateLink";
+        return EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE;
     }
 
-    @PostMapping("/emailAccountActivateLink")
+    @PostMapping("/accounts/active")
     public String handleEmailAccountActivateLink(String emailAddress, Model model) {
         LOG.info("send email account activate link if inactive");
 
@@ -147,7 +75,7 @@ public class ForgotUsernameController {
         }).onErrorResume(throwable -> {
             setErrorInModel(throwable, model, "Failed to send email ");
             return Mono.just("/");
-        }).thenReturn("/emailAccountActivateLink").block();
+        }).thenReturn(EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE).block();
 
     }
 

@@ -79,7 +79,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("call forgotUsername endpoint");
 
         LOG.info("assert that the page returned is Email username help");
-        this.mockMvc.perform(get("/forgotUsername")).andDo(print()).andExpect(status().isOk())
+        this.mockMvc.perform(get("/username")).andDo(print()).andExpect(status().isOk())
                 .andExpect(content().string(containsString("Email username help")));
     }
 
@@ -88,7 +88,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("call forgotPassword endpoint");
 
         LOG.info("assert that the page returned is Change password help");
-        this.mockMvc.perform(get("/forgotPassword")).andDo(print()).andExpect(status().isOk());
+        this.mockMvc.perform(get("/password")).andDo(print()).andExpect(status().isOk());
     }
 
     @Test
@@ -106,7 +106,7 @@ public class ForgotUsernamePasswordIntegTest {
         final String urlEncodedEmail = URLEncoder.encode(email, Charset.defaultCharset());
         LOG.info("urlEncodedEmail: {}", urlEncodedEmail);
 
-        this.mockMvc.perform(post("/forgotUsername")
+        this.mockMvc.perform(post("/username")
                         .param("emailAddress", email))
                 .andDo(print()).andExpect(status().isOk());
                // .andExpect(content().string(containsString("Your username has been sent to your email address.")));
@@ -132,9 +132,9 @@ public class ForgotUsernamePasswordIntegTest {
 
         final String emailMsg = " {\"message\":\"email successfully sent\"}";
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(201).setBody(emailMsg));//"Account created successfully.  Check email for activating account"));
+                .setResponseCode(201).setBody(emailMsg));
 
-        this.mockMvc.perform(post("/forgotPassword")
+        this.mockMvc.perform(post("/password")
                         .param("email", "sonam@sonam.com"))
 
                 .andDo(print()).andExpect(status().isOk());
@@ -160,7 +160,7 @@ public class ForgotUsernamePasswordIntegTest {
         final String emailMsg = " {\"error\":\"Account is not active or does not exist\"}";
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(400).setBody(emailMsg));//"Account created successfully.  Check email for activating account"));
 
-        this.mockMvc.perform(post("/forgotPassword")
+        this.mockMvc.perform(post("/password")
                         .param("email", "sonam@sonam.com"))
                 .andDo(print()).andExpect(status().isOk());
                 //.andExpect(content().string(containsString("Account is not active or does not exist")));
@@ -174,4 +174,48 @@ public class ForgotUsernamePasswordIntegTest {
         assertThat(request.getMethod()).isEqualTo("PUT");
         assertThat(request.getPath()).startsWith("/accounts/email/");
     }
+
+    @Test
+    public void passwordChangeTest() throws Exception {
+        LOG.info("test the password change post method");
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
+
+        final String emailMsg = "{\"message\":\"password-secret and reason matches\"}";
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(emailMsg));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
+
+        final String passwordUpdated = "{\"message\":\"password updated\"}";
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(passwordUpdated));
+
+        final String email = "sonam@sonam.com";
+        final String secret = "x2340c";
+
+        this.mockMvc.perform(post("/password/secret").param("email", email)
+                        .param("secret", secret).param("password", "mysecretpassword"))
+                .andDo(print()).andExpect(status().isOk());
+        //.andExpect(content().string(containsString("Check your email for changing your password.")));
+
+        LOG.info("take recorded requests");
+
+        RecordedRequest request = mockWebServer.takeRequest();
+        assertThat(request.getMethod()).isEqualTo("POST");
+        assertThat(request.getPath()).startsWith("/oauth2/token");
+
+        request = mockWebServer.takeRequest();
+        assertThat(request.getMethod()).isEqualTo("GET");
+        assertThat(request.getPath()).matches("/accounts/(.)*/password-secret/(.)*");
+
+        request = mockWebServer.takeRequest();
+        assertThat(request.getMethod()).isEqualTo("POST");
+        assertThat(request.getPath()).startsWith("/oauth2/token");
+
+        request = mockWebServer.takeRequest();
+        assertThat(request.getMethod()).isEqualTo("PUT");
+        assertThat(request.getPath()).startsWith("/accounts/password-secret");
+    }
+
 }
