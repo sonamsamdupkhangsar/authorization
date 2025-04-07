@@ -46,6 +46,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -188,8 +189,17 @@ public class JwtUserInfoMapperSecurityConfig {
         allowedOrigins = allowedOrigins.replace(" ", ""); //remove whitespaces between csv
         List<String> list = Arrays.asList(allowedOrigins.split(","));
         LOG.info("adding allowedOrigins: {}", list);
+        List<String> allowedOrigins = new ArrayList<>();
 
-        corsConfig.setAllowedOrigins(list);
+        for(String origin: list) {
+            if (origin.equals("*")) {
+                corsConfig.setAllowedOriginPatterns(List.of(origin));
+            }
+            else {
+                allowedOrigins.add(origin);
+            }
+        }
+        corsConfig.setAllowedOrigins(allowedOrigins);
         //corsConfig.addAllowedMethod("*");
         corsConfig.setAllowedMethods(Arrays.asList("GET", "PUT", "POST", "OPTIONS"));
         corsConfig.addAllowedHeader("*");

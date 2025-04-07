@@ -5,7 +5,7 @@ server:
 
 logging:
   level:
-    root: warn
+    root: info
     me.sonam: info
     com.netflix: off
     me.sonam.auth.config: debug
@@ -63,19 +63,20 @@ organization-rest-service:
 account-rest-service:
   root: ${ACCOUNT_REST_SERVICE}
   context: /accounts
-  emailUsername: /email/{email}/authentication-id
-  emailMySecret: /email/{email}/password-secret
-  emailActivateLink: /active/email/{email}/password-secret
+  emailUsername: /email/authentication-id
+  emailMySecret: /email/password-secret
+  emailActivateLink: /active/email/password-secret
   validateEmailLoginSecret: /{email}/password-secret/{secret}
   updatePassword: /password-secret
-  emailSecretUnlockAccount: /lock/email/{email}/password-secret
-  lockAccount: /lock/true/{authenticationId}
+  emailSecretUnlockAccount: /lock/email/password-secret
+  lockAccount: /lock/true
   unLockAccount: /lock/false
-  isAccountLocked: /lock/true/{authenticationId}
+  isAccountLocked: /lock
 
 # this is used for getting accesstoken by header filter
 auth-server:
-  root: http://authorization-server/issuer
+  root: http://authorization-server
+  context-path: /issuer
   oauth2token:
     path: /oauth2/token
     grantType: client_credentials
@@ -93,41 +94,15 @@ client:
   forgot-username-password: /forgot
 
 requestFilters:
-  # get user info during authentication, user exists in organization during authentication,
-  #  validate emailLoginSecret during password change
-  - out: /users/authentication-id/(.)*,
-      /organizations/(.)*/users/(.)*, /accounts/(.)*/password-secret/(.)*,
-      /accounts/lock/true/(.)*
-    outHttpMethods: get
-    accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
-      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
-    # update password, authenticate
-  - out: /authentications/authenticate
-    outHttpMethods: post
-    accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
-      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
-  # email my username, emailActivationLink, email my secret for password reset, password reset
-  - out: /accounts/email/(.)*/authentication-id, /accounts/active/email/(.)*/password-secret,
-      /accounts/email/(.)*/password-secret, /accounts/password-secret,
-      /accounts/lock/email/(.)*/password-secret, /accounts/lock/false,
-      /attempts/login/failed, /attempts/login/success,
-      /accounts/lock/true/(.)*
-    outHttpMethods: put
-    accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
-      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
-  - out: /attempts/(.)*
-    outHttpMethods: delete
+  - out:
+    outHttpMethods:
     accessToken:
       option: request
       scopes: ${REQUEST_SCOPES}
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
 
+
 # this is for create authzmanager client if it is not present
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
+tokenExpireMinutes: 3

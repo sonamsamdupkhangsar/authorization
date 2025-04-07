@@ -69,10 +69,7 @@ public class PasswordChangeController {
     public Mono<String> passwordChange(@NotEmpty String password ,@NotEmpty String email, @NotEmpty String secret, Model model) {
         LOG.info("change password {} for email {} and secret: {}", password, email, secret);
 
-        return accountWebClient.validateEmailLoginSecret(email, secret)
-                .doOnNext(stringStringMap -> LOG.info("email and secret validated"))
-                .flatMap(stringStringMap ->
-                    accountWebClient.updateAuthenticationPassword(email, secret, password))
+        return accountWebClient.updateAuthenticationPassword(email, secret, password)
                 .flatMap(stringStringMap -> {
                     LOG.info("password has been changed: {}", stringStringMap);
                     model.addAttribute("message", "password has been updated successfully");

@@ -47,44 +47,23 @@ public class AccountWebClient {
     }
 
     public Mono<String> emailAccountActivationLink(String email) {
-        String urlEncodedEmail = URLEncoder.encode(email, Charset.defaultCharset());
-        final String endpoint = emailActiveLink.replace("{email}", urlEncodedEmail);
-        LOG.info("email using endpoint: {}", endpoint);
+        LOG.info("email activation link endpoint: {} for email: {}", emailActiveLink, email);
 
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailActiveLink)
+                .bodyValue(Map.of("email", email))
                 .retrieve();
         return responseSpec.bodyToMono(String.class);
     }
 
     public Mono<String> emailMySecret(String email) {
-        String urlEncodedEmail = URLEncoder.encode(email, Charset.defaultCharset());
-        LOG.info("urlEncodedEmail: {}, and raw email: {}", urlEncodedEmail, email);
-        LOG.info("emailMySecret endpoint: {}", emailMySecret);
+        LOG.info("emailMySecret endpoint: {} for email: {}", emailMySecret, email);
 
-        String endpoint = emailMySecret.replace("{email}", urlEncodedEmail);
-        LOG.info("email '{}' using endpoint: {}", email, endpoint);
-
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailMySecret)
+                .bodyValue(Map.of("email", email))
                 .retrieve();
         return responseSpec.bodyToMono(String.class).onErrorResume(throwable -> {
             LOG.error("failed to call email my secret endpoint", throwable);
             return Mono.error(throwable);
-        });
-    }
-
-    public Mono<Map<String, String>> validateEmailLoginSecret(String email, String secret) {
-        LOG.info("call validate email login secret using account-rest-service");
-
-
-        String endpoint = validateEmailLoginSecret.replace("{email}", URLEncoder.encode(email, Charset.defaultCharset())).replace("{secret}", secret);
-        LOG.info("validate secret using endpoint: {}", endpoint);
-
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
-                .retrieve();
-        return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {
-        }).flatMap(map -> {
-                LOG.info("received response {}", map);
-                return Mono.just(map);
         });
     }
 
@@ -98,12 +77,9 @@ public class AccountWebClient {
     }
 
     public Mono<Map<String, String>> emailUsername(String email) {
-        String urlEncodedEmail = URLEncoder.encode(email, Charset.defaultCharset());
+        LOG.info("email {}, username endpoint: {}", email, emailUserName);
 
-        String endpoint = emailUserName.replace("{email}", urlEncodedEmail);
-        LOG.info("email {}, username endpoint: {}", email, endpoint);
-
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailUserName).bodyValue(Map.of("email", email))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
     }
@@ -114,11 +90,11 @@ public class AccountWebClient {
      * @return
      */
     public Mono<Map<String, String>> emailSecretForAccountUnlock(String email) {
-        LOG.info("email secret to unlock account using account-rest-service");
+        LOG.info("email secret to unlock account using account-rest-service endpoint: {}",
+                emailSecretUnlockAccount);
 
-        String endpoint = emailSecretUnlockAccount.replace("{email}", email);
-
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailSecretUnlockAccount)
+                .bodyValue(Map.of("email", email))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
     }
@@ -126,10 +102,10 @@ public class AccountWebClient {
     public Mono<Map<String, String>> lockAccount(String authenticationId) {
         LOG.info("lock account using authenticationId");
 
-        String endpoint = lockAccount.replace("{authenticationId}", authenticationId);
-        LOG.info("lock account using endpoint: {}", endpoint);
+        LOG.info("lock account using endpoint: {}", lockAccount);
 
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(lockAccount)
+                .bodyValue(Map.of("authenticationId", authenticationId))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
     }
@@ -148,9 +124,9 @@ public class AccountWebClient {
     public Mono<Boolean> isAccountLocked(String authenticationId) {
         LOG.info("check if account is locked for authenticationId: {}", authenticationId);
         LOG.info("isAccountLockedEndpoint {}", isAccountLockedEndpoint);
-        final String endpoint = isAccountLockedEndpoint.replace("{authenticationId}", authenticationId);
 
-        return webClientBuilder.build().get().uri(endpoint)
+
+        return webClientBuilder.build().put().uri(isAccountLockedEndpoint).bodyValue(Map.of("authenticationId", authenticationId))
                 .retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Boolean>>() {})
                 .flatMap(map -> {
                     LOG.info("map contains {}", map);
@@ -170,7 +146,7 @@ public class AccountWebClient {
                     Boolean value = map.get("message");
                     return Mono.just(value);
                 }).onErrorResume(throwable -> {
-                    LOG.error("error occured calling isAccountLocked endpoint {}", endpoint, throwable);
+                    LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
                     return Mono.error(throwable);
                 });
     }

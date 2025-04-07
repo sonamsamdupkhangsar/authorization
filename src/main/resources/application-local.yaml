@@ -36,7 +36,7 @@ BASE64_CLIENT_ID_SECRET: b2F1dGgtY2xpZW50Om9hdXRoLXNlY3JldA==
 
 client-app: http://10.0.0.28:3000
 changePassword: /issuer/forgot/changePassword #@{/forgot/changePassword} use for local
-allowedOrigins: http://api-gateway, 10.0.0.28, localhost, 127.0.0.1, api-gateway, 10.0.0.28:8080, 127.0.0.1
+allowedOrigins: http://api-gateway, 10.0.0.28, localhost, 127.0.0.1, api-gateway, 10.0.0.28:8080, 127.0.0.1, *,
 
 NEW_RELIC_ENABLED: false
 authzmanager: http://api-gateway:9093

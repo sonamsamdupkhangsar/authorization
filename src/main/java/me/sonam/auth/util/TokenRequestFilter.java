@@ -3,6 +3,7 @@ package me.sonam.auth.util;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -45,6 +46,10 @@ public class TokenRequestFilter {
             return this.outHttpMethodSet;
         }
 
+        public String getOutHttpMethods() {
+            return this.outHttpMethods;
+        }
+
         public void setOutHttpMethods(String outHttpMethods) {
             this.outHttpMethods = outHttpMethods;
             String[] httpMethodArray = outHttpMethods.split(",");
@@ -69,14 +74,29 @@ public class TokenRequestFilter {
                     '}';
         }
 
+        @Override
+        public boolean equals(Object object) {
+            if (this == object) return true;
+            if (object == null || getClass() != object.getClass()) return false;
+            RequestFilter that = (RequestFilter) object;
+            return Objects.equals(out, that.out) && Objects.equals(outHttpMethods, that.outHttpMethods) && Objects.equals(accessToken, that.accessToken);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(out, outHttpMethods, accessToken);
+        }
+
         public static class AccessToken {
             public static enum JwtOption {
                 forward, request, doNothing
             }
 
-            private JwtOption option;
-            private String scopes;
-            private String base64EncodedClientIdSecret;
+            private final JwtOption option;
+            private final String scopes;
+            private final String base64EncodedClientIdSecret;
+            private String accessToken;
+            private LocalDateTime accessTokenCreationTime;
 
             public AccessToken(String option, String scopes, String base64EncodedClientIdSecret) {
                 this.option = JwtOption.valueOf(option);
@@ -94,6 +114,23 @@ public class TokenRequestFilter {
                 return base64EncodedClientIdSecret;
             }
 
+            public String getAccessToken() {
+                return this.accessToken;
+            }
+
+            public void setAccessToken(String accessToken) {
+                this.accessToken = accessToken;
+
+                if (accessToken != null) {
+                    accessTokenCreationTime = LocalDateTime.now();
+                }
+            }
+
+            public LocalDateTime getAccessTokenCreationTime() {
+                return this.accessTokenCreationTime;
+            }
+
+
             @Override
             public String toString() {
                 return "AccessToken{" +
@@ -101,6 +138,19 @@ public class TokenRequestFilter {
                         ", scopes='" + scopes + '\'' +
                         ", base64EncodedClientIdSecret='" + base64EncodedClientIdSecret + '\'' +
                         '}';
+            }
+
+            @Override
+            public boolean equals(Object object) {
+                if (this == object) return true;
+                if (object == null || getClass() != object.getClass()) return false;
+                AccessToken that = (AccessToken) object;
+                return option == that.option && Objects.equals(scopes, that.scopes) && Objects.equals(base64EncodedClientIdSecret, that.base64EncodedClientIdSecret);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(option, scopes, base64EncodedClientIdSecret);
             }
         }
     }

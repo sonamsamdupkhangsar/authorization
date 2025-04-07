@@ -133,12 +133,12 @@ public class AccountLockControllerIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/oauth2/token");
+        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
         //looks like the urlEncoded is getting urlEncoded again in the account put call so double it
-        assertThat(request.getPath()).startsWith("/accounts/lock/email/"+email+"/password-secret");
+        assertThat(request.getPath()).startsWith("/accounts/lock/email/password-secret");
     }
 
     /**
@@ -173,7 +173,7 @@ public class AccountLockControllerIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/oauth2/token");
+        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
@@ -181,7 +181,7 @@ public class AccountLockControllerIntegTest {
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/oauth2/token");
+        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("DELETE");
