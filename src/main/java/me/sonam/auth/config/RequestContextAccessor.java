@@ -11,7 +11,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * With the RequestContextFilter registered in {@link FilterConfig}, the HttpServletRequest can be accessed using RequestContextHolder.
  */
 
-@Component
+//@Component
 public class RequestContextAccessor {
     private static final Logger LOG = LoggerFactory.getLogger(RequestContextAccessor.class);
 

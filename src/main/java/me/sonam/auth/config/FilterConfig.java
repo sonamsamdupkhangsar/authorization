@@ -8,7 +8,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 /**
  * This is to inject the request from a Spring servlet filter into a context.
  */
-@Configuration
+//@Configuration
 public class FilterConfig {
 
     @Bean

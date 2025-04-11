@@ -95,16 +95,6 @@ public class AuthenticationCallout implements AuthenticationProvider {
             LOG.info("ip address is {}", ipAddress);
         }
 
-        var requestAttributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        LOG.info("requestAttributes: {}", requestAttributes);
-
-        var request = requestAttributes.getRequest();
-
-        var loginType =  requestAttributes.getRequest().getParameter("manage");
-        LOG.info("manage request value: {}", loginType);
-        LOG.info("request getRequestURI info: {}", request.getRequestURI());
-
-
         final String authenticationId = authentication.getName();
         final String password = authentication.getCredentials().toString();
 

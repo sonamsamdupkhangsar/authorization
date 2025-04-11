@@ -120,10 +120,7 @@ public class TokenRequestFilter {
 
             public void setAccessToken(String accessToken) {
                 this.accessToken = accessToken;
-
-                if (accessToken != null) {
-                    accessTokenCreationTime = LocalDateTime.now();
-                }
+                accessTokenCreationTime = LocalDateTime.now();
             }
 
             public LocalDateTime getAccessTokenCreationTime() {

@@ -2,11 +2,13 @@ package me.sonam.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.sonam.auth.rest.AccountLockController;
+import me.sonam.auth.util.TokenRequestFilter;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
@@ -50,12 +52,22 @@ public class AccountLockControllerIntegTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private TokenRequestFilter tokenRequestFilter;
+
     final String clientCredentialResponse = "{" +
             "    \"access_token\": \"eyJraWQiOiJhNzZhN2I0My00YTAzLTQ2MzAtYjVlMi0wMTUzMGRlYzk0MGUiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJwcml2YXRlLWNsaWVudCIsImF1ZCI6InByaXZhdGUtY2xpZW50IiwibmJmIjoxNjg3MTA0NjY1LCJzY29wZSI6WyJtZXNzYWdlLnJlYWQiLCJtZXNzYWdlLndyaXRlIl0sImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6OTAwMSIsImV4cCI6MTY4NzEwNDk2NSwiaWF0IjoxNjg3MTA0NjY1LCJhdXRob3JpdGllcyI6WyJtZXNzYWdlLnJlYWQiLCJtZXNzYWdlLndyaXRlIl19.Wx03Q96TR17gL-BCsG6jPxpdt3P-UkcFAuE6pYmZLl5o9v1ag9XR7MX71pfJcIhjmoog8DUTJXrq-ZB-IxIbMhIGmIHIw57FfnbBzbA8mjyBYQOLFOh9imLygtO4r9uip3UR0Ut_YfKMMi-vPfeKzVDgvaj6N08YNp3HNoAnRYrEJLZLPp1CUQSqIHEsGXn2Sny6fYOmR3aX-LcSz9MQuyDDr5AQcC0fbcpJva6aSPvlvliYABxfldDfpnC-i90F6azoxJn7pu3wTC7sjtvS0mt0fQ2NTDYXFTtHm4Bsn5MjZbOruih39XNsLUnp4EHpAh6Bb9OKk3LSBE6ZLXaaqQ\"," +
             "    \"scope\": \"message.read message.write\"," +
             "    \"token_type\": \"Bearer\"," +
             "    \"expires_in\": 299" +
             "}";
+
+    @BeforeEach
+    public void cleanOutAccessTokens() {
+        for(TokenRequestFilter.RequestFilter tokenRequestFilter: tokenRequestFilter.getRequestFilters()) {
+            tokenRequestFilter.getAccessToken().setAccessToken(null);
+        }
+    }
 
     @BeforeAll
     static void setupMockWebServer() throws IOException {
@@ -159,9 +171,7 @@ public class AccountLockControllerIntegTest {
                 .setResponseCode(201).setBody("{\"message\":\"account unlocked for "+email+"\", " +
                         "\"authenticationId\": \"sonam\"}"));//"Account created successfully.  Check email for activating account"));
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
-
-        //2
+        //3
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody("{\"message\":\"deleted by username\"}"));// loginAttempt data with username deleted response
 
@@ -178,10 +188,6 @@ public class AccountLockControllerIntegTest {
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
         assertThat(request.getPath()).startsWith("/accounts/lock/false");
-
-        request = mockWebServer.takeRequest();
-        assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("DELETE");

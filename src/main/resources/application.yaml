@@ -105,4 +105,4 @@ requestFilters:
 # this is for create authzmanager client if it is not present
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
-tokenExpireMinutes: 3
+tokenExpireSeconds: 180
