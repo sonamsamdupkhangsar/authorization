@@ -1,6 +1,5 @@
 package me.sonam.auth.util;
 
-import me.sonam.auth.config.RequestContextAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,9 +62,7 @@ public class TokenFilter {
 
     public static Mono<ServerHttpRequest> getRequest() {
         return Mono.deferContextual(Mono::just)// returns .Mono<ContextView>
-                .map(ctx -> ctx.get(CONTEXT_KEY)).map(serverHttpRequest -> {
-                    return serverHttpRequest;
-                });
+                .map(ctx -> ctx.get(CONTEXT_KEY)).map(serverHttpRequest -> serverHttpRequest);
     }
 
     public ExchangeFilterFunction renewTokenFilter() {
@@ -154,27 +151,18 @@ public class TokenFilter {
                     map(securityContext -> securityContext.getAuthentication().getPrincipal())
                     .cast(Jwt.class).flatMap(jwt -> {
                         LOG.info("got accessToken inbound jwt.getTokenValue: {}, jwt: {}", jwt.getTokenValue(), jwt);
-                        ClientRequest clientRequest = getClientRequest(jwt.getTokenValue(), request, next);
-
-                        return next.exchange(clientRequest);
-                    }).switchIfEmpty(requestToken(request, next, accessToken));//if not jwt found, then switch to empty method
+                        return getClientRequestWithToken(jwt.getTokenValue(), request, next);
+                    }).switchIfEmpty(requestToken(request, next, accessToken));//if not jwt found, then switch to empty method -- this will execute eagerly so will execute before
         }
         else if (accessToken.getOption().equals(TokenRequestFilter.RequestFilter.AccessToken.JwtOption.request)) {
 
             if (accessToken.getAccessToken() != null && !isExpired(accessToken.getAccessTokenCreationTime())) {
                 LOG.info("accessToken object contains a accessToken that is not expired");
-                return getClientRequestWithHeader(accessToken.getAccessToken(), request, next);
+                return getClientRequestWithToken(accessToken.getAccessToken(), request, next);
             }
             else {
                 LOG.info("accessToken does not contain a un-expired token");
-                return getAccessToken(oauth2TokenEndpoint, grantType, accessToken.getScopes(), accessToken.getBase64EncodedClientIdSecret())
-                        .flatMap(jwtAccessToken -> {
-                            LOG.info("set token in access-token");
-                            accessToken.setAccessToken(jwtAccessToken);
-
-                            ClientRequest clientRequest = getClientRequest(accessToken.getAccessToken(), request, next);
-                            return Mono.just(clientRequest);
-                        }).flatMap(next::exchange);
+                return requestToken(request, next, accessToken);
             }
         } // there is no need to forward as there is no inbound token coming in, just requests going out
         else {
@@ -188,7 +176,7 @@ public class TokenFilter {
         LOG.info("request token");
         return  getAccessToken(oauth2TokenEndpoint, grantType, accessToken.getScopes(), accessToken.getBase64EncodedClientIdSecret())
                 .flatMap(jwtAccessToken -> {
-                    LOG.info("set token in access-token");
+                    LOG.info("request {} set token in access-token", request.url());
                     accessToken.setAccessToken(jwtAccessToken);
 
                     ClientRequest clientRequest = getClientRequest(accessToken.getAccessToken(), request, next);
@@ -196,7 +184,7 @@ public class TokenFilter {
                 }).flatMap(next::exchange);
     }
 
-    private Mono<ClientResponse> getClientRequestWithHeader(String accessToken, ClientRequest request, ExchangeFunction next) {
+    private Mono<ClientResponse> getClientRequestWithToken(String accessToken, ClientRequest request, ExchangeFunction next) {
         ClientRequest clientRequest = getClientRequest(accessToken, request, next);
         return next.exchange(clientRequest);
     }

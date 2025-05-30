@@ -22,15 +22,18 @@ public class LoginAttemptWebClient {
     private final String failed;
     private final String success;
     private final String delete;
+    private final String checkLoginAttempt;
+
     private AccountWebClient accountWebClient;
 
     public LoginAttemptWebClient(WebClient.Builder webClientBuilder, String failed,
                                  String success, AccountWebClient accountWebClient,
-                                 String delete) {
+                                 String delete, String checkLoginAttempt) {
         this.webClientBuilder = webClientBuilder;
         this.failed = failed;
         this.success = success;
         this.delete = delete;
+        this.checkLoginAttempt = checkLoginAttempt;
         this.accountWebClient = accountWebClient;
     }
 
@@ -104,6 +107,29 @@ public class LoginAttemptWebClient {
                 .doOnNext(s -> LOG.info("response from delete login attempt is {}", s))
                 .onErrorResume(throwable -> {
                     LOG.error("failed to delete loginAttempt by username {}", throwable.getMessage());
+                    LOG.debug("error stack trace ", throwable);
+                    return Mono.error(throwable);
+                });
+    }
+
+    public Mono<String> checkLoginAttempt(String username) {
+        LOG.info("check loginAttempt using endpoint: {}", checkLoginAttempt);
+
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(checkLoginAttempt)
+                .bodyValue(Map.of("username", username))
+                .retrieve();
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>(){})
+                .flatMap(map -> {
+                    LOG.debug("response from checkLoginAttempt is {}", map);
+                    if (map.get("message") != null) {
+                        return Mono.just(map.get("message"));
+                    }
+                    else {
+                        return Mono.just("keep locked");
+                    }
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to check loginAttempt by username {}", throwable.getMessage());
                     LOG.debug("error stack trace ", throwable);
                     return Mono.error(throwable);
                 });

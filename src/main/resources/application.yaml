@@ -6,10 +6,11 @@ server:
 logging:
   level:
     root: info
-    me.sonam: info
+    me.sonam: debug
     com.netflix: off
     me.sonam.auth.config: debug
-    me.sonam.auth.service.TokenFilter: error
+    me.sonam.auth.util.TokenFilter: debug
+
 #    org.springframework.web: info
 #    org.springframework.security: info
 #    org.springframework.security.oauth2: info
@@ -48,7 +49,10 @@ application-rest-service:
 
 authentication-rest-service:
   root: ${AUTHENTICATION_REST_SERVICE}
-  authenticate: /authentications/authenticate
+  context: ${authentication-rest-service.root}/authentications
+  authenticate: ${authentication-rest-service.context}/authenticate
+  authenticationId: ${authentication-rest-service.context}/authenticationId
+
 
 user-rest-service:
   root: ${USER_REST_SERVICE}
@@ -62,16 +66,17 @@ organization-rest-service:
 
 account-rest-service:
   root: ${ACCOUNT_REST_SERVICE}
-  context: /accounts
-  emailUsername: /email/authentication-id
-  emailMySecret: /email/password-secret
-  emailActivateLink: /active/email/password-secret
-  validateEmailLoginSecret: /{email}/password-secret/{secret}
-  updatePassword: /password-secret
-  emailSecretUnlockAccount: /lock/email/password-secret
-  lockAccount: /lock/true
-  unLockAccount: /lock/false
-  isAccountLocked: /lock
+  context: ${account-rest-service.root}/accounts
+  emailUsername: ${account-rest-service.context}/email/authentication-id
+  emailMySecret: ${account-rest-service.context}/email/password-secret
+  emailActivateLink: ${account-rest-service.context}/active/email/password-secret
+  validateEmailLoginSecret: ${account-rest-service.context}/{email}/password-secret/{secret}
+  updatePassword: ${account-rest-service.context}/password-secret
+  emailSecretUnlockAccount: ${account-rest-service.context}/lock/email/password-secret
+  lockAccount: ${account-rest-service.context}/lock/true
+  unLockAccount: ${account-rest-service.context}/lock/false
+  unLockAccountTimeExpire: ${account-rest-service.context}/lock/false/expire
+  isAccountLocked: ${account-rest-service.context}/lock
 
 # this is used for getting accesstoken by header filter
 auth-server:
@@ -84,10 +89,11 @@ auth-server:
 
 attempt-rest-service:
   root: ${ATTEMPT_REST_SERVICE}
-  context: /attempts
-  failed: /login/failed
-  success: /login/success
-  delete: /{username}
+  context: ${attempt-rest-service.root}/attempts
+  failed: ${attempt-rest-service.context}/login/failed
+  success: ${attempt-rest-service.context}/login/success
+  delete: ${attempt-rest-service.context}/{username}
+  check: ${attempt-rest-service.context}/login
 
 client:
   url: ${client-app}
@@ -106,3 +112,7 @@ requestFilters:
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
 tokenExpireSeconds: 180
+
+authIdNotExist: authentication does not exist with authId
+authNotActive: Authentication not active, activate your account first
+authPasswordNotSet: User needs to set their password.

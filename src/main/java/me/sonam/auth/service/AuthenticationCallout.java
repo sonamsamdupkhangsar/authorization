@@ -112,9 +112,29 @@ public class AuthenticationCallout implements AuthenticationProvider {
                  .flatMap(aBoolean -> {
                      if (aBoolean) {
                          LOG.info("account is locked for authenticationId {}", authenticationId);
-                         return Mono.error(new BadCredentialsException("account is locked"));
+
+                         return loginAttemptWebClient.checkLoginAttempt(authenticationId)
+                                         .flatMap(s -> {
+                                             if (s.equals("keep locked")) {
+                                                 LOG.info("response from checkAttempt is to keep locked as time interval has not passed");
+                                                 return Mono.error(new BadCredentialsException("account is locked"));
+                                             }
+                                             else {
+                                                 LOG.info("response {}", s);
+                                                 LOG.info("let user attempt go thru");
+                                                 return accountWebClient.unLockAccountAfterTimedIntervalExpire(authenticationId)
+                                                         .onErrorResume(throwable -> {
+                                                             LOG.debug("exception occurred in unlockAccount time Expiration", throwable);
+                                                             LOG.error("failed to unlock account after timed interval expire {}", throwable.getMessage());
+                                                             return Mono.error(throwable);
+                                                         }).thenReturn(s);
+                                             }
+                                         }).thenReturn(true);
                      }
-                     return Mono.just(aBoolean);
+                     else {
+                         LOG.info("account is not locked");
+                         return Mono.just(aBoolean);
+                     }
                  })
                 .flatMap(aBoolean -> {
                     LOG.info("authorities: {}, details: {}, credentials: {}", authentication.getAuthorities(),
@@ -177,7 +197,10 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
                             return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
                                     .doOnNext(s -> LOG.trace("authentication failed: {}", authenticationId, throwable))
-                                    .flatMap(s -> Mono.error(new BadCredentialsException(s)));
+                                    .flatMap(s -> {
+                                        final String message = throwable.getMessage() + " " + s;
+                                        return Mono.error(new BadCredentialsException(message));
+                                       });
                         }
                         return Mono.error(throwable);
                     })

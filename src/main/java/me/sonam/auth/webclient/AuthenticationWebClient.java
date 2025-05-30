@@ -1,22 +1,23 @@
 package me.sonam.auth.webclient;
 
+import jakarta.servlet.http.HttpServletRequest;
 import me.sonam.auth.service.exception.BadCredentialsException;
 import me.sonam.auth.util.UserId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * This contains the authentication-rest-service rest endpoints as Java methods.
@@ -27,16 +28,29 @@ public class AuthenticationWebClient {
     private final WebClient.Builder webClientBuilder;
 
     private final String authenticateEndpoint;
+    private final String authenticationIdCheckEndpoint;
 
     private final String ROLES = "roles";
 
     private final LoginAttemptWebClient loginAttemptWebClient;
 
+    private final String authIdNotExist;
+    private final String authNotActive;
+    private final String authPasswordNotSet;
+
     public AuthenticationWebClient(WebClient.Builder webClientBuilder,
-                                   String authenticateEndpoint, LoginAttemptWebClient loginAttemptWebClient) {
+                                   String authenticateEndpoint, String authenticateIdCheckEndpoint,
+                                   LoginAttemptWebClient loginAttemptWebClient, String authIdNotExist,
+                                   String authNotActive, String authPasswordNotSet) {
         this.webClientBuilder = webClientBuilder;
         this.authenticateEndpoint = authenticateEndpoint;
+        this.authenticationIdCheckEndpoint = authenticateIdCheckEndpoint;
         this.loginAttemptWebClient = loginAttemptWebClient;
+        this.authIdNotExist = authIdNotExist;
+        this.authNotActive = authNotActive;
+        this.authPasswordNotSet = authPasswordNotSet;
+
+
     }
 
     public Mono<UsernamePasswordAuthenticationToken> getAuth(Authentication authentication, Map<String, Object> mapBody) {
@@ -98,15 +112,78 @@ public class AuthenticationWebClient {
                 LOG.error("error body contains: {}", webClientResponseException.getResponseBodyAsString());
                 if (webClientResponseException.getResponseBodyAsString().contains("\"error\":")) {
                     String error = webClientResponseException.getResponseBodyAs(Map.class).get("error").toString();
-                    return Mono.error(new BadCredentialsException("message: " +error));
+                    return Mono.error(new BadCredentialsException(error));
                 }
                 else {
-                    return Mono.error(new BadCredentialsException("message: " +webClientResponseException.getResponseBodyAsString()));
+                    return Mono.error(new BadCredentialsException(webClientResponseException.getResponseBodyAsString()));
                 }
             }
             else {
                 return Mono.error(new BadCredentialsException("Bad credentials"));
             }
         });
+    }
+
+    public Mono<String> checkUsername(String ipAddress, String authenticationId) {
+        LOG.info("check authenticationId endpoint: {}", authenticationIdCheckEndpoint);
+
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(authenticationIdCheckEndpoint)
+                .bodyValue(Map.of("authenticationId", authenticationId)).retrieve();
+
+        //throws exception on authentication not found return with 401 http status
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
+                .flatMap(map -> {
+                    LOG.debug("got response for authenticationId check {}", map);
+                    String message = map.get("message");
+                    if (message != null) {
+                        return Mono.just(message);
+                    }
+                    else {
+                        return Mono.just("no message");
+                    }
+                }).onErrorResume(throwable -> logError(authenticationId, ipAddress,"error in calling checkUsername: {}", throwable));
+        //auth no active in error, bad auth in error also
+    }
+
+    private Mono<String> logError(String authenticationId, String ipAddress, String errorString, Throwable throwable) {
+        LOG.error(errorString, throwable.getMessage());
+        if (throwable instanceof WebClientResponseException) {
+            WebClientResponseException webClientResponseException = (WebClientResponseException) throwable;
+            LOG.error("error body contains: {}", webClientResponseException.getResponseBodyAsString());
+            if (webClientResponseException.getResponseBodyAsString().contains("\"error\":")) {
+                String error = webClientResponseException.getResponseBodyAs(Map.class).get("error").toString();
+
+                //HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
+             //   String ipAddress = ".1.1.1.1";//request.getRemoteAddr();
+                LOG.info("ipAddress {}", ipAddress);
+
+                if (error.contains(authIdNotExist)) {
+                    LOG.info("audit authId tried {}", authenticationId);
+                    final String invalidUsername = "Invalid username";
+                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).
+                            flatMap(s -> Mono.just("Invalid username. " + s));
+                }
+                else if (error.contains(authNotActive)) {
+                    LOG.info("audit auth not active for {}", authenticationId);
+                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).thenReturn(error);
+                }
+                else if(error.contains(authPasswordNotSet)) {
+                    LOG.info("audit password not set for {}", authenticationId);
+                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).thenReturn(error);
+                }
+                else {
+                    LOG.error("different response {} for authId {}", error, authenticationId);
+                    return Mono.error(new BadCredentialsException(error));
+                }
+            }
+            else {
+                LOG.info("error body does not contain error {}", throwable.getMessage());
+                return Mono.error(new BadCredentialsException(webClientResponseException.getResponseBodyAsString()));
+            }
+        }
+        else {
+            LOG.info("throwable not instance of WebClientResponseException {}", throwable.getMessage());
+            return Mono.error(new BadCredentialsException("Bad credentials"));
+        }
     }
 }

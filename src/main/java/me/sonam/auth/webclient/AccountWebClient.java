@@ -27,13 +27,14 @@ public class AccountWebClient {
     private final String emailSecretUnlockAccount;
     private final String lockAccount;
     private final String unLockAccount;
+    private final String unLockAccountTimeExpire;
     private final String isAccountLockedEndpoint;
 
     public AccountWebClient(WebClient.Builder webClientBuilder,
                             String emailUserName, String emailMySecret, String emailActiveLink,
                             String validateEmailLoginSecret, String updatePassword,
                             String emailSecretUnlockAccount, String lockAccount,
-                            String unLockAccount, String isAccountLockedEndpoint) {
+                            String unLockAccount, String isAccountLockedEndpoint, String unLockAccountTimeExpire) {
         this.webClientBuilder = webClientBuilder;
         this.emailUserName = emailUserName;
         this.emailMySecret = emailMySecret;
@@ -44,6 +45,7 @@ public class AccountWebClient {
         this.lockAccount = lockAccount;
         this.unLockAccount = unLockAccount;
         this.isAccountLockedEndpoint = isAccountLockedEndpoint;
+        this.unLockAccountTimeExpire = unLockAccountTimeExpire;
     }
 
     public Mono<String> emailAccountActivationLink(String email) {
@@ -119,6 +121,17 @@ public class AccountWebClient {
                         "secret", secret))
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
+    }
+
+    public Mono<Map<String, String>> unLockAccountAfterTimedIntervalExpire(String authenticationId) {
+        LOG.info("unlock account after timed interval expires using authenticationId  '{}''", authenticationId);
+
+        LOG.debug("unlock account timed expire endpoint {}", unLockAccountTimeExpire);
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(unLockAccountTimeExpire)
+                .bodyValue(Map.of("authenticationId", authenticationId))
+                .retrieve();
+        return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
+                .doOnNext(map -> LOG.info("got response for unlock account time expire {}", map));
     }
 
     public Mono<Boolean> isAccountLocked(String authenticationId) {

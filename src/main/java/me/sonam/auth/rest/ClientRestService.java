@@ -141,7 +141,6 @@ public class ClientRestService {
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
-        UUID ownerId = UUID.fromString(userIdString);
 
         LOG.info("userIdString: {}, and userId: {}",userIdString, userId);
         LOG.info("jwt.getTokenValue: {}", jwt.getTokenValue());

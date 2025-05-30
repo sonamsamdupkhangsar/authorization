@@ -16,37 +16,46 @@ public class BeanConfig {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanConfig.class);
 
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.emailActivateLink}")
+    @Value("$${account-rest-service.emailActivateLink}")
     private String emailActiveLink;
 
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.emailMySecret}")
+    @Value("${account-rest-service.emailMySecret}")
     private String emailMySecret;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.emailUsername}")
+    @Value("${account-rest-service.emailUsername}")
     private String emailUsername;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.validateEmailLoginSecret}")
+    @Value("${account-rest-service.validateEmailLoginSecret}")
     private String validateEmailLoginSecret;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.updatePassword}")
+    @Value("${account-rest-service.updatePassword}")
     private String updatePassword;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.emailSecretUnlockAccount}")
+    @Value("${account-rest-service.emailSecretUnlockAccount}")
     private String emailSecretUnlockAccount;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.lockAccount}")
+    @Value("${account-rest-service.lockAccount}")
     private String lockAccount;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.unLockAccount}")
+    @Value("${account-rest-service.unLockAccount}")
     private String unLockAccount;
-    @Value("${account-rest-service.root}${account-rest-service.context}${account-rest-service.isAccountLocked}")
+    @Value("${account-rest-service.isAccountLocked}")
     private String isAccountLockedEndpoint;
 
-    @Value("${authentication-rest-service.root}${authentication-rest-service.authenticate}")
+    @Value("${account-rest-service.unLockAccountTimeExpire}")
+    private String unLockAccountTimeExpireEndpoint;
+
+    @Value("${authentication-rest-service.authenticate}")
     private String authenticateEndpoint;
 
-    @Value("${attempt-rest-service.root}${attempt-rest-service.context}${attempt-rest-service.success}")
+    @Value("${authentication-rest-service.authenticationId}")
+    private String authenticateIdCheckEndpoint;
+
+    @Value("${attempt-rest-service.success}")
     private String loginAttemptSuccess;
 
-    @Value("${attempt-rest-service.root}${attempt-rest-service.context}${attempt-rest-service.failed}")
+    @Value("${attempt-rest-service.failed}")
     private String loginAttemptFail;
 
-    @Value("${attempt-rest-service.root}${attempt-rest-service.context}${attempt-rest-service.delete}")
+    @Value("${attempt-rest-service.delete}")
     private String deleteAttempt;
+
+    @Value("${attempt-rest-service.check}")
+    private String checkLoginAttempt;
 
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
@@ -57,6 +66,19 @@ public class BeanConfig {
 
     @Value("${user-rest-service.root}${user-rest-service.userByAuthId}")
     private String userEndpoint;
+
+    //authIdNotExist: authentication does not exist with authId
+    //authNotActive: Authentication not active, activate your account first
+    //authPasswordNotSet: User needs to set their password.
+
+    @Value("${authIdNotExist}")
+    private String authIdNotExist;
+
+    @Value("${authNotActive}")
+    private String authNotActive;
+
+    @Value("${authPasswordNotSet}")
+    private String authPasswordNotSet;
 
     @Autowired
     private WebClient.Builder webClientBuilder;
@@ -78,17 +100,19 @@ public class BeanConfig {
     public AccountWebClient accountWebClient() {
         return new AccountWebClient(webClientBuilder, emailUsername, emailMySecret, emailActiveLink,
                 validateEmailLoginSecret, updatePassword,  emailSecretUnlockAccount, lockAccount,
-                unLockAccount, isAccountLockedEndpoint);
+                unLockAccount, isAccountLockedEndpoint, unLockAccountTimeExpireEndpoint);
     }
 
     @Bean
     public AuthenticationWebClient authenticationWebClient() {
-        return new AuthenticationWebClient(webClientBuilder, authenticateEndpoint, loginAttemptWebClient());
+        return new AuthenticationWebClient(webClientBuilder, authenticateEndpoint, authenticateIdCheckEndpoint,
+                loginAttemptWebClient(), authIdNotExist,
+                authNotActive, authPasswordNotSet);
     }
 
     @Bean
     public LoginAttemptWebClient loginAttemptWebClient() {
-        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt);
+        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt, checkLoginAttempt);
     }
 
     @Bean

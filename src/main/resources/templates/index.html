@@ -7,10 +7,58 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
 </head>
+<title>Login</title>
+<script th:inline="javascript">
+    window.addEventListener('load', function() {
+    console.log("remove after loading body");
+   const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
+
+    userIdCheckDivElement.style.display = "none";
+
+});
+
+  function checkUsername(url) {
+    const usernameTextField = document.getElementById('username');
+    if (usernameTextField.value.length <= 0) {
+     // console.error('no username in text-field');
+      return;
+    }
+    const usernameValue = usernameTextField.value;
+    console.log('username to check ' + usernameValue + ", url: " + url);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("PUT", url, true);
+
+    const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
+    userIdCheckDivElement.style.display = "none";
+
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+          console.log('PUT request successful!', xhr.responseText);
+          const spanElement = document.getElementById('userIdCheckSpan');
+          if (xhr.responseText == 'authenticationId exists, is activated and a password is set') {
+              spanElement.textContent = '';
+          }
+          else {
+              userIdCheckDivElement.style.display = "block";
+              spanElement.textContent = xhr.responseText;
+          }
+      }
+
+      else {
+          console.error('PUT request failed: ', xhr.status, xhr.responseText);
+      }
+    };
+    xhr.send(usernameValue);
+   }
+</script>
 <body>
 <div class="container">
 
     <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
+        <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
+            <span id="userIdCheckSpan"></span>
+        </div>
         <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
             Login failed. <span th:text="${errorMsg}"></span>.
         </div>
@@ -19,7 +67,8 @@
         </div>
         <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
         <div class="form-floating">
-            <input type="text" id="username" name="username" autocomplete="username" class="form-control" required autofocus>
+            <input type="text" id="username" name="username" autocomplete="username" class="form-control"
+                   th:with="url = @{/users/username}"  th:onblur="checkUsername([[${url}]])" required autofocus>
             <label for="username">Username</label>
         </div>
         <div class="form-floating">
