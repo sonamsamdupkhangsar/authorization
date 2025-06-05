@@ -32,12 +32,20 @@
     const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
     userIdCheckDivElement.style.display = "none";
 
+    const loginDiv = document.getElementById('loginDiv');
+    if (loginDiv != null) {
+        loginDiv.textContent = '';
+        loginDiv.style.display = "none";
+        console.log('clear loginDiv textContent');
+    }
+
     xhr.onload = function () {
       if (xhr.status >= 200 && xhr.status < 300) {
           console.log('PUT request successful!', xhr.responseText);
           const spanElement = document.getElementById('userIdCheckSpan');
           if (xhr.responseText == 'authenticationId exists, is activated and a password is set') {
               spanElement.textContent = '';
+              console.log('clear div');
           }
           else {
               userIdCheckDivElement.style.display = "block";
@@ -51,15 +59,26 @@
     };
     xhr.send(usernameValue);
    }
+
+    function showErrorDiv() {
+        const loginDiv = document.getElementById('loginDiv');
+        if (loginDiv == null) {
+          console.log("loginDiv is null");
+        }
+        else {
+            loginDiv.style.display = "block";
+            console.log('show login div');
+        }
+    }
 </script>
 <body>
 <div class="container">
 
-    <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
+    <form class="form-signin w-100 m-auto" method="post" th:action="@{/}" onsubmit="showErrorDiv()">
         <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
             <span id="userIdCheckSpan"></span>
         </div>
-        <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
+        <div id="loginDiv" th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
             Login failed. <span th:text="${errorMsg}"></span>.
         </div>
         <div th:if="${param.logout}" class="alert alert-success" role="alert">
