@@ -172,8 +172,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
             return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
                     .doOnNext(s -> LOG.error("user not found with authenticationId: {}", authenticationId, throwable))
-                    .flatMap(s -> Mono.error(new BadCredentialsException("user not found with authenticationId: "+
-                            authenticationId + ", "+s)));
+                    .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
         }
         ).flatMap(userId ->

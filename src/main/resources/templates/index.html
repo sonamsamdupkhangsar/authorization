@@ -18,13 +18,14 @@
 });
 
   function checkUsername(url) {
+    document.getElementById("submit").disabled = true;
+
     const usernameTextField = document.getElementById('username');
     if (usernameTextField.value.length <= 0) {
      // console.error('no username in text-field');
       return;
     }
     const usernameValue = usernameTextField.value;
-    console.log('username to check ' + usernameValue + ", url: " + url);
 
     var xhr = new XMLHttpRequest();
     xhr.open("PUT", url, true);
@@ -41,21 +42,24 @@
 
     xhr.onload = function () {
       if (xhr.status >= 200 && xhr.status < 300) {
-          console.log('PUT request successful!', xhr.responseText);
+          console.log('PUT request successful!');
           const spanElement = document.getElementById('userIdCheckSpan');
           if (xhr.responseText == 'authenticationId exists, is activated and a password is set') {
               spanElement.textContent = '';
               console.log('clear div');
+          }
+          else if (xhr.responseText.includes("Invalid username")) {
+            //don't do anything
           }
           else {
               userIdCheckDivElement.style.display = "block";
               spanElement.textContent = xhr.responseText;
           }
       }
-
       else {
           console.error('PUT request failed: ', xhr.status, xhr.responseText);
       }
+      document.getElementById("submit").disabled = false;
     };
     xhr.send(usernameValue);
    }
@@ -74,7 +78,7 @@
 <body>
 <div class="container">
 
-    <form class="form-signin w-100 m-auto" method="post" th:action="@{/}" onsubmit="showErrorDiv()">
+    <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
         <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
             <span id="userIdCheckSpan"></span>
         </div>
@@ -95,7 +99,7 @@
             <label for="password">Password</label>
         </div>
         <div>
-            <button class="w-100 btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+            <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
         <div class="mt-5">
             <div class="mt-2"><a href="/issuer/password" style="color: dimgrey !important;">Forgot password?</a></div>

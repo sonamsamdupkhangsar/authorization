@@ -16,7 +16,7 @@ public class BeanConfig {
 
     private static final Logger LOG = LoggerFactory.getLogger(BeanConfig.class);
 
-    @Value("$${account-rest-service.emailActivateLink}")
+    @Value("${account-rest-service.emailActivateLink}")
     private String emailActiveLink;
 
     @Value("${account-rest-service.emailMySecret}")

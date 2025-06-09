@@ -153,37 +153,34 @@ public class AuthenticationWebClient {
             if (webClientResponseException.getResponseBodyAsString().contains("\"error\":")) {
                 String error = webClientResponseException.getResponseBodyAs(Map.class).get("error").toString();
 
-                //HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
-             //   String ipAddress = ".1.1.1.1";//request.getRemoteAddr();
                 LOG.info("ipAddress {}", ipAddress);
 
                 if (error.contains(authIdNotExist)) {
                     LOG.info("audit authId tried {}", authenticationId);
-                    final String invalidUsername = "Invalid username";
-                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).
-                            flatMap(s -> Mono.just("Invalid username. " + s));
+                    return Mono.just("Invalid username");
+
                 }
                 else if (error.contains(authNotActive)) {
                     LOG.info("audit auth not active for {}", authenticationId);
-                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).thenReturn(error);
+                    return Mono.just(error);
                 }
                 else if(error.contains(authPasswordNotSet)) {
                     LOG.info("audit password not set for {}", authenticationId);
-                    return loginAttemptWebClient.loginFailed(authenticationId, ipAddress).thenReturn(error);
+                    return Mono.just(error);
                 }
                 else {
                     LOG.error("different response {} for authId {}", error, authenticationId);
-                    return Mono.error(new BadCredentialsException(error));
+                    return Mono.just("Bad credentials");
                 }
             }
             else {
                 LOG.info("error body does not contain error {}", throwable.getMessage());
-                return Mono.error(new BadCredentialsException(webClientResponseException.getResponseBodyAsString()));
+                return Mono.just("Bad credentials");
             }
         }
         else {
             LOG.info("throwable not instance of WebClientResponseException {}", throwable.getMessage());
-            return Mono.error(new BadCredentialsException("Bad credentials"));
+            return Mono.just("Bad credentials");
         }
     }
 }
