@@ -10,12 +10,10 @@
 <title>Login</title>
 <script th:inline="javascript">
     window.addEventListener('load', function() {
-    console.log("remove after loading body");
-   const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
-
-    userIdCheckDivElement.style.display = "none";
-
-});
+      console.log("remove after loading body");
+      const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
+      userIdCheckDivElement.style.display = "none";
+    });
 
   function checkUsername(url) {
     document.getElementById("submit").disabled = true;
@@ -50,6 +48,10 @@
           }
           else if (xhr.responseText.includes("Invalid username")) {
             //don't do anything
+          }
+          else if (xhr.responseText.includes("User needs to set their password.")) {
+              userIdCheckDivElement.style.display = "block";
+              spanElement.innerHTML = xhr.responseText + "(Use <strong>Forgot password?</strong> link to set password)";
           }
           else {
               userIdCheckDivElement.style.display = "block";
