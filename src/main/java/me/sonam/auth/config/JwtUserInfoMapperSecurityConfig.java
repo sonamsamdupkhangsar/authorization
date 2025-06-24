@@ -6,9 +6,6 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import jakarta.annotation.Nullable;
-import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
-import me.sonam.auth.jpa.repo.HClientUserRepository;
-import me.sonam.auth.service.AuthenticationCallout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,19 +14,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
@@ -42,10 +31,8 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
@@ -54,7 +41,6 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -132,14 +118,16 @@ public class JwtUserInfoMapperSecurityConfig {
                 .authorizeHttpRequests((authorize) ->
                         authorize.requestMatchers("/api/health/liveness").permitAll()
                                 .requestMatchers("/api/health/readiness").permitAll()
-                                .requestMatchers("/forgotUsername").permitAll()
-                                .requestMatchers("/forgotPassword").permitAll()
-                                .requestMatchers("/forgot/emailUsername").permitAll()
-                                .requestMatchers("/forgot/changePassword").permitAll()
-                                .requestMatchers("/myauthenticate").permitAll()
-                                .requestMatchers("/emailAccountActivateLink").permitAll()
-                                .requestMatchers("/password/*/*").permitAll()
+                                .requestMatchers("/username").permitAll()
+                                .requestMatchers("/password/secret").permitAll()
                                 .requestMatchers("/password").permitAll()
+                                .requestMatchers("/accounts/active").permitAll()
+                                .requestMatchers("/accounts/lock").permitAll()
+                                .requestMatchers("/accounts/lock/secret").permitAll()
+                                .requestMatchers("/accounts/lock/email").permitAll()
+                                .requestMatchers("/accounts/lock/email/secret").permitAll()
+                                .requestMatchers("/users/username").permitAll()
+
 
                 .anyRequest().authenticated()
                 )
@@ -149,20 +137,10 @@ public class JwtUserInfoMapperSecurityConfig {
                 .formLogin(httpSecurityFormLoginConfigurer ->
                         httpSecurityFormLoginConfigurer.loginPage("/")
                 );
-                //.authenticationManager(authenticationManager());
+
       return http.cors(Customizer.withDefaults()).formLogin(formLogin ->
               formLogin.loginPage("/").permitAll()).build();
     }
-
-   /* private AuthenticationManager authenticationManager() {
-        AuthenticationCallout callout = new AuthenticationCallout(authenticateEndpoint, userEndpoint,
-                organizationEndpoint, requestCache, webClientBuilder, clientOrganizationRepository,
-                clientUserRepository) ;
-
-        ProviderManager providerManager = new ProviderManager(callout);
-        providerManager.setEraseCredentialsAfterAuthentication(false);
-        return providerManager;
-    }*/
 
     @Bean
     public JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
@@ -212,8 +190,17 @@ public class JwtUserInfoMapperSecurityConfig {
         allowedOrigins = allowedOrigins.replace(" ", ""); //remove whitespaces between csv
         List<String> list = Arrays.asList(allowedOrigins.split(","));
         LOG.info("adding allowedOrigins: {}", list);
+        List<String> allowedOrigins = new ArrayList<>();
 
-        corsConfig.setAllowedOrigins(list);
+        for(String origin: list) {
+            if (origin.equals("*")) {
+                corsConfig.setAllowedOriginPatterns(List.of(origin));
+            }
+            else {
+                allowedOrigins.add(origin);
+            }
+        }
+        corsConfig.setAllowedOrigins(allowedOrigins);
         //corsConfig.addAllowedMethod("*");
         corsConfig.setAllowedMethods(Arrays.asList("GET", "PUT", "POST", "OPTIONS"));
         corsConfig.addAllowedHeader("*");

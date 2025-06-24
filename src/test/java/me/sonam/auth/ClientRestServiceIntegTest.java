@@ -163,7 +163,7 @@ public class ClientRestServiceIntegTest {
 
         /*RecordedRequest recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
+        assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("DELETE");
         assertThat(recordedRequest.getPath()).startsWith("/oauth2-token-mediator/clients");
@@ -205,7 +205,7 @@ public class ClientRestServiceIntegTest {
         // take request for mocked response of access token
      //   RecordedRequest recordedRequest = mockWebServer.takeRequest();
       /*  assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
+        assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
 
         LOG.info("take request for mocked response to token-mediator for client delete");
         recordedRequest = mockWebServer.takeRequest();
@@ -357,7 +357,7 @@ public class ClientRestServiceIntegTest {
         // take request for mocked response of access token
       //  RecordedRequest recordedRequest = mockWebServer.takeRequest();
        /* assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
+        assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
 
         LOG.info("take request for mocked response to token-mediator for client when mediateToken field is not present");*/
         //recordedRequest = mockWebServer.takeRequest();

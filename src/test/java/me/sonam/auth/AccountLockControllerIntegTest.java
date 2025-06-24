@@ -1,5 +1,7 @@
 package me.sonam.auth;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import me.sonam.auth.rest.AccountLockController;
 import me.sonam.auth.util.TokenRequestFilter;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -19,6 +21,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.ui.Model;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -39,12 +42,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(SpringExtension.class)
 @SpringBootTest( webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-public class ForgotUsernamePasswordIntegTest {
-    private static final Logger LOG = LoggerFactory.getLogger(ForgotUsernamePasswordIntegTest.class);
+public class AccountLockControllerIntegTest {
+    private static final Logger LOG = LoggerFactory.getLogger(AccountLockControllerIntegTest.class);
 
     @Autowired
     private MockMvc mockMvc;
     private static MockWebServer mockWebServer;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @Autowired
     private TokenRequestFilter tokenRequestFilter;
 
@@ -61,7 +68,6 @@ public class ForgotUsernamePasswordIntegTest {
             tokenRequestFilter.getAccessToken().setAccessToken(null);
         }
     }
-
 
     @BeforeAll
     static void setupMockWebServer() throws IOException {
@@ -84,31 +90,43 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("mock the port for account-rest-service");
         r.add("account-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("auth-server.root", () -> "http://localhost:"+ mockWebServer.getPort());
+        r.add("attempt-rest-service.root", () -> "http://localhost:"+ mockWebServer.getPort());
     }
 
     @Test
-    public void forgotUsername() throws Exception {
-        LOG.info("call forgotUsername endpoint");
+    public void getUnLockAccountHtmlPage() throws Exception {
+        LOG.info("get account/lock.html page");
 
-        LOG.info("assert that the page returned is Email username help");
-        this.mockMvc.perform(get("/username")).andDo(print()).andExpect(status().isOk())
-                .andExpect(content().string(containsString("Email username help")));
+        LOG.info("assert that the page returned is unlocking user account page.");
+        this.mockMvc.perform(get("/accounts/lock")).andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("To unlock your account enter your email address")));
     }
 
     @Test
-    public void forgotPassword() throws Exception {
-        LOG.info("call forgotPassword endpoint");
+    public void getUnLockAccountSecretHtmlPage() throws Exception {
+        LOG.info("get account/lock-secret.html page");
 
-        LOG.info("assert that the page returned is Change password help");
-        this.mockMvc.perform(get("/password")).andDo(print()).andExpect(status().isOk());
+        LOG.info("assert that the page returned is unlocking with secret form user account page.");
+        this.mockMvc.perform(get("/accounts/lock/secret")).andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("To unlock your account enter your email address and the secret.")));
     }
 
+
+    /**
+     *
+     * This will test the endpoint 'emailUserToUnLockAccount' which will send a user an email
+     * with a secret and a http link to unlock account associated with email and secret.
+     * This starts the process of unlocking an account when the user enters their email address.
+     * @throws Exception
+     */
     @Test
-    public void emailUsername() throws Exception {
+    public void emailUserToUnLockAccount() throws Exception {
         LOG.info("email username");
 
+        //1
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
 
+        //2
         LOG.info("add mock response for email username call into queue");
         final String emailMsg = " {\"message\":\"email successfully sent\"}";
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
@@ -118,10 +136,11 @@ public class ForgotUsernamePasswordIntegTest {
         final String urlEncodedEmail = URLEncoder.encode(email, Charset.defaultCharset());
         LOG.info("urlEncodedEmail: {}", urlEncodedEmail);
 
-        this.mockMvc.perform(post("/username")
-                        .param("emailAddress", email))
+        this.mockMvc.perform(post("/accounts/lock/email")
+                        .param("email", email))
                 .andDo(print()).andExpect(status().isOk());
-               // .andExpect(content().string(containsString("Your username has been sent to your email address.")));
+                //.andExpect(content().string(containsString("Check the associated email to unlock account.")));
+
 
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
@@ -131,26 +150,35 @@ public class ForgotUsernamePasswordIntegTest {
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
         //looks like the urlEncoded is getting urlEncoded again in the account put call so double it
-        assertThat(request.getPath()).startsWith("/accounts/email/authentication-id");
+        assertThat(request.getPath()).startsWith("/accounts/lock/email/password-secret");
     }
 
+    /**
+     * This method will test the process of actually unlocking an account associated with a email address and the secret.
+     * This method will test the unLockAccount method @{{@link AccountLockController#unLockAccount(String, String, Model)}}
+     * @throws Exception if error occurred
+     */
     @Test
-    public void emailMySecretForPasswordChange() throws Exception {
+    public void unLockAccountWithEmailAndSecret() throws Exception {
         LOG.info("email username");
+        final String email = "dummy@xyqkl.com";
 
-        LOG.info("add mock response for email username call into queue");
-
+        //1
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
 
-        final String emailMsg = " {\"message\":\"email successfully sent\"}";
+        //2
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(201).setBody(emailMsg));
+                .setResponseCode(201).setBody("{\"message\":\"account unlocked for "+email+"\", " +
+                        "\"authenticationId\": \"sonam\"}"));//"Account created successfully.  Check email for activating account"));
 
-        this.mockMvc.perform(post("/password")
-                        .param("email", "sonam@sonam.com"))
+        //3
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody("{\"message\":\"deleted by username\"}"));// loginAttempt data with username deleted response
 
+
+        this.mockMvc.perform(post("/accounts/lock/email/secret").
+                param("email", email).param("secret", "dummy-secret"))
                 .andDo(print()).andExpect(status().isOk());
-                //.andExpect(content().string(containsString("Check your email for changing your password.")));
 
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
@@ -159,61 +187,11 @@ public class ForgotUsernamePasswordIntegTest {
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
-        assertThat(request.getPath()).startsWith("/accounts/email/");
-    }
-
-    @Test
-    public void emailMySecretForPasswordChangeThrowException() throws Exception {
-        LOG.info("email username");
-
-        LOG.info("add mock response for email username call into queue");
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
-
-        final String emailMsg = " {\"error\":\"Account is not active or does not exist\"}";
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(400).setBody(emailMsg));//"Account created successfully.  Check email for activating account"));
-
-        this.mockMvc.perform(post("/password")
-                        .param("email", "sonam@sonam.com"))
-                .andDo(print()).andExpect(status().isOk());
-                //.andExpect(content().string(containsString("Account is not active or does not exist")));
-
-        LOG.info("serve the queued mock response for email username http callout");
-        RecordedRequest request = mockWebServer.takeRequest();
-        assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith("/accounts/lock/false");
 
         request = mockWebServer.takeRequest();
-        assertThat(request.getMethod()).isEqualTo("PUT");
-        assertThat(request.getPath()).startsWith("/accounts/email/");
-    }
-
-    @Test
-    public void passwordChangeTest() throws Exception {
-        LOG.info("test the password change post method");
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setResponseCode(200).setBody(clientCredentialResponse));
-
-        final String passwordUpdated = "{\"message\":\"password updated\"}";
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(passwordUpdated));
-
-        final String email = "sonam@sonam.com";
-        final String secret = "x2340c";
-
-        this.mockMvc.perform(post("/password/secret").param("email", email)
-                        .param("secret", secret).param("password", "mysecretpassword"))
-                .andDo(print()).andExpect(status().isOk());
-        //.andExpect(content().string(containsString("Check your email for changing your password.")));
-
-        LOG.info("take recorded requests");
-
-        RecordedRequest request = mockWebServer.takeRequest();
-        assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
-
-        request = mockWebServer.takeRequest();
-        assertThat(request.getMethod()).isEqualTo("PUT");
-        assertThat(request.getPath()).matches("/accounts/password-secret");
+        assertThat(request.getMethod()).isEqualTo("DELETE");
+        assertThat(request.getPath()).startsWith("/attempts/sonam");
     }
 
 }

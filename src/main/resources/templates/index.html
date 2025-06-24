@@ -7,11 +7,84 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
 </head>
+<title>Login</title>
+<script th:inline="javascript">
+    window.addEventListener('load', function() {
+      console.log("remove after loading body");
+      const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
+      userIdCheckDivElement.style.display = "none";
+    });
+
+  function checkUsername(url) {
+    document.getElementById("submit").disabled = true;
+
+    const usernameTextField = document.getElementById('username');
+    if (usernameTextField.value.length <= 0) {
+     // console.error('no username in text-field');
+      return;
+    }
+    const usernameValue = usernameTextField.value;
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("PUT", url, true);
+
+    const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
+    userIdCheckDivElement.style.display = "none";
+
+    const loginDiv = document.getElementById('loginDiv');
+    if (loginDiv != null) {
+        loginDiv.textContent = '';
+        loginDiv.style.display = "none";
+        console.log('clear loginDiv textContent');
+    }
+
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+          console.log('PUT request successful!');
+          const spanElement = document.getElementById('userIdCheckSpan');
+          if (xhr.responseText == 'authenticationId exists, is activated and a password is set') {
+              spanElement.textContent = '';
+              console.log('clear div');
+          }
+          else if (xhr.responseText.includes("Invalid username")) {
+            //don't do anything
+          }
+          else if (xhr.responseText.includes("User needs to set their password.")) {
+              userIdCheckDivElement.style.display = "block";
+              spanElement.innerHTML = xhr.responseText + "(Use <strong>Forgot password?</strong> link to set password)";
+          }
+          else {
+              userIdCheckDivElement.style.display = "block";
+              spanElement.textContent = xhr.responseText;
+          }
+      }
+      else {
+          console.error('PUT request failed: ', xhr.status, xhr.responseText);
+      }
+      document.getElementById("submit").disabled = false;
+    };
+    xhr.send(usernameValue);
+   }
+
+    function showErrorDiv() {
+        const loginDiv = document.getElementById('loginDiv');
+        if (loginDiv == null) {
+          console.log("loginDiv is null");
+        }
+        else {
+            loginDiv.style.display = "block";
+            console.log('show login div');
+        }
+    }
+</script>
 <body>
 <div class="container">
 
     <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
-        <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
+        <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
+            <span id="userIdCheckSpan"></span>
+        </div>
+        <div id="loginDiv" th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
             Login failed. <span th:text="${errorMsg}"></span>.
         </div>
         <div th:if="${param.logout}" class="alert alert-success" role="alert">
@@ -19,7 +92,8 @@
         </div>
         <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
         <div class="form-floating">
-            <input type="text" id="username" name="username" autocomplete="username" class="form-control" required autofocus>
+            <input type="text" id="username" name="username" autocomplete="username" class="form-control"
+                   th:with="url = @{/users/username}"  th:onblur="checkUsername([[${url}]])" required autofocus>
             <label for="username">Username</label>
         </div>
         <div class="form-floating">
@@ -27,12 +101,13 @@
             <label for="password">Password</label>
         </div>
         <div>
-            <button class="w-100 btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+            <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
         <div class="mt-5">
-            <div class="mt-2"><a href="/issuer/forgotPassword" style="color: dimgrey !important;">Forgot password?</a></div>
-            <div class="mt-2"><a href="/issuer/forgotUsername" style="color: dimgrey !important;">Forgot username?</a></div>
-            <div class="mt-2"><a href="/issuer/emailAccountActivateLink" style="color: dimgrey !important;">Email activation link</a></div>
+            <div class="mt-2"><a href="/issuer/password" style="color: dimgrey !important;">Forgot password?</a></div>
+            <div class="mt-2"><a href="/issuer/username" style="color: dimgrey !important;">Forgot username?</a></div>
+            <div class="mt-2"><a href="/issuer/accounts/active" style="color: dimgrey !important;">Email activation link</a></div>
+            <div class="mt-2"><a href="/issuer/accounts/lock" style="color: dimgrey !important;">Unlock account</a></div>
         </div>
         <div class="row justify-content-around mt-3">
             <div class="col"></div>

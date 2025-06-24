@@ -41,7 +41,9 @@ application-rest-service:
 
 authentication-rest-service:
   root: http://localhost:8080
-  authenticate: /authentications/authenticate
+  context: ${authentication-rest-service.root}/authentications
+  authenticate: ${authentication-rest-service.context}/authenticate
+  authenticationId: ${authentication-rest-service.context}/authenticationId
 
 user-rest-service:
   root: http://localhost:8080
@@ -54,46 +56,45 @@ organization-rest-service:
 
 account-rest-service:
   root:  http://localhost:8080
-  context: /accounts
-  emailUsername: /email/{email}/authentication-id
-  emailMySecret: /email/{email}/password-secret
-  emailActivateLink: /active/email/{email}/password-secret
-  validateEmailLoginSecret: /{email}/password-secret/{secret}
-  updatePassword: /password-secret
+  context: ${account-rest-service.root}/accounts
+  emailUsername: ${account-rest-service.context}/email/authentication-id
+  emailMySecret: ${account-rest-service.context}/email/password-secret
+  emailActivateLink: ${account-rest-service.context}/active/email/password-secret
+  validateEmailLoginSecret: ${account-rest-service.context}/{email}/password-secret/{secret}
+  updatePassword: ${account-rest-service.context}/password-secret
+  emailSecretUnlockAccount: ${account-rest-service.context}/lock/email/password-secret
+  lockAccount: ${account-rest-service.context}/lock/true
+  unLockAccount: ${account-rest-service.context}/lock/false
+  unLockAccountTimeExpire: ${account-rest-service.context}/lock/false/expire
+  isAccountLocked: ${account-rest-service.context}/lock
+
+
+attempt-rest-service:
+  root: http://localhost:8080
+  context: ${attempt-rest-service.root}/attempts
+  failed: ${attempt-rest-service.context}/login/failed
+  success: ${attempt-rest-service.context}/login/success
+  delete: ${attempt-rest-service.context}/{username}
+  check: ${attempt-rest-service.context}/login
 
 ISSUER_URI: http://my-server:9001
 private-client-url: http://127.0.0.1:8090
 
 
 requestFilters:
-  # get user info during authentication, user exists in organization during authentication,
-  #  validate emailLoginSecret during password change
-  - out: /users/authentication-id/(.)*,
-      /organizations/(.)*/users/(.)*, /accounts/(.)*/password-secret/(.)*
-    outHttpMethods: get
-    accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
-      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
-    # update password, authenticate
-  - out: /authentications/authenticate
-    outHttpMethods: post
-    accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
-      base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
-  # email my username, emailActivationLink, email my secret for password reset
-  - out: /accounts/email/(.)*/authentication-id, /accounts/active/email/(.)*/password-secret,
-      /accounts/email/(.)*/password-secret, /accounts/password-secret
-    outHttpMethods: put
+  - out:
+    outHttpMethods:
     accessToken:
       option: request
       scopes: ${REQUEST_SCOPES}
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
 
+
+
 # this is used for getting accesstoken by header filter
 auth-server:
   root: http://localhost:{port}
+  context-path: /issuer
   oauth2token:
     path: /oauth2/token
     grantType: client_credentials
@@ -110,3 +111,9 @@ authzmanager: http://localhost:9093
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
 AUTHZMANAGER_INITIAL_SECRET: hello
+  
+tokenExpireSeconds: 3
+
+authIdNotExist: authentication does not exist with authId
+authNotActive: Authentication not active, activate your account first
+authPasswordNotSet: User needs to set their password.

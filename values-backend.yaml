@@ -67,9 +67,8 @@ resources: {}
   #   cpu: 100m
 #   memory: 128Mi
 
-nodeSelector: {}
-
-tolerations: []
+nodeSelector:
+  node.kubernetes.io/instance-type: s-2vcpu-4gb
 
 affinity: {}
 
@@ -92,6 +91,8 @@ envs:
     value: http://user-rest-service
   - name: ACCOUNT_REST_SERVICE
     value: http://account-rest-service
+  - name: ATTEMPT_REST_SERVICE
+    value: http://attempt-rest-service
   - name: private-client-url
     value: http://127.0.0.1:8090
   - name: AUTH_SERVER_PORT
