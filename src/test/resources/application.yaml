@@ -8,10 +8,10 @@ server:
 
 logging:
   level:
-    root: INFO
-    org.springframework.web: INFO
-    org.springframework.security: info
-    org.springframework.security.oauth2: info
+    root: info
+    #org.springframework.web: INFO
+    #org.springframework.security: info
+    #org.springframework.security.oauth2: info
     me.sonam.auth: debug
 #    org.springframework.boot.autoconfigure: DEBUG
 
@@ -47,11 +47,12 @@ authentication-rest-service:
 
 user-rest-service:
   root: http://localhost:8080
-  context: /users
+  context: ${user-rest-service.root}/users
   userByAuthId: ${user-rest-service.context}/authentication-id/{authenticationId}
 
 organization-rest-service:
   root: http://localhost:8080
+  context: ${organization-rest-service.root}/organizations
   userExistsInOrganization: /organizations/{organizationId}/users/{userId}
 
 account-rest-service:
@@ -68,7 +69,6 @@ account-rest-service:
   unLockAccountTimeExpire: ${account-rest-service.context}/lock/false/expire
   isAccountLocked: ${account-rest-service.context}/lock
 
-
 attempt-rest-service:
   root: http://localhost:8080
   context: ${attempt-rest-service.root}/attempts
@@ -76,6 +76,16 @@ attempt-rest-service:
   success: ${attempt-rest-service.context}/login/success
   delete: ${attempt-rest-service.context}/{username}
   check: ${attempt-rest-service.context}/login
+
+setting-rest-service:
+  root: http://localhost:{port}
+  context: ${setting-rest-service.root}/settings
+  users: ${setting-rest-service.context}/users
+  defaultOrganization: ${setting-rest-service.context}/users
+
+role-rest-service:
+  root: http://localhost:{port}
+  context: ${role-rest-service.root}/roles
 
 ISSUER_URI: http://my-server:9001
 private-client-url: http://127.0.0.1:8090
@@ -85,7 +95,7 @@ requestFilters:
   - out:
     outHttpMethods:
     accessToken:
-      option: request
+      option: forward
       scopes: ${REQUEST_SCOPES}
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
 
@@ -117,3 +127,8 @@ tokenExpireSeconds: 3
 authIdNotExist: authentication does not exist with authId
 authNotActive: Authentication not active, activate your account first
 authPasswordNotSet: User needs to set their password.
+
+maxClients: 5
+maxOrganizations: 1
+maxUserPerOrganization: 5
+maxRoles: 5

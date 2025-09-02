@@ -59,13 +59,26 @@ public class BeanConfig {
 
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
+    private String userExistsInOrganizationEndpoint;
+
+    @Value("${organization-rest-service.context}")
     private String organizationEndpoint;
 
-    @Value("${user-rest-service.root}${user-rest-service.userByAuthId}")
+
+    @Value("${user-rest-service.userByAuthId}")
     private String userByAuthIdEp;
 
-    @Value("${user-rest-service.root}${user-rest-service.userByAuthId}")
+    @Value("${user-rest-service.context}")
     private String userEndpoint;
+
+    @Value("${role-rest-service.context}")
+    private String roleEndpoint;
+
+    @Value("${setting-rest-service.users}")
+    private String userSettingEndpoint;
+
+    @Value("${setting-rest-service.defaultOrganization}")
+    private String defaultOrganizationSettingEndpoint;
 
     //authIdNotExist: authentication does not exist with authId
     //authNotActive: Authentication not active, activate your account first
@@ -92,7 +105,7 @@ public class BeanConfig {
 
     @Bean
     public UserWebClient userWebClient() {
-        return new UserWebClient(webClientBuilder, userByAuthIdEp);
+        return new UserWebClient(webClientBuilder, userByAuthIdEp, userEndpoint);
     }
 
 
@@ -117,6 +130,16 @@ public class BeanConfig {
 
     @Bean
     public OrganizationWebClient organizationWebClient() {
-        return new OrganizationWebClient(webClientBuilder, organizationEndpoint);
+        return new OrganizationWebClient(webClientBuilder, organizationEndpoint, userExistsInOrganizationEndpoint);
+    }
+
+    @Bean
+    public RoleWebClient roleWebClient() {
+        return new RoleWebClient(webClientBuilder, roleEndpoint);
+    }
+
+    @Bean
+    public SettingWebClient settingWebClient() {
+        return new SettingWebClient(webClientBuilder, userSettingEndpoint, defaultOrganizationSettingEndpoint);
     }
 }

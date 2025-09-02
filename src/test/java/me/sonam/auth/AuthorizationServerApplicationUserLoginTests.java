@@ -508,37 +508,15 @@ public class AuthorizationServerApplicationUserLoginTests {
 		LOG.info("serverPort: {}", AuthorizationServerApplicationUserLoginTests.serverPort);
 		final String jwtString= "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzb25hbSIsImlzcyI6InNvbmFtLmNsb3VkIiwiYXVkIjoic29uYW0uY2xvdWQiLCJqdGkiOiJmMTY2NjM1OS05YTViLTQ3NzMtOWUyNy00OGU0OTFlNDYzNGIifQ.KGFBUjghvcmNGDH0eM17S9pWkoLwbvDaDBGAx2AyB41yZ_8-WewTriR08JdjLskw1dsRYpMh9idxQ4BS6xmOCQ";
 
-		//1
 		final String jwtTokenMsg = " {\"access_token\":\""+jwtString+"\"}";
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody(jwtTokenMsg));
 
-		//1
-	/*	mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody(jwtTokenMsg));*/
-
-
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\":\"false\"}"));
 
-		//2
-		//this response is for getting user by authenticationId (loginId)
-	//	mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-	//		.setResponseCode(200).setBody("{\"message\":\"authenticationId exists, is activated and a password is set\"}"));
-
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(400).setBody("{\"error\":\"user not found\"}"));
-
-
-		//mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-		//		.setResponseCode(200).setBody(jwtTokenMsg));
-
-		//2
-		//this response is for getting user by authenticationId (loginId)
-
-		//3
-		//this response is for getting user by authenticationId (loginId)
-
 
 		//4 when user does not exist or login fails, make call out to attempt-rest-service/attempts/loginFailed
 		//to find out remaining attempts or lock out user by username
@@ -554,22 +532,12 @@ public class AuthorizationServerApplicationUserLoginTests {
 		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
-		//recordedRequest = mockWebServer.takeRequest();
-		//LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		//AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
-		//AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-
 		recordedRequest = mockWebServer.takeRequest();
 		LOG.info("tpath: {}", recordedRequest.getPath());
-
 		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
 		assertThat(recordedRequest.getPath()).startsWith("/accounts/lock");
 
 		recordedRequest = mockWebServer.takeRequest();
-		/*LOG.info("tpath2 : {}", recordedRequest.getPath());
-		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-		assertThat(recordedRequest.getPath()).startsWith("/users/authentication-id");
-*/
 		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
 		assertThat(recordedRequest.getPath()).startsWith("/users/authentication-id/user1");
 

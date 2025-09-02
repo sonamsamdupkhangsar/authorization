@@ -127,6 +127,7 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/accounts/lock/email").permitAll()
                                 .requestMatchers("/accounts/lock/email/secret").permitAll()
                                 .requestMatchers("/users/username").permitAll()
+                                .requestMatchers("/signup").permitAll()
 
 
                 .anyRequest().authenticated()

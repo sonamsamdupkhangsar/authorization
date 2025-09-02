@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import me.sonam.auth.jpa.entity.Client;
 import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
+import me.sonam.auth.service.UserSignupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +52,8 @@ public class ClientSetup {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private UserSignupService userSignupService;
 
     @PostConstruct
     public void createAuthzManagerClient() {

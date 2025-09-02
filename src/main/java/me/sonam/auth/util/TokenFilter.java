@@ -147,23 +147,21 @@ public class TokenFilter {
         if (accessToken.getOption().equals(TokenRequestFilter.RequestFilter.AccessToken.JwtOption.forward)) {
             LOG.info("option is forward token");
 
-            return ReactiveSecurityContextHolder.getContext().
-                    map(securityContext -> securityContext.getAuthentication().getPrincipal())
-                    .cast(Jwt.class).flatMap(jwt -> {
-                        LOG.info("got accessToken inbound jwt.getTokenValue: {}, jwt: {}", jwt.getTokenValue(), jwt);
-                        return getClientRequestWithToken(jwt.getTokenValue(), request, next);
-                    }).switchIfEmpty(requestToken(request, next, accessToken));//if not jwt found, then switch to empty method -- this will execute eagerly so will execute before
+            if (request.headers().getFirst("Authorization") != null) {
+                LOG.info("inbound request contains a authorization header, sending that instead");
+                String token = request.headers().getFirst("Authorization");
+                if (token != null) {
+                    LOG.debug("inbound token: {}", token);
+                    token = token.replace("Bearer ", "");
+                    return getClientRequestWithToken(token, request, next);
+                }
+                LOG.info("inbound token is null");
+            }
+            return requestToken(request, next, accessToken);
         }
         else if (accessToken.getOption().equals(TokenRequestFilter.RequestFilter.AccessToken.JwtOption.request)) {
-
-            if (accessToken.getAccessToken() != null && !isExpired(accessToken.getAccessTokenCreationTime())) {
-                LOG.info("accessToken object contains a accessToken that is not expired");
-                return getClientRequestWithToken(accessToken.getAccessToken(), request, next);
-            }
-            else {
-                LOG.info("accessToken does not contain a un-expired token");
-                return requestToken(request, next, accessToken);
-            }
+            LOG.info("request accessToken");
+            return requestToken(request, next, accessToken);
         } // there is no need to forward as there is no inbound token coming in, just requests going out
         else {
             LOG.info("do nothing");
@@ -173,7 +171,11 @@ public class TokenFilter {
     }
 
     private Mono<ClientResponse> requestToken(ClientRequest request, ExchangeFunction next, TokenRequestFilter.RequestFilter.AccessToken accessToken) {
-        LOG.info("request token");
+        if (accessToken.getAccessToken() != null && !isExpired(accessToken.getAccessTokenCreationTime())) {
+            LOG.info("accessToken object contains a accessToken that is not expired");
+            return getClientRequestWithToken(accessToken.getAccessToken(), request, next);
+        }
+        LOG.info("accessToken object does not contain a token, request token");
         return  getAccessToken(oauth2TokenEndpoint, grantType, accessToken.getScopes(), accessToken.getBase64EncodedClientIdSecret())
                 .flatMap(jwtAccessToken -> {
                     LOG.info("request {} set token in access-token", request.url());

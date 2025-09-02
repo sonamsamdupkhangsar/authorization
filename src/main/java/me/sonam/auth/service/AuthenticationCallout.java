@@ -175,8 +175,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
         }
-        ).flatMap(userId ->
-            checkClientInOrganization(authentication, userId, clientId)
+        ).flatMap(userId -> isClientAuthzManager(userId, clientId, authentication)
+                .switchIfEmpty(checkClientInOrganization(authentication, userId, clientId))
                     .switchIfEmpty(checkClientUserRelationship(userId, clientId, authentication))
 
                     .onErrorResume(throwable -> {
@@ -206,62 +206,78 @@ public class AuthenticationCallout implements AuthenticationProvider {
         );
     }
 
-    private Mono<UsernamePasswordAuthenticationToken> checkClientUserRelationship(final UUID userId, final UUID clientId, final Authentication authentication) {
-        LOG.info("checkClientUserRelationship() - checking userId {} and clientId {} in ClientUser relationship", userId, clientId);
+    /**
+     * If the clientId is authzManager create a client-user row if doesn't exist
+     * and return call to authenticationWebClient.getAuth()
+     * @param userId UUID of user
+     * @param clientId UUID of client id
+     * @param authentication authentication object
+     * @return if authentication is success or fail object
+     */
+    private Mono<UsernamePasswordAuthenticationToken> isClientAuthzManager(final UUID userId, final UUID clientId, final Authentication authentication) {
+        LOG.info("checking if the clientId: {} is for authzManagerId: {}", clientId, authzManagerId);
 
-        Optional<ClientUser> clientUserOptional = clientUserRepository.findByClientIdAndUserId(clientId, userId);
-
-        if (clientUserOptional.isPresent()) {
-            LOG.info("user has clientId relationship");
-            return authenticationWebClient.getAuth(authentication, Map.of("authenticationId", authentication.getPrincipal().toString(),
+        if (authzManagerId.equals(clientId)) {
+            LOG.info("client is authzManager, authentication user");
+            LOG.info("returning auth");
+            return authenticationWebClient.getAuth(authentication,  Map.of("authenticationId", authentication.getPrincipal().toString(),
                     "password", authentication.getCredentials().toString(),
-                    "clientId", clientId));
+                    "clientId", clientId)
+            );
         }
         else {
-            LOG.info("authzManagerId: {}, clientId: {}", authzManagerId, clientId);
-            if (authzManagerId.equals(clientId)) {
-                LOG.info("clientId is for authzmanager, create user-authzmanager client relationship");
-                clientUserRepository.save(new ClientUser(clientId, userId));
-
-                return authenticationWebClient.getAuth(authentication,  Map.of("authenticationId", authentication.getPrincipal().toString(),
-                                                    "password", authentication.getCredentials().toString(),
-                                                "clientId", clientId)
-                        );
-            }
-            else {
-
-                LOG.error("the user trying to log-in with user-id is not associated with this client-id");
-                return Mono.error(new BadCredentialsException("there is no client-id association with this user-id"));
-            }
+            LOG.info("clientId is not AuthzManager");
+            return Mono.empty();
         }
     }
 
+    private Mono<UsernamePasswordAuthenticationToken> checkClientUserRelationship(final UUID userId, final UUID clientId, final Authentication authentication) {
+        return Mono.defer(() -> {
+            LOG.info("checkClientUserRelationship() - checking userId {} and clientId {} in ClientUser relationship", userId, clientId);
+
+            Optional<ClientUser> clientUserOptional = clientUserRepository.findByClientIdAndUserId(clientId, userId);
+
+            if (clientUserOptional.isPresent()) {
+                LOG.info("user has clientId relationship {}", clientUserOptional.get());
+                return authenticationWebClient.getAuth(authentication, Map.of("authenticationId", authentication.getPrincipal().toString(),
+                        "password", authentication.getCredentials().toString(),
+                        "clientId", clientId));
+            }
+            else {
+                LOG.info("authzManagerId: {}, clientId: {}", authzManagerId, clientId);
+                LOG.error("the user trying to log-in with user-id is not associated with this client-id");
+                return Mono.error(new BadCredentialsException("there is no client-id association with this user-id"));
+            }
+        });
+    }
+
+
     private Mono<UsernamePasswordAuthenticationToken> checkClientInOrganization(Authentication authentication, UUID userId, UUID clientId) {
-        LOG.info("checkClientInOrganization() - checking client exists in clientOrganization");
+        return Mono.defer(() -> {
+            LOG.info("checkClientInOrganization() - checking client exists in clientOrganization");
 
-        Optional<ClientOrganization> optionalClientOrganization = clientOrganizationRepository.findByClientId(clientId);
-        optionalClientOrganization.ifPresent(clientOrganization -> LOG.info("clientOrganization exists with clientId: {}", clientOrganization));
+            Optional<ClientOrganization> optionalClientOrganization = clientOrganizationRepository.findByClientId(clientId);
+            optionalClientOrganization.ifPresent(clientOrganization -> LOG.info("clientOrganization exists with clientId: {}", clientOrganization));
 
-        if (optionalClientOrganization.isEmpty()) {
-            LOG.error("client-id {} not found in clientOrganization", clientId);
-            return Mono.empty(); // return empty if there is no client organization association for this client-id
-           //return Mono.error(new BadCredentialsException("no clientId " + clientId + " found in ClientOrganization"));
-        }
-        else {
-            LOG.info("client-id is associated to a organization, so user must also be associated to a organization for logging-in");
-        }
+            if (optionalClientOrganization.isEmpty()) {
+                LOG.info("client-id {} not associated with organization, not found in clientOrganization", clientId);
+                return Mono.empty(); // return empty if there is no client organization association for this client-id
+            } else {
+                LOG.info("client-id is associated to a organization, so user must also be associated to a organization for logging-in");
+            }
 
-        ClientOrganization clientOrganization = optionalClientOrganization.get();
+            ClientOrganization clientOrganization = optionalClientOrganization.get();
 
-        // client-id is associated to organization-id, check user-id is also in organization-id
-        return organizationWebClient.userExistInOrganization(userId, clientOrganization.getOrganizationId())
-                .filter(aBoolean -> aBoolean)
-                .switchIfEmpty(Mono.error(new BadCredentialsException("user does not exists in organization")))
-                .flatMap(aBoolean -> authenticationWebClient.getAuth(authentication,
-                        Map.of("authenticationId", authentication.getPrincipal().toString(),
-                                "password", authentication.getCredentials().toString(),
-                                "clientId", clientId,
-                                "organizationId", clientOrganization.getOrganizationId())));
+            // client-id is associated to organization-id, check user-id is also in organization-id
+            return organizationWebClient.userExistInOrganization(userId, clientOrganization.getOrganizationId())
+                    .filter(aBoolean -> aBoolean)
+                    .switchIfEmpty(Mono.error(new BadCredentialsException("user does not exists in organization")))
+                    .flatMap(aBoolean -> authenticationWebClient.getAuth(authentication,
+                            Map.of("authenticationId", authentication.getPrincipal().toString(),
+                                    "password", authentication.getCredentials().toString(),
+                                    "clientId", clientId,
+                                    "organizationId", clientOrganization.getOrganizationId())));
+        });
     }
 
     @Override
