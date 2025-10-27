@@ -93,6 +93,10 @@ envs:
     value: http://account-rest-service
   - name: ATTEMPT_REST_SERVICE
     value: http://attempt-rest-service
+  - name: ROLE_REST_SERVICE
+    value: http://role-rest-service
+  - name: SETTING_REST_SERVICE
+    value: http://setting-rest-service
   - name: private-client-url
     value: http://127.0.0.1:8090
   - name: AUTH_SERVER_PORT
