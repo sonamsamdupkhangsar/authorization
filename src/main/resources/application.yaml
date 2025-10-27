@@ -6,10 +6,10 @@ server:
 logging:
   level:
     root: info
-    me.sonam: debug
-    com.netflix: off
-    me.sonam.auth.config: debug
-    me.sonam.auth.util.TokenFilter: debug
+    me.sonam: info
+    #com.netflix: off
+    #me.sonam.auth.config: info
+    #me.sonam.auth.util.TokenFilter: info
 
 #    org.springframework.web: info
 #    org.springframework.security: info
