@@ -3,8 +3,9 @@ package me.sonam.auth;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import me.sonam.auth.jpa.entity.ClientOrganization;
+import me.sonam.auth.jpa.entity.ClientUser;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
-import me.sonam.auth.jpa.repo.ClientOwnerRepository;
 import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
 import me.sonam.auth.mocks.WithMockCustomUser;
@@ -82,6 +83,10 @@ public class ClientRestServiceIntegTest {
 
     @Autowired
     private HClientUserRepository clientUserRepository;
+    @Autowired
+    private ClientRepository clientRepository;
+    @Autowired
+    private ClientOrganizationRepository clientOrganizationRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -135,8 +140,6 @@ public class ClientRestServiceIntegTest {
         tokenRequestFilter.getRequestFilters().forEach(requestFilter ->
             requestFilter.getAccessToken().setAccessToken(null));
 
-
-        clientOwnerRepository.deleteAll();
         clientOrganizationRepository.deleteAll();
         clientUserRepository.deleteAll();
 
@@ -145,12 +148,57 @@ public class ClientRestServiceIntegTest {
 
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
     @Test
+    public void getClientCountForLoggedInUser() throws Exception {
+        UUID defaultOrgId = UUID.randomUUID();
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+        LOG.info("call getClientCount without any clients for a org");
+
+        Mono<Long> longMono = webTestClient.get().uri("/clients/count/users")
+                .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
+
+        StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(0)).verifyComplete();
+
+
+        RecordedRequest recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        LOG.info("create 3 client organizations");
+        clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
+        clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
+        clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+        LOG.info("call getClientCount without any clients for a org");
+
+        longMono = webTestClient.get().uri("/clients/count/users")
+                .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
+
+        StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(3)).verifyComplete();
+
+
+        recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+
+    }
+
+        @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
+    @Test
     public void create() throws Exception {
         LOG.info("create registration client");
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107");
         UUID defaultOrgId = UUID.randomUUID();
-        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
 
         RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(messageClient);
         assertThat(registeredClient).isNotNull();
@@ -190,16 +238,50 @@ public class ClientRestServiceIntegTest {
 
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
     @Test
-    public void createFailWhenNotMatchingSuperAdmin() throws Exception {
+    public void createFailWhenNotSuperAdmin() throws Exception {
         LOG.info("create registration client");
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107");
         UUID defaultOrgId = UUID.randomUUID();
-        saveClientNotSuccess(clientId.toString(), "{noop}" + clientSecret, userId, true, defaultOrgId, List.of(UUID.randomUUID()));
+
+        UUID clientId = UUID.randomUUID();
+        Map<String, Object> regClientMap = getRegClientMap(clientId.toString(), "{noop}"+clientSecret, userId);
+        String authenticationId = "dave";
+        Jwt jwt = JwtUtil.jwt(authenticationId);
+
+        //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
+        when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", false))));
+
+        try {
+            Mono<String> stringMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
+                    .exchange().expectStatus().is4xxClientError().returnResult(String.class).getResponseBody().single();
+            StepVerifier.create(stringMono).assertNext(s -> {
+                LOG.info("got response: {}",s );
+            }).verifyComplete();
+        }
+        catch (Exception e) {
+            LOG.info("This exception is thrown because the user is not a superadmin for orgId, error: {}", e.getMessage());
+        }
+
+        // take request for mocked response of access token
+        RecordedRequest recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/"+userId+"/organizations/"+defaultOrgId);
+
 
         RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId.toString());
         assertThat(registeredClient).isNull();
-        LOG.info("client: {}", registeredClient);
     }
 
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
@@ -217,14 +299,14 @@ public class ClientRestServiceIntegTest {
         UUID clientId5 = UUID.randomUUID();
         UUID clientId6 = UUID.randomUUID();
 
-        saveClient(clientId1.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
-        saveClient(clientId2.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
-        saveClient(clientId3.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
-        saveClient(clientId4.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
-        saveClient(clientId5.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(clientId1.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+        saveClient(clientId2.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+        saveClient(clientId3.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+        saveClient(clientId4.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+        saveClient(clientId5.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
 
         LOG.info("this should fail after creating max clients");
-        saveClientNotSuccess(clientId6.toString(), "{noop}" + clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClientNotSuccess(clientId6.toString(), "{noop}" + clientSecret, userId, defaultOrgId, true);
 
         RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId6.toString());
         assertThat(registeredClient).isNull();
@@ -238,9 +320,9 @@ public class ClientRestServiceIntegTest {
         LOG.info("update registration client by using access_token from this client itself for client credential flow");
         final String messageClientAccessToken = getOauth2Token(messageClient, clientSecret); //get token using messageClient first
 
-        UUID userId = UUID.randomUUID();
+        UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107");
         UUID defaultOrgId = UUID.randomUUID();
-        saveClient(clientId.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(clientId.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
 
         RegisteredClient registeredClient = getRegisteredClientFromRestService(clientId.toString(), defaultOrgId);
         Map<String, String> rcMap = jpaRegisteredClientRepository.getMap(registeredClient);
@@ -272,6 +354,8 @@ public class ClientRestServiceIntegTest {
 
     /**
      * this will test the "get all client association with user".
+     * It will first get clients by organization, and verifies there is none on first attempt
+     * Then it will create a client, verify in get client by org that client id is retrieved and so on
      * @throws Exception
      */
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
@@ -289,7 +373,7 @@ public class ClientRestServiceIntegTest {
 
         UUID testClient1 = UUID.randomUUID();
         LOG.info("save a client");
-        saveClient(testClient1.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(testClient1.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         LOG.info("get associated clients to another user");
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
         assertThat(page.getTotalElements()).isEqualTo(1);
@@ -299,14 +383,14 @@ public class ClientRestServiceIntegTest {
         assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
 
         UUID testClient2= UUID.randomUUID();
-        saveClient(testClient2.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(testClient2.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
         assertThat(page.getTotalElements()).isEqualTo(2);
         assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
         assertThat(page).contains(Pair.of(testClient2.toString(), testClient2.toString()));
 
         UUID testClient3 = UUID.randomUUID();
-        saveClient(testClient3.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(testClient3.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
         assertThat(page.getTotalElements()).isEqualTo(3);
         assertThat(page.getContent().get(2).getFirst()).isNotNull();
@@ -315,7 +399,7 @@ public class ClientRestServiceIntegTest {
         assertThat(page).contains(Pair.of(testClient3.toString(), testClient3.toString()));
 
         UUID testClient4 = UUID.randomUUID();
-        saveClient(testClient4.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(testClient4.toString(), "{noop}"+clientSecret, userId,  defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
         assertThat(page.getTotalElements()).isEqualTo(4);
         assertThat(page.getContent().get(3).getFirst()).isNotNull();
@@ -325,7 +409,7 @@ public class ClientRestServiceIntegTest {
         assertThat(page).contains(Pair.of(testClient4.toString(), testClient4.toString()));
 
         UUID testClient5 = UUID.randomUUID();
-        saveClient(testClient5.toString(), "{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(testClient5.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
         assertThat(page.getTotalElements()).isEqualTo(5);
         assertThat(page.getContent().get(4).getFirst()).isNotNull();
@@ -356,27 +440,10 @@ public class ClientRestServiceIntegTest {
         return tokenMap.get("access_token");
     }
 
-    private void saveClient(String clientId, String clientSecret, UUID userId, boolean accessTokenPassed, UUID defaultOrgId, List<UUID> superAmdinOrgs) throws  Exception {
+    private void saveClient(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isSuperAdmin) throws  Exception {
         LOG.info("now make a request to create a client");
-        RegisteredClient registeredClient = RegisteredClient.withId(clientId.toString())
-                .clientId(clientId.toString())
-                .clientSecret(clientSecret)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
-                .redirectUri("http://127.0.0.1:8080/authorized")
-                .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
-                .scope("message.read")
-                .scope("message.write")
-                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
-                .build();
+        Map<String, Object> regClientMap = getRegClientMap(clientId, clientSecret, userId);
 
-        Map<String, Object> regClientMap = jpaRegisteredClientRepository.getMapObject(registeredClient);
-        regClientMap.put("userId", userId);
         LOG.info("requestBody: {}", regClientMap);
         String authenticationId = "dave";
         Jwt jwt = JwtUtil.jwt(authenticationId);
@@ -384,19 +451,12 @@ public class ClientRestServiceIntegTest {
         //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
         when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
 
-
-        if (!accessTokenPassed) {
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
-        }
-
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
 
-        if (superAmdinOrgs != null && !superAmdinOrgs.isEmpty()) {
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(getJson(superAmdinOrgs)));
-        }
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
+
 
         Mono<Map> mapMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
                 .exchange().expectStatus().isCreated().returnResult(Map.class).getResponseBody().single();
@@ -414,121 +474,55 @@ public class ClientRestServiceIntegTest {
 
         // take request for mocked response of access token
         RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        if (!accessTokenPassed) {
-            assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-            assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
-            recordedRequest = mockWebServer.takeRequest();
-        }
-
-        // take reqiest for getting default orgId from setting rest service
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
         assertThat(recordedRequest.getPath()).startsWith("/settings/users");
 
-        if (superAmdinOrgs != null && !superAmdinOrgs.isEmpty()) {
-            // take request for getting superadmin org ids for the logged-in user
-            recordedRequest = mockWebServer.takeRequest();
-            assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-            assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/organizations?page=");
-        }
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/"+userId+"/organizations/"+defaultOrgId);
     }
 
-    private void saveClientNotSuccess(String clientId, String clientSecret, UUID userId, boolean accessTokenPassed, UUID defaultOrgId, List<UUID> superAmdinOrgs) throws  Exception {
-        LOG.info("now make a request to create a client");
-        RegisteredClient registeredClient = RegisteredClient.withId(clientId.toString())
-                .clientId(clientId.toString())
-                .clientSecret(clientSecret)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
-                .redirectUri("http://127.0.0.1:8080/authorized")
-                .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
-                .scope("message.read")
-                .scope("message.write")
-                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
-                .build();
-
-        Map<String, Object> regClientMap = jpaRegisteredClientRepository.getMapObject(registeredClient);
-        regClientMap.put("userId", userId);
-        LOG.info("requestBody: {}", regClientMap);
-        String authenticationId = "dave";
-        Jwt jwt = JwtUtil.jwt(authenticationId);
-
-        //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
-        when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
-
-
-        if (!accessTokenPassed) {
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
-        }
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
-
-        if (superAmdinOrgs != null && !superAmdinOrgs.isEmpty()) {
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(getJson(superAmdinOrgs)));
-        }
+    private void saveClientNotSuccess(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isSuperAdmin) throws  Exception {
 
         try {
-        Mono<String> stringMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
-                .exchange().expectStatus().is4xxClientError().returnResult(String.class).getResponseBody().single();
+            LOG.info("now make a request to create a client");
+            Map<String, Object> regClientMap = getRegClientMap(clientId, clientSecret, userId);
+            LOG.info("requestBody: {}", regClientMap);
+            String authenticationId = "dave";
+            Jwt jwt = JwtUtil.jwt(authenticationId);
 
-        LOG.info("assert that the page returned is unlocking user account page.");
+            //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
+            when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
 
-        // take request for mocked response of access token
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        if (!accessTokenPassed) {
-            assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-            assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
-            recordedRequest = mockWebServer.takeRequest();
+            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                    .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                    .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
+
+            Mono<String> stringMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
+                    .exchange().expectStatus().is4xxClientError().returnResult(String.class).getResponseBody().single();
+
+
+            StepVerifier.create(stringMono).assertNext(s -> {
+                LOG.info("got response: {}", s);
+            }).verifyComplete();
+
         }
-
-        // take reqiest for getting default orgId from setting rest service
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
-
-        if (superAmdinOrgs != null && !superAmdinOrgs.isEmpty()) {
-            // take request for getting superadmin org ids for the logged-in user
-            recordedRequest = mockWebServer.takeRequest();
-            assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-            assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/organizations?page=");
-        }
-
-            }
         catch (Exception e) {
+            LOG.error("Exception occured: {}", e.getMessage());
+        }
+            // take request for mocked response of access token
             RecordedRequest recordedRequest = mockWebServer.takeRequest();
-            if (!accessTokenPassed) {
-                assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-                assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
-                recordedRequest = mockWebServer.takeRequest();
-            }
 
-            // take reqiest for getting default orgId from setting rest service
             assertThat(recordedRequest.getMethod()).isEqualTo("GET");
             assertThat(recordedRequest.getPath()).startsWith("/settings/users");
 
-            if (superAmdinOrgs != null && !superAmdinOrgs.isEmpty()) {
-                // take request for getting superadmin org ids for the logged-in user
-                recordedRequest = mockWebServer.takeRequest();
-                assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-                assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/organizations?page=");
-            }
-            LOG.error("Excepiton e", e);
-        }
+            recordedRequest = mockWebServer.takeRequest();
+            assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+            assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/" + userId + "/organizations/" + defaultOrgId);
+
     }
-
-
-    @Autowired
-    private ClientOwnerRepository clientOwnerRepository;
-    @Autowired
-    private ClientRepository clientRepository;
-    @Autowired
-    private ClientOrganizationRepository clientOrganizationRepository;
 
     /**
      * this test is for testing client delete, part of delete my info
@@ -546,32 +540,106 @@ public class ClientRestServiceIntegTest {
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107"); //this should match the value from WithMockCustomerUser.userId value
         UUID defaultOrgId = UUID.randomUUID();
-        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, true, defaultOrgId, List.of(defaultOrgId));
+        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
 
-        assertThat(clientOwnerRepository.findByUserId(userId).size()).isEqualTo(1);
-        assertThat(clientUserRepository.countByUserId(userId)).isEqualTo(1);
         assertThat(clientRepository.findByClientId(clientId.toString()).get()).isNotNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
 
-       /* mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody("{\"message\": \"deleted clientId in token-mediator: "+clientId+"\"}"));
-*/
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", true))));
+
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", 0L))));
+
         LOG.info("call client delete");
         EntityExchangeResult<Map<String, Object>> entityExchangeResult = webTestClient.delete()
                 .uri("/clients")
                 .accept(MediaType.APPLICATION_JSON).exchange().expectBody(new ParameterizedTypeReference<Map<String, Object>>() {}).returnResult();
 
-       /* RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        assertThat(recordedRequest.getMethod()).isEqualTo("DELETE");
-        assertThat(recordedRequest.getPath()).startsWith("/oauth2-token-mediator/clients/"+clientId);
-*/
+        LOG.info("response: {}", entityExchangeResult.getResponseBody());
+        RecordedRequest recordedRequest = mockWebServer.takeRequest();
 
-        assertThat(clientOwnerRepository.findByUserId(userId).size()).isEqualTo(0);
-        assertThat(clientUserRepository.countByUserId(userId)).isEqualTo(0);
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/" + userId + "/organizations/" + defaultOrgId);
+
+        recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+
         assertThat(clientRepository.findByClientId(clientId.toString())).isEmpty();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isEmpty();
 
+        LOG.info("done test");
     }
+
+    /**
+     * Delete my info from clients when there are clients with organization-user-roles for any client
+     * @throws Exception
+     */
+    //WithMockCustomUser annotation will pass a token to the security.  No need to add to the http header as bearer authorization
+    @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
+    @Test
+    public void deleteClientWithClientOrgRoles() throws Exception {
+        LOG.info("create registration client");
+        final String accessToken = "eyJraWQiOiJiYThjMDY1Mi1mNDY1LTRjMjgtYTBhNC00ZjkwZjZiMDgwYWUiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzb25hbSIsImF1ZCI6ImI0ZGZlM2ZiLTE2OTItNDRiOC05MmFiLTM2NmNjYzg0YjUzOS1hdXRoem1hbmFnZXIiLCJuYmYiOjE3MTg4MjMyOTgsInNjb3BlIjpbIm9wZW5pZCIsInByb2ZpbGUiXSwiaXNzIjoiaHR0cDovL2FwaS1nYXRld2F5OjkwMDEvaXNzdWVyIiwiZXhwIjoxNzE4ODIzNTk4LCJ1c2VyUm9sZSI6WyJVU0VSX1JPTEUiXSwiaWF0IjoxNzE4ODIzMjk4LCJ1c2VySWQiOiIxZjQ0MmRhYi05NmEzLTQ1OWUtODYwNS03ZjVjZDVmODJlMjUiLCJqdGkiOiJkOTA2MmE2MC01ODQ2LTRiM2YtYmYwOC03ZGZmNDY5ZmIxOTMifQ.fwKo-SWQnFRpyAVuLxTjjkAqMqNMXBy7NNr-SIbuaXYzOrpzdhY0PFKrG2sRbbvSWxoIIjPFaVeFskh-I_sON8uvTw3MPld5W3gf7RcT_ZG49UlGt4E1R_BzhxiYpkm2QCZqZl1CtgQ_lqgN0roTWuXGMCPFuwATIyIhfkAHnyvWBcUlGRavDfGEBx61MEWJZ3ZnK0Mr08_LH4dXqms2QoDEIQzDbpNLUFCpV99mTEKyOMfKh5wrSgex7fdwdDcdhq1wx98nlbrk9gmLRMruYaPx8Vun0xFjudZzIDwvqA9iQRPjQmJdO-8V9xFY5mvS04zrRbRCIDR_g09hwkkRTw";
+
+        UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107"); //this should match the value from WithMockCustomerUser.userId value
+        UUID defaultOrgId = UUID.randomUUID();
+        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+
+        assertThat(clientRepository.findByClientId(clientId.toString()).get()).isNotNull();
+        assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
+
+        LOG.info("call client delete");
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", true))));
+
+        // return 1 (row count) when getting count of client-organization-user roles by orgId
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", 1L))));
+
+        EntityExchangeResult<Map<String, Object>> entityExchangeResult = webTestClient.delete()
+                .uri("/clients")
+                .accept(MediaType.APPLICATION_JSON).exchange().expectBody(new ParameterizedTypeReference<Map<String, Object>>() {}).returnResult();
+
+        LOG.info("response: {}", entityExchangeResult.getResponseBody());
+        RecordedRequest recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/" + userId + "/organizations/" + defaultOrgId);
+
+        recordedRequest = mockWebServer.takeRequest();
+
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+
+        //the client(s) should not be deleted if we get a count of 1 for roles in client-org-user-roles
+
+        assertThat(clientRepository.findByClientId(clientId.toString())).isNotEmpty();
+        assertThat(clientOrganizationRepository.findByClientId(clientId)).isNotEmpty();
+
+        assertThat(clientOrganizationRepository.findByClientId(clientId)).isNotNull();
+        assertThat(clientOrganizationRepository.findByClientId(clientId).get().getOrganizationId()).isEqualTo(defaultOrgId);
+        assertThat(clientOrganizationRepository.findByClientId(clientId).get().getClientId()).isEqualTo(clientId);
+
+    }
+
     private RegisteredClient getRegisteredClientFromRestService(String clientId, UUID defaultOrgId) throws InterruptedException {
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
@@ -644,14 +712,20 @@ public class ClientRestServiceIntegTest {
             mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                     .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
         }
-
+        //get defaultOrganization response
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
 
+        //isSuperAdminInOrgId response
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", true))));
+
         EntityExchangeResult<RestPage<Pair<String, String>>> entityExchangeResult = webTestClient.get()
-                .uri("/clients/users")
+                .uri("/clients/organizations")
                 .exchange().expectStatus().isOk().expectBody(new ParameterizedTypeReference<
                         RestPage<Pair<String, String>>>(){}).returnResult();
+
+        LOG.info("entityExchange result: {}", entityExchangeResult.getResponseBody());
 
         // take request for mocked response of access token
         RecordedRequest recordedRequest = mockWebServer.takeRequest();
@@ -665,6 +739,10 @@ public class ClientRestServiceIntegTest {
 
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
         assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/"+userId+"/organizations/"+defaultOrgId);
 
         assertThat(entityExchangeResult).isNotNull();
         assertThat(entityExchangeResult.getResponseBody()).isNotNull();
@@ -684,6 +762,30 @@ public class ClientRestServiceIntegTest {
             LOG.error("error occurred", e);
             return null;
         }
+    }
+
+    private Map<String, Object> getRegClientMap(String clientId, String clientSecret, UUID userId) {
+        RegisteredClient registeredClient = RegisteredClient.withId(clientId)
+                .clientId(clientId)
+                .clientSecret(clientSecret)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
+                .redirectUri("http://127.0.0.1:8080/authorized")
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope("message.read")
+                .scope("message.write")
+                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
+                .build();
+
+        Map<String, Object> regClientMap = jpaRegisteredClientRepository.getMapObject(registeredClient);
+        regClientMap.put("userId", userId);
+
+        return regClientMap;
     }
 
 }

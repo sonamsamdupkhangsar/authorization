@@ -25,6 +25,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,6 +61,10 @@ public class AuthenticationCallout implements AuthenticationProvider {
     private final UserWebClient userWebClient;
     @Autowired
     private AccountWebClient accountWebClient;
+    @Autowired
+    private SettingWebClient settingWebClient;
+    @Autowired
+    private RoleWebClient roleWebClient;
 
     @Value("${authzmanager-id}")
     private UUID authzManagerId;
@@ -70,7 +75,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                  LoginAttemptWebClient loginAttemptWebClient,
                                  OrganizationWebClient organizationWebClient,
                                  AuthenticationWebClient authenticationWebClient,
-                                 UserWebClient userWebClient, AccountWebClient accountWebClient) {
+                                 UserWebClient userWebClient, AccountWebClient accountWebClient,
+                                 SettingWebClient settingWebClient, RoleWebClient roleWebClient) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
         this.loginAttemptWebClient = loginAttemptWebClient;
@@ -78,6 +84,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
         this.authenticationWebClient = authenticationWebClient;
         this.userWebClient = userWebClient;
         this.accountWebClient = accountWebClient;
+        this.settingWebClient = settingWebClient;
+        this.roleWebClient = roleWebClient;
     }
 
     @Override
@@ -104,7 +112,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
          LOG.info("clientId: {}", clientId);
          if (clientId == null || clientId.equals("")) {
              LOG.error("client id not found");
-             throw new BadCredentialsException("clientId not found in request cache");
+             throw new BadCredentialsException("Please go back your main application that brought you here to this sign-in page");
          }
 
 
@@ -177,11 +185,10 @@ public class AuthenticationCallout implements AuthenticationProvider {
         }
         ).flatMap(userId -> isClientAuthzManager(userId, clientId, authentication)
                 .switchIfEmpty(checkClientInOrganization(authentication, userId, clientId))
-                    .switchIfEmpty(checkClientUserRelationship(userId, clientId, authentication))
 
                     .onErrorResume(throwable -> {
-                        LOG.debug("exception occurred after going thru checking if client-id exists in client-user relationship", throwable);
-                        LOG.error("exception occurred after going thru client-user relationship check: {}", throwable.getMessage());
+                        LOG.debug("exception occurred when going thru client organization check", throwable);
+                        LOG.error("exception occurred when going thru client organization check: {}", throwable.getMessage());
 
                         if (throwable instanceof BadCredentialsException) {
                             String ipAddress = "";
@@ -218,12 +225,18 @@ public class AuthenticationCallout implements AuthenticationProvider {
         LOG.info("checking if the clientId: {} is for authzManagerId: {}", clientId, authzManagerId);
 
         if (authzManagerId.equals(clientId)) {
-            LOG.info("client is authzManager, authentication user");
-            LOG.info("returning auth");
-            return authenticationWebClient.getAuth(authentication,  Map.of("authenticationId", authentication.getPrincipal().toString(),
-                    "password", authentication.getCredentials().toString(),
-                    "clientId", clientId)
-            );
+            LOG.info("client is authzManager, authenticate user");
+
+            return settingWebClient.getDefaultOrganization(null, userId)
+                            .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(null, userId, orgId).zipWith(Mono.just(orgId)))
+                                    .flatMap(objects -> {
+                                        if (!objects.getT1()) {
+                                            return Mono.error(new BadCredentialsException("User is not a superadmin in the default orgId: "+ objects.getT2()));
+                                        }
+                                        return Mono.just(objects.getT2()); //return orgId
+                                    }).flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of("authenticationId", authentication.getPrincipal().toString(),
+                                    "password", authentication.getCredentials().toString(),
+                                    "clientId", clientId)));
         }
         else {
             LOG.info("clientId is not AuthzManager");
@@ -231,37 +244,15 @@ public class AuthenticationCallout implements AuthenticationProvider {
         }
     }
 
-    private Mono<UsernamePasswordAuthenticationToken> checkClientUserRelationship(final UUID userId, final UUID clientId, final Authentication authentication) {
-        return Mono.defer(() -> {
-            LOG.info("checkClientUserRelationship() - checking userId {} and clientId {} in ClientUser relationship", userId, clientId);
-
-            Optional<ClientUser> clientUserOptional = clientUserRepository.findByClientIdAndUserId(clientId, userId);
-
-            if (clientUserOptional.isPresent()) {
-                LOG.info("user has clientId relationship {}", clientUserOptional.get());
-                return authenticationWebClient.getAuth(authentication, Map.of("authenticationId", authentication.getPrincipal().toString(),
-                        "password", authentication.getCredentials().toString(),
-                        "clientId", clientId));
-            }
-            else {
-                LOG.info("authzManagerId: {}, clientId: {}", authzManagerId, clientId);
-                LOG.error("the user trying to log-in with user-id is not associated with this client-id");
-                return Mono.error(new BadCredentialsException("there is no client-id association with this user-id"));
-            }
-        });
-    }
-
-
     private Mono<UsernamePasswordAuthenticationToken> checkClientInOrganization(Authentication authentication, UUID userId, UUID clientId) {
         return Mono.defer(() -> {
             LOG.info("checkClientInOrganization() - checking client exists in clientOrganization");
-
             Optional<ClientOrganization> optionalClientOrganization = clientOrganizationRepository.findByClientId(clientId);
-            optionalClientOrganization.ifPresent(clientOrganization -> LOG.info("clientOrganization exists with clientId: {}", clientOrganization));
 
             if (optionalClientOrganization.isEmpty()) {
                 LOG.info("client-id {} not associated with organization, not found in clientOrganization", clientId);
-                return Mono.empty(); // return empty if there is no client organization association for this client-id
+                //return Mono.empty(); // return empty if there is no client organization association for this client-id
+                return Mono.error(new BadCredentialsException("client is not associated to organization"));
             } else {
                 LOG.info("client-id is associated to a organization, so user must also be associated to a organization for logging-in");
             }
@@ -272,6 +263,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
             return organizationWebClient.userExistInOrganization(userId, clientOrganization.getOrganizationId())
                     .filter(aBoolean -> aBoolean)
                     .switchIfEmpty(Mono.error(new BadCredentialsException("user does not exists in organization")))
+                    .flatMap(aBoolean -> roleWebClient.getRoleIdForClientOrganizationUser(null, clientId, clientOrganization.getOrganizationId(), userId))
+                    .switchIfEmpty(Mono.error(new BadCredentialsException("User does not have a role for clientId, organization")))
                     .flatMap(aBoolean -> authenticationWebClient.getAuth(authentication,
                             Map.of("authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),

@@ -18,8 +18,10 @@ public interface ClientOrganizationRepository extends JpaRepository<ClientOrgani
     Optional<Boolean> existsByClientIdAndOrganizationId(UUID clientId, UUID organizationId);
     Optional<ClientOrganization> findByClientIdAndOrganizationIdIn(UUID clientId, List<UUID> organizationIds);
 
+    Optional<Long> deleteByOrganizationId(UUID organizationId);
     Optional<Long> deleteByClientIdAndOrganizationId(UUID clientId, UUID organizationId);
     List<ClientOrganization> findByOrganizationIdIn(List<UUID> organizationIds);
     List<ClientOrganization> findByOrganizationId(UUID organizationId, Pageable pageable);
+    List<ClientOrganization> findByOrganizationId(UUID organizationId);
     long countByOrganizationId(UUID organizationId);
 }

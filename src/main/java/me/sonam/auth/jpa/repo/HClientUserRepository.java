@@ -12,7 +12,11 @@ import java.util.UUID;
 
 public interface HClientUserRepository extends JpaRepository<ClientUser, ClientUserId> {
 
+    long deleteByUserId(UUID userId);
     long countByUserId(UUID userId);
+    long countByUserIdNot(UUID userId);
+    List<ClientUser> findByUserId(UUID userId);
+    List<ClientUser> findByClientIdAndUserIdNot(UUID clientId, UUID userId);
     List<ClientUser> findByUserId(UUID userId, Pageable pageable);
     List<ClientUser> findByClientId(UUID clientId);
     Optional<ClientUser> findByClientIdAndUserId(UUID clientId, UUID userId);

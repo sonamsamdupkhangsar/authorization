@@ -4,13 +4,12 @@ package me.sonam.auth.rest;
 import jakarta.ws.rs.BadRequestException;
 import me.sonam.auth.jpa.entity.Client;
 import me.sonam.auth.jpa.entity.ClientOrganization;
-import me.sonam.auth.jpa.entity.ClientOwner;
-import me.sonam.auth.jpa.entity.ClientUser;
-import me.sonam.auth.jpa.repo.*;
-import me.sonam.auth.rest.util.MyPair;
+import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
+import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
 import me.sonam.auth.service.exception.MaxCountException;
 import me.sonam.auth.util.TokenRequestFilter;
+import me.sonam.auth.util.UserIdUtil;
 import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.SettingWebClient;
 import org.apache.tomcat.websocket.AuthenticationException;
@@ -24,13 +23,15 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.util.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
@@ -48,14 +49,11 @@ public class ClientRestService {
     private final ClientRepository clientRepository;
     private final JpaRegisteredClientRepository jpaRegisteredClientRepository;
 
-    @Autowired
-    private HClientUserRepository clientUserRepository;
+/*    @Autowired
+    private HClientUserRepository clientUserRepository;*/
 
     @Autowired
     private ClientOrganizationRepository clientOrganizationRepository;
-
-    @Autowired
-    private ClientOwnerRepository clientOwnerRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -72,14 +70,20 @@ public class ClientRestService {
     @Value("${maxClients}")
     private int maxClients;
 
+    @Value("${authzmanager-id}")
+    private String authzManagerId;
+
+    private final TransactionTemplate transactionTemplate;
+
     public ClientRestService(JpaRegisteredClientRepository jpaRegisteredClientRepository,
                              ClientRepository clientRepository, PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
-                             SettingWebClient settingWebClient) {
+                             SettingWebClient settingWebClient, TransactionTemplate transactionTemplate) {
         this.jpaRegisteredClientRepository = jpaRegisteredClientRepository;
         this.clientRepository = clientRepository;
         this.passwordEncoder = passwordEncoder;
         this.roleWebClient = roleWebClient;
         this.settingWebClient = settingWebClient;
+        this.transactionTemplate = transactionTemplate;
         LOG.info("initialized clientRestService");
     }
 
@@ -100,41 +104,28 @@ public class ClientRestService {
         LOG.info("userId {}, accessToken: {}", userId, accessToken);
 
 
-       return settingWebClient.getDefaultOrganization(accessToken)
+       return settingWebClient.getDefaultOrganization(accessToken, userId)
                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
-               .flatMap(orgId -> roleWebClient.getSuperAdminOrgIds(accessToken, 0, 1)
-                       .switchIfEmpty(Mono.error(new AuthenticationException("No super Admin org id found")))
-                       .zipWith(Mono.just(orgId)))
-
+               .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                .flatMap(objects -> {
-                   UUID organizationId = objects.getT2();
-
-                   LOG.info("max number of clients count: {}", maxClients);
-                   long clientCount = clientOrganizationRepository.countByOrganizationId(organizationId);
-                   LOG.info("clientCount: {}", clientCount);
-                   if (clientCount >= maxClients) {
-                       LOG.info("client row count max exceeded by organizationId: {}", clientCount);
-                       return Mono.error(new MaxCountException("Max number of clients reached"));
-                   }
-                   return Mono.just(objects);
-               })
-               .flatMap(objects -> {
-                    LOG.error("orgId: {}", objects.getT2());
-
-                   if (objects.getT1().isEmpty()) {
-                    return Mono.error(new AuthenticationException("no superadmin org id found"));
-                   }
-                   UUID superAdminOrgId = objects.getT1().getFirst(); //just get first only as we store 1 superadmin only
-                   UUID organizationId = objects.getT2();
-                   if (superAdminOrgId.equals(organizationId)) {
-                       LOG.info("superAdminOrgId and orgId matches: {}, {}", superAdminOrgId, objects.getT2());
-                       return save(map, userId, objects.getT2());
+                   if (objects.getT1() == false) {
+                       return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : "+ objects.getT2()));
                    }
                    else {
-                       LOG.info("throwing exception when superAdminOrgId and defaultOrgId does not match");
-                       return Mono.error(new BadRequestException("superAdminOrgId and defaultOrgId does not match"));
+                    return Mono.just(objects.getT2());
                    }
+               })
+               .flatMap(orgId -> {
+                   LOG.info("max number of clients count: {}", maxClients);
+                    long clientCount = clientOrganizationRepository.countByOrganizationId(orgId);
+                    LOG.info("clientCount: {}", clientCount);
+                    if (clientCount >= maxClients) {
+                        LOG.info("client row count max exceeded by organizationId: {}", clientCount);
+                        return Mono.error(new MaxCountException("Max number of clients reached"));
+                    }
+                   return save(map, userId, orgId);
                 });
+
     }
 
     private Mono<Map<String, Object>> save(Map<String, Object> map, UUID userId, UUID organizationId) {
@@ -163,15 +154,9 @@ public class ClientRestService {
         LOG.info("saved registeredClient.id: {}", registeredClient.getId());
         UUID clientId = UUID.fromString(registeredClient.getId());
 
-        LOG.info("save clientUser relationship, userId: {}", map.get("userId"));
-        clientUserRepository.save(new ClientUser(UUID.fromString(registeredClient.getId()),
-                UUID.fromString(map.get("userId").toString())));
-
         Map<String, Object> mapToReturn = jpaRegisteredClientRepository.getMapObject(registeredClient);
 
         LOG.info("clientId: {}", clientId);
-
-        clientOwnerRepository.save(new ClientOwner(clientId, userId));
 
         clientOrganizationRepository.save(new ClientOrganization(clientId, organizationId));
         LOG.info("saved clientOrganization clientId: {}, orgId: {}", clientId, organizationId);
@@ -187,8 +172,13 @@ public class ClientRestService {
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String accessToken = jwt.getTokenValue();
+        String userIdString = jwt.getClaim("userId");
 
-        return settingWebClient.getDefaultOrganization(accessToken)
+        LOG.info("userId: {}", userIdString);
+
+        UUID userId = UUID.fromString(userIdString);
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
                 .flatMap(orgId -> {
                     RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
                     if (registeredClient != null) {
@@ -216,8 +206,12 @@ public class ClientRestService {
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String accessToken = jwt.getTokenValue();
+        String userIdString = jwt.getClaim("userId");
 
-        return settingWebClient.getDefaultOrganization(accessToken)
+        LOG.info("userId: {}", userIdString);
+        UUID userId = UUID.fromString(userIdString);
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
                 .flatMap(orgId -> {
                     LOG.info("orgId: '{}'", id);
                     UUID uuid = UUID.fromString(id);
@@ -232,6 +226,19 @@ public class ClientRestService {
                 });
     }
 
+
+    // get count of clients owned by logged-in user based on access token
+    @GetMapping("/count/users")
+    public Mono<Long> getClientCount() {
+        LOG.info("get count of clients for logged-in user");
+        Pair<UUID, String> uuidTokenPair = UserIdUtil.getLoggedInUserId();
+        String accessToken = uuidTokenPair.getSecond();
+        UUID userId = uuidTokenPair.getFirst();
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .flatMap(orgId -> Mono.just(clientOrganizationRepository.countByOrganizationId(orgId)))
+                .doOnNext(aLong -> LOG.info("found {} clients for organization", aLong));
+    }
     /**
      * Get user's default organization (whether a subdomain like org1.authzger.com or a free tier one) or a id from settings
      * then show organization level clients.  Users can't login, only superadmins can.
@@ -239,45 +246,41 @@ public class ClientRestService {
      * @param pageable
      * @return
      */
-    @GetMapping("/users")
+    @GetMapping("/organizations")
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Page<Pair<String, String>>> getClientsOwnedByUserId(Pageable pageable) {
+    public Mono<Page<Pair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
         LOG.info("get clientIds for userId");
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
+        LOG.info("userId: {}", userIdString);
+        UUID userId = UUID.fromString(userIdString);
 
         String accessToken = jwt.getTokenValue();
         List<Pair<String, String>> list = new ArrayList<>();
 
-        return settingWebClient.getDefaultOrganization(accessToken)
-                .flatMap(orgId -> {
-                    LOG.info("transfer to organizationId for userId: {}", userIdString);
-                    UUID userId = UUID.fromString(userIdString);
-
-                    List<ClientUser> clientUserList = clientUserRepository.findByUserId(userId, pageable);
-                    clientUserList.forEach(clientUser -> {
-                        LOG.info("transfer client.id {} to organization: {}", clientUser.getClientId(), orgId);
-                        Optional<Boolean> optionalBoolean = clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUser.getClientId(), orgId);
-                        if (optionalBoolean.isPresent() && optionalBoolean.get() == false) {
-                            clientOrganizationRepository.save(new ClientOrganization(clientUser.getClientId(), orgId));
-                            LOG.info("transfer client.id to organization", clientUser.getClientId());
-                        }
-                    });
-
-
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
+                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(objects -> {
+                    if (!objects.getT1()) {
+                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                    } else {
+                        return Mono.just(objects.getT2());
+                    }
+                }).flatMap(orgId -> {
                     List<ClientOrganization> clientOrganizationList = clientOrganizationRepository.findByOrganizationId(orgId, pageable);
 
-                LOG.info("defaultOrgId: {}, clientOrganizationList: {}", orgId, clientOrganizationList.size());
-                clientOrganizationList.forEach(clientOrganization -> {
-                    Optional<Client> clientOptional = clientRepository.findById(clientOrganization.getClientId().toString());
-                    clientOptional.ifPresent(client -> list.add(Pair.of(client.getId(), client.getClientId())));
-                });
-                LOG.info("list.size {}, list {}", list.size(), list);
+                    LOG.info("defaultOrgId: {}, clientOrganizationList: {}", orgId, clientOrganizationList.size());
+                    clientOrganizationList.forEach(clientOrganization -> {
+                        Optional<Client> clientOptional = clientRepository.findById(clientOrganization.getClientId().toString());
+                        clientOptional.ifPresent(client -> list.add(Pair.of(client.getId(), client.getClientId())));
+                    });
+                    LOG.info("list.size {}, list {}", list.size(), list);
 
 
-            return Mono.just(new PageImpl<>(list, pageable, clientOrganizationRepository.countByOrganizationId(orgId)));
-        }).switchIfEmpty(Mono.just(new PageImpl<>(list, pageable, 0))).flatMap(Mono::just);
+                    return Mono.just(new PageImpl<>(list, pageable, clientOrganizationRepository.countByOrganizationId(orgId)));
+                }).switchIfEmpty(Mono.just(new PageImpl<>(list, pageable, 0))).flatMap(Mono::just);
     }
 
     @PutMapping
@@ -356,8 +359,7 @@ public class ClientRestService {
             LOG.info("deleting by id: {}", registeredClient.getId());
             clientRepository.deleteById(registeredClient.getId());
 
-            long rows = clientUserRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
-            LOG.info("delete clientUser by clientId: {} affected rows: {}", registeredClient.getClientId(), rows);
+            LOG.info("delete client associated with organization {}", registeredClient.getClientId());
             clientOrganizationRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
 
         }
@@ -366,31 +368,65 @@ public class ClientRestService {
 
 
     /**
-     * delete clients, clientorganization, clientowner, clientuser part of delete my info
+     * delete clients, clientorganization, clientuser part of delete my info
+     * delete client-user relationship for logged-in userId
      * @return
      */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public Mono<Map<String, String>> delete() {
-        LOG.info("delete my clients");
+        LOG.info("delete client-user relationship for logged-in user-id");
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
         String userIdString = jwt.getClaim("userId");
-        LOG.info("delete user data for userId: {}", userIdString);
+        LOG.info("delete client-user for userIdString: {}", userIdString);
 
         UUID userId = UUID.fromString(userIdString);
-
         String accessToken = jwt.getTokenValue();
-        LOG.info("userId: {}, accessToken: {}", jwt.getClaim("userId"), accessToken);
 
-        clientOwnerRepository.findByUserId(userId).forEach(clientOwner -> {
-            clientUserRepository.deleteByClientId(clientOwner.getClientId());
-            clientRepository.deleteById(clientOwner.getClientId().toString());
-            clientOrganizationRepository.deleteByClientId(clientOwner.getClientId());
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
+                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(objects -> {
+                    if (!objects.getT1()) {
+                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                    }
+                    UUID orgId = objects.getT2();
+                    //check if there are rows where there are roles set by this orgId -- indicating there are users with roles for some client
+                    //basically we don't want to delete any client if there are roles assigned to this org
+                    return roleWebClient.getCountOfUsersWithUserClientOrganizationRoleByOrgId(accessToken, orgId).zipWith(Mono.just(orgId));
+                })
+                .flatMap(objects -> {
+                    UUID orgId = objects.getT2();
+                    LOG.info("count of users with user-client-org-role by orgId: {}", objects.getT1());
+                    int count = objects.getT1();
+                    if (count <= 0) {
+                        //there are no roles setup for any client, org -- this should delete all rows with this orgId
+                        transactionTemplate.executeWithoutResult(status -> {
+                            deleteCli(orgId);
+                        });
+
+                        return Mono.just(Map.of("message", "delete client"));
+                    } else {
+                        return Mono.just(Map.of("error", "there are currently roles associated to organization"));
+                    }
+                });
+   }
+
+    private void deleteCli(UUID orgId) {
+        List<ClientOrganization> clientOrganizationList = clientOrganizationRepository.findByOrganizationId(orgId);
+
+        LOG.info("deleting clientOrganization by organizationId");
+        clientOrganizationRepository.deleteByOrganizationId(orgId);
+
+        LOG.info("iterate {}", clientOrganizationList.size());
+        //then delete all clients associated to this org
+        clientOrganizationList.forEach(clientOrganization ->
+        {
+            LOG.info("delete client: {}", clientOrganization.getClientId());
+            clientRepository.deleteById(clientOrganization.getClientId().toString());
         });
-        clientOwnerRepository.deleteByUserId(userId);
-        return Mono.just(Map.of("message", "deleted user client data"));
+        LOG.info("done");
     }
 }

@@ -40,7 +40,7 @@ public class OrganizationWebClient {
     }
     // use httpMethod for update or post
     public Mono<Organization> updateOrganization(Organization organization, HttpMethod httpMethod) {
-        LOG.info("create organization: {} with endpoint: {}", organization, organizationEndpoint);
+        LOG.info("create organization with endpoint: {} for org: {}", organizationEndpoint, organization);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().method(httpMethod).uri(organizationEndpoint)
                 .bodyValue(organization)

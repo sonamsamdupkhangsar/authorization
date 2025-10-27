@@ -33,16 +33,19 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -88,6 +91,8 @@ public class UserSignupIntegTest {
         r.add("organization-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
         r.add("role-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
         r.add("user-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
+        r.add("setting-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
+
     }
 
     @Test
@@ -112,10 +117,19 @@ public class UserSignupIntegTest {
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
                 .setResponseCode(200).setBody(getJson(user)));
 
-        Organization org = new Organization(null, userSignup.getOrganization(), userId);
+        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), userId);
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
                 .setResponseCode(200).setBody(getJson(org)));
 
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
+                .setResponseCode(200).setBody(getJson(Map.of("message", "added defaultOrganizationId"))));
+
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
+                .setResponseCode(201).setBody(getJson(
+                        Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
+                                "userId", user.getId(), "organizationId", org.getId()))));
+
+/*
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post("/signup")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("firstName", userSignup.getFirstName())
@@ -123,9 +137,25 @@ public class UserSignupIntegTest {
                         .param("email", userSignup.getEmail())
                         .param("authenticationId", userSignup.getAuthenticationId())
                         .param("password", "1234567890")
-                        .param("active", "false")).andDo(print()).andExpect(status().isOk()).andReturn();
+                        .param("active", "false")).andDo(print()).andExpect(status().isOk()).andReturn();*/
 
-        LOG.info("mvcResult: {}", mvcResult.getResponse());
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("firstName", userSignup.getFirstName());
+        formData.add("lastName", userSignup.getLastName());
+        formData.add("email", userSignup.getEmail());
+        formData.add("authenticationId", userSignup.getAuthenticationId());
+        formData.add("password", "1234567890");
+        formData.add("active", "false");
+
+        // use webtestClient to get response and assert.  The MockMvc does not give the response back.
+        EntityExchangeResult<String> entityExchangeResult = webTestClient.post().uri("/signup")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .bodyValue(formData)
+                                .exchange().expectStatus().isOk().expectBody(String.class).returnResult();
+
+        LOG.info("response: {}",entityExchangeResult.getResponseBody());
+
+        assertThat(entityExchangeResult.getResponseBody()).contains("<strong>User Signup Success!</strong> <span>Sonam, your signup was successful! Please check your email ");
         RecordedRequest recordedRequest = mockWebServer.takeRequest();
         Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
         Assertions.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
@@ -142,6 +172,13 @@ public class UserSignupIntegTest {
         Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
         Assertions.assertThat(recordedRequest.getPath()).startsWith("/organizations");
 
+        recordedRequest = mockWebServer.takeRequest();
+        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
+        Assertions.assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+
+        recordedRequest = mockWebServer.takeRequest();
+        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
+        Assertions.assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/names/users/organizations");
     }
 
 

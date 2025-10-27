@@ -99,7 +99,7 @@ public class UserWebClient {
         StringBuilder userByAuthId = new StringBuilder(userByAuthIdEp.replace("{authenticationId}",
                 authenticationId));
 
-        LOG.info("make user call out to endpoint: {}", userByAuthId);
+        LOG.info("get user by authenticationId call out to endpoint: {}", userByAuthId);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(userByAuthId.toString())
                 .retrieve();

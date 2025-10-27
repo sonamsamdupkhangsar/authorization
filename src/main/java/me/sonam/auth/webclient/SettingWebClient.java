@@ -22,18 +22,22 @@ public class SettingWebClient {
         this.userSettingEndpoint = userSettingEndpoint;
         this.defaultOrganizationSettingEndpoint = defaultOrganizationSettingEndpoint;
     }
-
+    
     /**
-     * get defaultOrganizationId for the logged-in user id
+     * get defaultOrganizationId for the userId
+     * @param userId logged-in user-id
      * @return defaultOrganizationId UUID if there is or null if not set
      */
-    public Mono<UUID> getDefaultOrganization(String accessToken) {
-        LOG.info("get defaultOrganizationId for userId with accessToken {}", accessToken);
+    public Mono<UUID> getDefaultOrganization(String accessToken, UUID userId) {
+        LOG.info("get defaultOrganizationId for userId: {}", userId);
 
-        LOG.info("get defaultOrganizationId for userId at endpoint: {}", defaultOrganizationSettingEndpoint);
+        final String endpoint = defaultOrganizationSettingEndpoint.replace("{userId}", userId.toString());
+
+
+        LOG.info("get defaultOrganizationId for userId at endpoint: {}", endpoint);
 
         //get all user setting and find the defaultOrganizationId field
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(defaultOrganizationSettingEndpoint)
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
                 .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
                 .doOnNext(stringObjectMap -> LOG.info("got data: {}", stringObjectMap))
@@ -46,12 +50,12 @@ public class SettingWebClient {
         });
     }
 
-    public Mono<String> addDefaultOrganization(String accessToken, UUID organizationId) {
-        LOG.info("add defaultOrganizationId {} for user using endpoint: {}", organizationId, userSettingEndpoint);
+    public Mono<String> addDefaultOrganization(String accessToken, UUID userId, UUID organizationId) {
+        LOG.info("add defaultOrganizationId for userId: {}, orgId: {} using endpoint: {}", userId, organizationId, userSettingEndpoint);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(userSettingEndpoint)
                 .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken))
-                .bodyValue(Map.of( "defaultOrganizationId", organizationId)).retrieve();
+                .bodyValue(Map.of("userId", userId, "defaultOrganizationId", organizationId)).retrieve();
 
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>(){})
                 .flatMap(this::addRemoveOrganization).onErrorResume(throwable -> {
@@ -94,17 +98,9 @@ public class SettingWebClient {
             Map<String, Object> objectMap = (Map) map.get("message");
 
             LOG.info("objectMap: {}", objectMap);
-            LOG.info("defaultOrganizationId: '{}'", objectMap.get("defaultOrganizationId"));
 
-            String uuidString = objectMap.get("defaultOrganizationId").toString();
-            if (uuidString != null) {
-                uuidString = uuidString.trim();
-            }
-
-            if (uuidString != null) {
-                UUID orgId = UUID.fromString(uuidString);
-                LOG.info("orgId returning: {}", orgId);
-                return Mono.just(orgId);
+            if (objectMap.get("defaultOrganizationId") != null) {
+                return Mono.just(UUID.fromString(objectMap.get("defaultOrganizationId").toString()));
             } else {
                 LOG.debug("no defaultOrganizationId value found");
                 return Mono.empty();

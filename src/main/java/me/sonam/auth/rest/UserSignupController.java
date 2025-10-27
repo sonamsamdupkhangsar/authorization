@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import me.sonam.auth.rest.signup.Organization;
 import me.sonam.auth.rest.signup.UserSignup;
 import me.sonam.auth.webclient.OrganizationWebClient;
+import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.SettingWebClient;
 import me.sonam.auth.webclient.UserWebClient;
 import org.slf4j.Logger;
@@ -40,6 +41,8 @@ public class UserSignupController {
 
     @Autowired
     private SettingWebClient settingWebClient;
+    @Autowired
+    private RoleWebClient roleWebClient;
 
     public UserSignupController(UserWebClient userWebClient) {
         this.userWebClient = userWebClient;
@@ -83,13 +86,15 @@ public class UserSignupController {
                         name = userSignup.getFirstName() + " " + userSignup.getLastName() + " Company";
                     }
                     Organization org = new Organization(null, name, user.getId());
-                    LOG.info("create organization user signup: {}", org);
+                    LOG.info("create organization for user in signup: {}", org);
                     org.setDefaultOrganization(true);
 
                     //create organization and add this user to it
-                    return organizationWebClient.updateOrganization(org, HttpMethod.POST);
+                    return organizationWebClient.updateOrganization(org, HttpMethod.POST).zipWith(Mono.just(user));
                 })
-                .flatMap(organization -> settingWebClient.addDefaultOrganization(null, organization.getId()))
+                .flatMap(objects -> settingWebClient.addDefaultOrganization(null, objects.getT2().getId(), objects.getT1().getId()).zipWith(Mono.just(objects)))
+                .flatMap(objects -> roleWebClient.setUserAsRoleNameForOrganization(null,
+                        "SuperAdmin", objects.getT2().getT2().getId(), objects.getT2().getT1().getId()))
                 .thenReturn(PATH)
                 .onErrorResume(throwable -> {
                                 setErrorInModel(throwable, model, "failed to signup user");

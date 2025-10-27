@@ -147,7 +147,8 @@ public class TokenFilter {
         if (accessToken.getOption().equals(TokenRequestFilter.RequestFilter.AccessToken.JwtOption.forward)) {
             LOG.info("option is forward token");
 
-            if (request.headers().getFirst("Authorization") != null) {
+            String authHeader = request.headers().getFirst("Authorization");
+            if (authHeader != null && !authHeader.contains("Bearer null")) {
                 LOG.info("inbound request contains a authorization header, sending that instead");
                 String token = request.headers().getFirst("Authorization");
                 if (token != null) {
