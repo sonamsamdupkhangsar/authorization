@@ -112,7 +112,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
          LOG.info("clientId: {}", clientId);
          if (clientId == null || clientId.equals("")) {
              LOG.error("client id not found");
-             throw new BadCredentialsException("Please go back your main application that brought you here to this sign-in page");
+             throw new BadCredentialsException("Please go back to your main application that brought you here to this sign-in page");
          }
 
 
