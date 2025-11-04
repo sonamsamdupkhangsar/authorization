@@ -4,6 +4,7 @@ import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.entity.ClientUser;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
+import me.sonam.auth.service.exception.AuthorizationException;
 import me.sonam.auth.service.exception.BadCredentialsException;
 import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
@@ -228,8 +229,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
             LOG.info("client is authzManager, authenticate user");
 
             return settingWebClient.getDefaultOrganization(null, userId)
+                    .switchIfEmpty(Mono.error(new AuthorizationException("No default org found four userId " + userId)))
                             .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(null, userId, orgId).zipWith(Mono.just(orgId)))
-                                    .flatMap(objects -> {
+                    .flatMap(objects -> {
                                         if (!objects.getT1()) {
                                             return Mono.error(new BadCredentialsException("User is not a superadmin in the default orgId: "+ objects.getT2()));
                                         }

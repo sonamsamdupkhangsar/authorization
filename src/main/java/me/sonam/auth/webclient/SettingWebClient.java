@@ -102,7 +102,7 @@ public class SettingWebClient {
             if (objectMap.get("defaultOrganizationId") != null) {
                 return Mono.just(UUID.fromString(objectMap.get("defaultOrganizationId").toString()));
             } else {
-                LOG.debug("no defaultOrganizationId value found");
+                LOG.error("no defaultOrganizationId value found");
                 return Mono.empty();
             }
         } else {
