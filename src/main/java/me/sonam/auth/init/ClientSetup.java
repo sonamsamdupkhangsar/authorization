@@ -51,7 +51,6 @@ public class ClientSetup {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-
     @PostConstruct
     public void createAuthzManagerClient() {
         LOG.info("create authzManager client if it is not created");

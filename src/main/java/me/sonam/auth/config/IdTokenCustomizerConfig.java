@@ -2,6 +2,8 @@ package me.sonam.auth.config;
 
 import me.sonam.auth.service.OidcUserInfoService;
 import me.sonam.auth.util.UserId;
+import me.sonam.auth.webclient.RoleWebClient;
+import me.sonam.auth.webclient.SettingWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +26,12 @@ import java.util.stream.Collectors;
 @Configuration
 public class IdTokenCustomizerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenCustomizerConfig.class);
+
+    private final SettingWebClient settingWebClient;
+
+    public IdTokenCustomizerConfig(SettingWebClient settingWebClient) {
+        this.settingWebClient = settingWebClient;
+    }
 
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(
@@ -59,6 +67,8 @@ public class IdTokenCustomizerConfig {
 
                     LOG.info("claims: {}", context.getClaims());
                     context.getClaims().claim("userId", userId.getUserId());
+
+
                 }
                 Set<String> authorities = context.getPrincipal().getAuthorities().stream()
                         .map(GrantedAuthority::getAuthority)

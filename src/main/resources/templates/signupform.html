@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spring Authorization User Signup form</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
+<style>
+    .error {
+      color: red;
+  }
+</style>
+    <script>
+        function disableButton() {
+            var btn = document.getElementById('submitButton');
+            btn.disabled = true;
+            btn.innerText = 'Posting...'
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+    <div class="mb-3">
+
+        <div th:if="${message}" class="alert alert-success">
+            <strong>User Signup Success!</strong> <span th:text="${message}"></span>
+        </div>
+        <div th:if="${error}" class="alert alert-danger">
+            <strong>Failed to signup user!</strong> <span th:text="${error}"></span>
+        </div>
+    </div>
+
+
+    <form th:if="${userSignup}" class="form-signin w-100 m-auto" method="post" th:object="${userSignup}" th:action="@{/signup}"  onsubmit='disableButton()'>
+        <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
+            Login failed. <span th:text="${errorMsg}"></span>.
+        </div>
+        <div th:if="${param.logout}" class="alert alert-success" role="alert">
+            You have been logged out.
+        </div>
+        <h1 class="h3 mb-3 fw-normal">Enter User information</h1>
+
+
+        <div class="form-floating mb-3 mt-5">
+            <p th:if="${#fields.hasErrors('firstName')}" class="error">Please enter first name</p>
+            <input type="text" maxlength="100" class="form-control" id="firstName" th:field="*{firstName}" placeholder="first name">
+            <label for="firstName">First name</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <p th:if="${#fields.hasErrors('lastName')}" class="error">Please enter last name</p>
+            <input type="text" maxlength="100" class="form-control" id="lastName" th:field="*{lastName}" placeholder="last name">
+            <label for="lastName">Last name</label>
+        </div>
+        <div class="form-floating mb-3">
+            <p th:if="${#fields.hasErrors('organization')}" class="error">Please your organization name</p>
+            <input type="text"  maxlength="256" class="form-control" id="organization" th:field="*{organization}" placeholder="organization">
+            <label for="organization">Organization name</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <p th:if="${#fields.hasErrors('email')}" class="error">Please enter email</p>
+            <input type="email"  maxlength="256" class="form-control" id="email" th:field="*{email}" placeholder="name@example.com">
+            <label for="email">Email address</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <p th:if="${#fields.hasErrors('authenticationId')}" class="error">Please enter username</p>
+            <input type="text" maxlength="36" autocomplete="username" class="form-control" id="authenticationId" th:field="*{authenticationId}" placeholder="username">
+            <label for="authenticationId">Username</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <p th:if="${#fields.hasErrors('password')}" class="error">Please enter password with 8 characters astleast</p>
+            <input type="password" maxlength="25" class="form-control" autocomplete="new-password" id="password" th:field="*{password}" placeholder="password">
+            <label for="password">Password of 8 characters atleast</label>
+        </div>
+
+
+        <div>
+            <button id="submitButton" class="w-100 btn btn-lg btn-primary btn-block" type="submit">Sign up</button>
+        </div>
+        <div class="mt-3">
+            <div class="mt-2"><a href="/issuer" style="color: dimgrey !important;">Go back to Signin page</a></div>
+        </div>
+
+    </form>
+</div>
+</body>
+</html>

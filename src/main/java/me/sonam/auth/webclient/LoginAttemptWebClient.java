@@ -93,7 +93,7 @@ public class LoginAttemptWebClient {
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(endpoint)
                 .bodyValue(map)
                 .retrieve();
-        return responseSpec.bodyToMono(String.class);
+        return responseSpec.bodyToMono(String.class).doOnNext(s -> LOG.info("got loginSuccess response: {}", s));
     }
 
     public Mono<String> deleteLoginAttempt(String username) {

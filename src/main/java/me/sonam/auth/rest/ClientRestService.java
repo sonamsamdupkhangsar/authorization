@@ -3,48 +3,57 @@ package me.sonam.auth.rest;
 
 import jakarta.ws.rs.BadRequestException;
 import me.sonam.auth.jpa.entity.Client;
-import me.sonam.auth.jpa.entity.ClientOwner;
-import me.sonam.auth.jpa.entity.ClientUser;
-import me.sonam.auth.jpa.repo.*;
-import me.sonam.auth.rest.util.MyPair;
+import me.sonam.auth.jpa.entity.ClientOrganization;
+import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
+import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
+import me.sonam.auth.service.exception.MaxCountException;
 import me.sonam.auth.util.TokenRequestFilter;
+import me.sonam.auth.util.UserIdUtil;
+import me.sonam.auth.webclient.RoleWebClient;
+import me.sonam.auth.webclient.SettingWebClient;
+import org.apache.tomcat.websocket.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.util.Pair;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.*;
 
+/**
+ * Clients are associated to a Organization and are searched by organization.
+ * They can be associated to a user who may create it but all objects fall
+ * under Organization.
+ */
 @RestController
 @RequestMapping("/clients")
 public class ClientRestService {
     private static final Logger LOG = LoggerFactory.getLogger(ClientRestService.class);
 
-
     private final ClientRepository clientRepository;
     private final JpaRegisteredClientRepository jpaRegisteredClientRepository;
 
-    @Autowired
-    private HClientUserRepository clientUserRepository;
+/*    @Autowired
+    private HClientUserRepository clientUserRepository;*/
 
     @Autowired
     private ClientOrganizationRepository clientOrganizationRepository;
-
-    @Autowired
-    private ClientOwnerRepository clientOwnerRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -52,21 +61,41 @@ public class ClientRestService {
     @Autowired
     private TokenRequestFilter tokenRequestFilter;
 
+    @Autowired
+    private final RoleWebClient roleWebClient;
+
+    @Autowired
+    private SettingWebClient settingWebClient;
+
+    @Value("${maxClients}")
+    private int maxClients;
+
+    @Value("${authzmanager-id}")
+    private String authzManagerId;
+
+    private final TransactionTemplate transactionTemplate;
+
     public ClientRestService(JpaRegisteredClientRepository jpaRegisteredClientRepository,
-                             ClientRepository clientRepository, PasswordEncoder passwordEncoder) {
+                             ClientRepository clientRepository, PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
+                             SettingWebClient settingWebClient, TransactionTemplate transactionTemplate) {
         this.jpaRegisteredClientRepository = jpaRegisteredClientRepository;
         this.clientRepository = clientRepository;
         this.passwordEncoder = passwordEncoder;
+        this.roleWebClient = roleWebClient;
+        this.settingWebClient = settingWebClient;
+        this.transactionTemplate = transactionTemplate;
         LOG.info("initialized clientRestService");
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Object> createNew(@RequestBody Map<String, Object> map) {
+    public Mono<Map<String, Object>> createNew(@RequestBody Map<String, Object> map) {
         LOG.info("create new client with map: {}", map);
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
+
+        LOG.info("userId: {}", userIdString);
 
         String accessToken = jwt.getTokenValue();
 
@@ -74,11 +103,37 @@ public class ClientRestService {
 
         LOG.info("userId {}, accessToken: {}", userId, accessToken);
 
+
+       return settingWebClient.getDefaultOrganization(accessToken, userId)
+               .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
+               .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+               .flatMap(objects -> {
+                   if (objects.getT1() == false) {
+                       return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : "+ objects.getT2()));
+                   }
+                   else {
+                    return Mono.just(objects.getT2());
+                   }
+               })
+               .flatMap(orgId -> {
+                   LOG.info("max number of clients count: {}", maxClients);
+                    long clientCount = clientOrganizationRepository.countByOrganizationId(orgId);
+                    LOG.info("clientCount: {}", clientCount);
+                    if (clientCount >= maxClients) {
+                        LOG.info("client row count max exceeded by organizationId: {}", clientCount);
+                        return Mono.error(new MaxCountException("Max number of clients reached"));
+                    }
+                   return save(map, userId, orgId);
+                });
+
+    }
+
+    private Mono<Map<String, Object>> save(Map<String, Object> map, UUID userId, UUID organizationId) {
         if (jpaRegisteredClientRepository.findByClientId(map.get("clientId").toString()) != null) {
             LOG.error("clientId already exists, do an update");
             RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(map.get("clientId").toString());
             if (registeredClient != null) {
-                return jpaRegisteredClientRepository.getMapObject(registeredClient);
+                return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
             }
             throw new BadRequestException("clientId already exists but not able to pull from repository");
         }
@@ -99,66 +154,133 @@ public class ClientRestService {
         LOG.info("saved registeredClient.id: {}", registeredClient.getId());
         UUID clientId = UUID.fromString(registeredClient.getId());
 
-        LOG.info("save clientUser relationship, userId: {}", map.get("userId"));
-        clientUserRepository.save(new ClientUser(UUID.fromString(registeredClient.getId()),
-                UUID.fromString(map.get("userId").toString())));
-
         Map<String, Object> mapToReturn = jpaRegisteredClientRepository.getMapObject(registeredClient);
 
         LOG.info("clientId: {}", clientId);
 
-        clientOwnerRepository.save(new ClientOwner(clientId, userId));
+        clientOrganizationRepository.save(new ClientOrganization(clientId, organizationId));
+        LOG.info("saved clientOrganization clientId: {}, orgId: {}", clientId, organizationId);
+        mapToReturn.put("orgId", organizationId);
 
-        return mapToReturn;
+        return Mono.just(mapToReturn);
     }
 
     @RequestMapping(value = "/client-id/{clientId}",  method=RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, Object> getByClientId(@PathVariable("clientId") String clientId) {
+    public Mono<Map<String, Object>> getByClientId(@PathVariable("clientId") String clientId) {
         LOG.info("get by clientId: {}", clientId);
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
-        return jpaRegisteredClientRepository.getMapObject(registeredClient);
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String accessToken = jwt.getTokenValue();
+        String userIdString = jwt.getClaim("userId");
+
+        LOG.info("userId: {}", userIdString);
+
+        UUID userId = UUID.fromString(userIdString);
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .flatMap(orgId -> {
+                    RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
+                    if (registeredClient != null) {
+                        UUID uuidClientId = UUID.fromString(registeredClient.getId());
+
+                        Optional<Boolean> optionalBoolean = clientOrganizationRepository.
+                                existsByClientIdAndOrganizationId(uuidClientId, orgId);
+                        if (optionalBoolean.isPresent() && optionalBoolean.get()) {
+
+                            return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
+                        }
+                        else {
+                            LOG.info("clientId and organizationId not associated");
+                        }
+                    }
+                    LOG.error("return error");
+                    return Mono.just(Map.of("error", "registeredClient not found with client-id:"+ clientId));
+                });
     }
 
     @GetMapping(value = "{id}")
     @ResponseStatus(HttpStatus.OK)
-    public Map<String, Object> getClientById(@PathVariable("id") String id) {
+    public Mono<Map<String, Object>> getClientById(@PathVariable("id") String id) {
         LOG.info("get client by id: {}", id);
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findById(id);
-        if (registeredClient != null) {
-            return jpaRegisteredClientRepository.getMapObject(registeredClient);
-        }
-        return Map.of("error", "registeredClient not found with id:"+ id);
+        Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String accessToken = jwt.getTokenValue();
+        String userIdString = jwt.getClaim("userId");
+
+        LOG.info("userId: {}", userIdString);
+        UUID userId = UUID.fromString(userIdString);
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .flatMap(orgId -> {
+                    LOG.info("orgId: '{}'", id);
+                    UUID uuid = UUID.fromString(id);
+                    Optional<Boolean> optionalBoolean = clientOrganizationRepository.existsByClientIdAndOrganizationId(uuid, orgId);
+                    if (optionalBoolean.isPresent() && optionalBoolean.get()) {
+                        RegisteredClient registeredClient = jpaRegisteredClientRepository.findById(id);
+                        if (registeredClient != null) {
+                            return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
+                        }
+                    }
+                    return Mono.just(Map.of("error", "registeredClient not found with id:"+ id));
+                });
     }
 
 
-    @GetMapping("/users/{id}")
+    // get count of clients owned by logged-in user based on access token
+    @GetMapping("/count/users")
+    public Mono<Long> getClientCount() {
+        LOG.info("get count of clients for logged-in user");
+        Pair<UUID, String> uuidTokenPair = UserIdUtil.getLoggedInUserId();
+        String accessToken = uuidTokenPair.getSecond();
+        UUID userId = uuidTokenPair.getFirst();
+
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .flatMap(orgId -> Mono.just(clientOrganizationRepository.countByOrganizationId(orgId)))
+                .doOnNext(aLong -> LOG.info("found {} clients for organization", aLong));
+    }
+    /**
+     * Get user's default organization (whether a subdomain like org1.authzger.com or a free tier one) or a id from settings
+     * then show organization level clients.  Users can't login, only superadmins can.
+     * use the tokenized userId
+     * @param pageable
+     * @return
+     */
+    @GetMapping("/organizations")
     @ResponseStatus(HttpStatus.OK)
-    public Page<MyPair<String, String>> getClientsOwnedByUserId(@PathVariable("id") UUID userId, Pageable pageable) {
-        LOG.info("get clientIds for userId: {}", userId);
+    public Mono<Page<Pair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
+        LOG.info("get clientIds for userId");
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
+        LOG.info("userId: {}", userIdString);
+        UUID userId = UUID.fromString(userIdString);
 
-        LOG.info("userIdString: {}, and userId: {}",userIdString, userId);
-        LOG.info("jwt.getTokenValue: {}", jwt.getTokenValue());
+        String accessToken = jwt.getTokenValue();
+        List<Pair<String, String>> list = new ArrayList<>();
 
-        List<MyPair<String, String>> list = new ArrayList<>();
-
-        clientOwnerRepository.findByUserId(userId, pageable).forEach(clientOwner -> {
-                    Optional<Client> optionalClient = clientRepository.findById(clientOwner.getClientId().toString());
-                    if (optionalClient.isEmpty()) {
-                        LOG.error("client not found ClientRepository by clientId: '{}'", clientOwner.getClientId());
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
+                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(objects -> {
+                    if (!objects.getT1()) {
+                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                    } else {
+                        return Mono.just(objects.getT2());
                     }
-                    optionalClient.ifPresent(client ->
-                            list.add(new MyPair<>(client.getId(), client.getClientId())));
-                }
-        );
+                }).flatMap(orgId -> {
+                    List<ClientOrganization> clientOrganizationList = clientOrganizationRepository.findByOrganizationId(orgId, pageable);
 
-        LOG.info("list of clientId pairs: {}", list);
-        return new PageImpl<>(list, pageable, clientOwnerRepository.countByUserId(userId));
+                    LOG.info("defaultOrgId: {}, clientOrganizationList: {}", orgId, clientOrganizationList.size());
+                    clientOrganizationList.forEach(clientOrganization -> {
+                        Optional<Client> clientOptional = clientRepository.findById(clientOrganization.getClientId().toString());
+                        clientOptional.ifPresent(client -> list.add(Pair.of(client.getId(), client.getClientId())));
+                    });
+                    LOG.info("list.size {}, list {}", list.size(), list);
+
+
+                    return Mono.just(new PageImpl<>(list, pageable, clientOrganizationRepository.countByOrganizationId(orgId)));
+                }).switchIfEmpty(Mono.just(new PageImpl<>(list, pageable, 0))).flatMap(Mono::just);
     }
 
     @PutMapping
@@ -181,8 +303,6 @@ public class ClientRestService {
             LOG.error("There is no RegisteredClient found with id: {}", map.get("id"));
             return Mono.error(new BadRequestException("Registered client not found with id: "+map.get("id")));
         }
-
-        verifyUserOwnsClientId(UUID.fromString(fromDb.getId()), UUID.fromString(map.get("userId").toString()));
 
         map.put("id", fromDb.getId());
         final String newClientSecret = (String) map.get("newClientSecret");
@@ -218,10 +338,10 @@ public class ClientRestService {
         }
     }
 
-    @DeleteMapping("{id}/user-id/{userId}")
+    @DeleteMapping("{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
-    public Mono<Void> delete(@PathVariable("id") String id, @PathVariable("userId") UUID userId) {
+    public Mono<Void> delete(@PathVariable("id") String id) {
         LOG.info("delete client with id: {}", id);
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -236,85 +356,77 @@ public class ClientRestService {
             return Mono.empty();
         }
         else {
-            verifyUserOwnsClientId(UUID.fromString(id), userId);
-
             LOG.info("deleting by id: {}", registeredClient.getId());
             clientRepository.deleteById(registeredClient.getId());
 
-            long rows = clientUserRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
-            LOG.info("delete clientUser by clientId: {} affected rows: {}", registeredClient.getClientId(), rows);
+            LOG.info("delete client associated with organization {}", registeredClient.getClientId());
             clientOrganizationRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
 
-            clientUserRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
         }
         return Mono.empty();
     }
 
 
     /**
-     * delete clients, clientorganization, clientowner, clientuser part of delete my info
+     * delete clients, clientorganization, clientuser part of delete my info
+     * delete client-user relationship for logged-in userId
      * @return
      */
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public Mono<Map<String, String>> delete() {
-        LOG.info("delete my clients");
+        LOG.info("delete client-user relationship for logged-in user-id");
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
         String userIdString = jwt.getClaim("userId");
-        LOG.info("delete user data for userId: {}", userIdString);
+        LOG.info("delete client-user for userIdString: {}", userIdString);
 
         UUID userId = UUID.fromString(userIdString);
-
         String accessToken = jwt.getTokenValue();
-        LOG.info("userId: {}, accessToken: {}", jwt.getClaim("userId"), accessToken);
 
-        clientOwnerRepository.findByUserId(userId).forEach(clientOwner -> {
-            clientUserRepository.deleteByClientId(clientOwner.getClientId());
-            clientRepository.deleteById(clientOwner.getClientId().toString());
-            clientOrganizationRepository.deleteByClientId(clientOwner.getClientId());
+        return settingWebClient.getDefaultOrganization(accessToken, userId)
+                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
+                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(objects -> {
+                    if (!objects.getT1()) {
+                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                    }
+                    UUID orgId = objects.getT2();
+                    //check if there are rows where there are roles set by this orgId -- indicating there are users with roles for some client
+                    //basically we don't want to delete any client if there are roles assigned to this org
+                    return roleWebClient.getCountOfUsersWithUserClientOrganizationRoleByOrgId(accessToken, orgId).zipWith(Mono.just(orgId));
+                })
+                .flatMap(objects -> {
+                    UUID orgId = objects.getT2();
+                    LOG.info("count of users with user-client-org-role by orgId: {}", objects.getT1());
+                    int count = objects.getT1();
+                    if (count <= 0) {
+                        //there are no roles setup for any client, org -- this should delete all rows with this orgId
+                        transactionTemplate.executeWithoutResult(status -> {
+                            deleteCli(orgId);
+                        });
+
+                        return Mono.just(Map.of("message", "delete client"));
+                    } else {
+                        return Mono.just(Map.of("error", "there are currently roles associated to organization"));
+                    }
+                });
+   }
+
+    private void deleteCli(UUID orgId) {
+        List<ClientOrganization> clientOrganizationList = clientOrganizationRepository.findByOrganizationId(orgId);
+
+        LOG.info("deleting clientOrganization by organizationId");
+        clientOrganizationRepository.deleteByOrganizationId(orgId);
+
+        LOG.info("iterate {}", clientOrganizationList.size());
+        //then delete all clients associated to this org
+        clientOrganizationList.forEach(clientOrganization ->
+        {
+            LOG.info("delete client: {}", clientOrganization.getClientId());
+            clientRepository.deleteById(clientOrganization.getClientId().toString());
         });
-        clientOwnerRepository.deleteByUserId(userId);
-        return Mono.just(Map.of("message", "deleted user client data"));
-    }
-
-
-
-    private void checkClientIdAndLoggedInUser(String clientId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        final String authId = authentication.getName();
-        LOG.info("checking logged-in user: {} and clientId match: {}", authId.toString(), clientId);
-
-
-        if(authId.equals(clientId)) {
-            LOG.info("logged-in principal name and clientId matches");
-        }
-        else {
-            LOG.error("logged-in principal and clientId does not match");
-            throw new BadRequestException("Logged-in user and clientId must match");
-        }
-    }
-
-    private void verifyUserOwnsClientId(UUID clientId, UUID userId) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        Optional<Boolean> booleanOptional = clientUserRepository.existsByClientIdAndUserId(clientId, userId);
-        if(booleanOptional.isEmpty()) {
-            LOG.error("logged-in user is not associated with clientId");
-            throw new BadRequestException("Logged-in user and clientId must match");
-        }
-
-        booleanOptional.ifPresent(aBoolean -> {
-            if (!aBoolean) {
-                LOG.error("logged-in userId {} is not associated with clientId: {}", userId, clientId);
-                throw new BadRequestException("Logged-in user and clientId must match");
-            }
-            else {
-                LOG.info("there is a relationship between the clientId and userId: {}", aBoolean);
-            }
-        });
+        LOG.info("done");
     }
 }

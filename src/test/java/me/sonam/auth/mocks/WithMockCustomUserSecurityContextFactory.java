@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames.ID_TOKEN;
+//import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 
 public class WithMockCustomUserSecurityContextFactory implements WithSecurityContextFactory<WithMockCustomUser> {
     @Override
@@ -31,7 +32,7 @@ public class WithMockCustomUserSecurityContextFactory implements WithSecurityCon
                 Instant.now().plusSeconds(60), Map.of("role", "USER_ROLE", "sub", "sonam", "userId", customUser.userId()));
         //DefaultOidcUser principal = new DefaultOidcUser(grantedAuths, idToken);
 
-        Jwt principal = Jwt.withTokenValue(customUser.token())
+       Jwt principal = Jwt.withTokenValue("sss")
                 .header("alg", "none")
                 .claim("sub", "user")
                 .claim("scope", "read")
@@ -40,7 +41,9 @@ public class WithMockCustomUserSecurityContextFactory implements WithSecurityCon
 
         Authentication auth =
                 UsernamePasswordAuthenticationToken.authenticated(principal, "password", grantedAuths);
+
         context.setAuthentication(auth);
+
         return context;
     }
 }

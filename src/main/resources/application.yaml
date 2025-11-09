@@ -6,10 +6,10 @@ server:
 logging:
   level:
     root: info
-    me.sonam: debug
-    com.netflix: off
-    me.sonam.auth.config: debug
-    me.sonam.auth.util.TokenFilter: debug
+    me.sonam: info
+    #com.netflix: off
+    #me.sonam.auth.config: info
+    #me.sonam.auth.util.TokenFilter: info
 
 #    org.springframework.web: info
 #    org.springframework.security: info
@@ -56,12 +56,13 @@ authentication-rest-service:
 
 user-rest-service:
   root: ${USER_REST_SERVICE}
-  context: /users
+  context: ${user-rest-service.root}/users
   userId: ${user-rest-service.context}/{id}
   userByAuthId: ${user-rest-service.context}/authentication-id/{authenticationId}
 
 organization-rest-service:
   root: ${ORGANIZATION_REST_SERVICE}
+  context: ${organization-rest-service.root}/organizations
   userExistsInOrganization: /organizations/{organizationId}/users/{userId}
 
 account-rest-service:
@@ -95,6 +96,16 @@ attempt-rest-service:
   delete: ${attempt-rest-service.context}/{username}
   check: ${attempt-rest-service.context}/login
 
+role-rest-service:
+  root: ${ROLE_REST_SERVICE}
+  context: ${role-rest-service.root}/roles
+
+setting-rest-service:
+  root: ${SETTING_REST_SERVICE}
+  context: ${setting-rest-service.root}/settings
+  users: ${setting-rest-service.context}/users
+  defaultOrganization: ${setting-rest-service.users}/{userId}
+
 client:
   url: ${client-app}
   forgot-username-password: /forgot
@@ -103,8 +114,8 @@ requestFilters:
   - out:
     outHttpMethods:
     accessToken:
-      option: request
-      scopes: ${REQUEST_SCOPES}
+      option: forward
+      scopes:
       base64EncodedClientIdSecret: ${BASE64_CLIENT_ID_SECRET}
 
 
@@ -116,3 +127,8 @@ tokenExpireSeconds: 180
 authIdNotExist: authentication does not exist with authId
 authNotActive: Authentication not active, activate your account first
 authPasswordNotSet: User needs to set their password.
+
+maxClients: 5
+maxOrganizations: 1
+maxUserPerOrganization: 5
+maxRoles: 5

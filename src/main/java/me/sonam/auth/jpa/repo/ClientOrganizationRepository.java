@@ -2,6 +2,7 @@ package me.sonam.auth.jpa.repo;
 
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.entity.ClientOrganizationId;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import reactor.core.publisher.Mono;
 
@@ -16,5 +17,11 @@ public interface ClientOrganizationRepository extends JpaRepository<ClientOrgani
     Optional<Long> deleteByClientId(UUID clientId);
     Optional<Boolean> existsByClientIdAndOrganizationId(UUID clientId, UUID organizationId);
     Optional<ClientOrganization> findByClientIdAndOrganizationIdIn(UUID clientId, List<UUID> organizationIds);
+
+    Optional<Long> deleteByOrganizationId(UUID organizationId);
     Optional<Long> deleteByClientIdAndOrganizationId(UUID clientId, UUID organizationId);
+    List<ClientOrganization> findByOrganizationIdIn(List<UUID> organizationIds);
+    List<ClientOrganization> findByOrganizationId(UUID organizationId, Pageable pageable);
+    List<ClientOrganization> findByOrganizationId(UUID organizationId);
+    long countByOrganizationId(UUID organizationId);
 }

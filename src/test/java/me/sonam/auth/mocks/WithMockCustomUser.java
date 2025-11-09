@@ -15,5 +15,5 @@ public @interface WithMockCustomUser {
     String name() default "";
     String password();
     String role();
-    String token();
+   // String token();
 }
