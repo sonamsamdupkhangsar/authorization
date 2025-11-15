@@ -1,7 +1,6 @@
 package me.sonam.auth.service;
 
 import me.sonam.auth.jpa.entity.ClientOrganization;
-import me.sonam.auth.jpa.entity.ClientUser;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
 import me.sonam.auth.service.exception.AuthorizationException;
@@ -20,13 +19,10 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -230,13 +226,15 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
             return settingWebClient.getDefaultOrganization(null, userId)
                     .switchIfEmpty(Mono.error(new AuthorizationException("No default org found four userId " + userId)))
+                    //.flatMap(uuid -> roleWebClient.setUserAsRoleNameForOrganization(null, "SuperAdmin", userId, uuid).thenReturn(uuid))
                             .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(null, userId, orgId).zipWith(Mono.just(orgId)))
                     .flatMap(objects -> {
                                         if (!objects.getT1()) {
                                             return Mono.error(new BadCredentialsException("User is not a superadmin in the default orgId: "+ objects.getT2()));
                                         }
                                         return Mono.just(objects.getT2()); //return orgId
-                                    }).flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of("authenticationId", authentication.getPrincipal().toString(),
+                                    }).flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of(
+                                            "authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),
                                     "clientId", clientId)));
         }
@@ -265,8 +263,6 @@ public class AuthenticationCallout implements AuthenticationProvider {
             return organizationWebClient.userExistInOrganization(userId, clientOrganization.getOrganizationId())
                     .filter(aBoolean -> aBoolean)
                     .switchIfEmpty(Mono.error(new BadCredentialsException("user does not exists in organization")))
-                    .flatMap(aBoolean -> roleWebClient.getRoleIdForClientOrganizationUser(null, clientId, clientOrganization.getOrganizationId(), userId))
-                    .switchIfEmpty(Mono.error(new BadCredentialsException("User does not have a role for clientId, organization")))
                     .flatMap(aBoolean -> authenticationWebClient.getAuth(authentication,
                             Map.of("authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),

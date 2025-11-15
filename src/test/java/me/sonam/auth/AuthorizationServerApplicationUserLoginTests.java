@@ -276,10 +276,10 @@ public class AuthorizationServerApplicationUserLoginTests {
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\": true}"));
 
-		UUID roleId = UUID.randomUUID();
+		//UUID roleId = UUID.randomUUID();
 		// return role id for get roleId by clientOrganizationUser
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody(roleId.toString()));
+		//mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+		//		.setResponseCode(200).setBody(roleId.toString()));
 
 		//5 this is returned for authentications authenticate call mock response with roles with userId
 		// and message
@@ -330,9 +330,9 @@ public class AuthorizationServerApplicationUserLoginTests {
 
 
 		//5 authentication call
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-		assertThat(recordedRequest.getPath()).startsWith("/roles/clients/"+clientIdUuid+"/organizations/"+organizationId+"/users/"+userId+"/roles");
+		//recordedRequest = mockWebServer.takeRequest();
+		//assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+		//assertThat(recordedRequest.getPath()).startsWith("/roles/clients/"+clientIdUuid+"/organizations/"+organizationId+"/users/"+userId+"/roles");
 
 		//6 authentication call
 		recordedRequest = mockWebServer.takeRequest();
@@ -677,19 +677,6 @@ public class AuthorizationServerApplicationUserLoginTests {
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\":\"remaining login attempt 1\"}"));
 
-		/*//4 user will be found from clientUser relationship
-		//mock role names for authentication http callout
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
-
-		//5 login success is recorded before returning user roles in authentication
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"message\": \"CONTINUE\"}"));
-
-		//6 it seems like we need to mock one more response for the redirection to redirecUris: /login/oauth2/code/messaging-client-oidc?code=...
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
-*/
 		LOG.info("sign-in to the location page");
 
 		//login should work for client as client should be found in ClientUser relationship
@@ -768,20 +755,15 @@ public class AuthorizationServerApplicationUserLoginTests {
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\": true}"));
 
-		UUID roleId = UUID.randomUUID();
-		//5 return role id for get roleId by clientOrganizationUser
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody(roleId.toString()));
-
-		//6 user authentication failure response
+		//5 user authentication failure response
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(400).setBody("{\"error\": \"no authentication found with username and password\"}"));
 
-		//7 login failure attempt-rest-service call and gets You can retry message indicating a lock out of user
+		//6 login failure attempt-rest-service call and gets You can retry message indicating a lock out of user
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\": \"You can retry login again in 1 hour\"}"));
 
-		//8, on lock-out of login failure in attempt-rest-service, call account-rest-service to lock account
+		//7, on lock-out of login failure in attempt-rest-service, call account-rest-service to lock account
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"message\": \"account is now locked for authenticationId: \"}"));
 
@@ -815,21 +797,17 @@ public class AuthorizationServerApplicationUserLoginTests {
 		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
 		assertThat(recordedRequest.getPath()).startsWith("/organizations/"+organizationId+"/users/"+userId);
 
-		//5 get clientOrganizationUserWithRoles
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-		assertThat(recordedRequest.getPath()).startsWith("/roles/clients/"+clientIdUuid+"/organizations/"+organizationId+"/users/"+userId+"/roles");
-
-		//6 authentication call
+		//5 authentication call
 		recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
 
-		//7
+		//6
 		recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
 		assertThat(recordedRequest.getPath()).startsWith("/attempts/login/failed");
 
+		//7
 		recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
 		assertThat(recordedRequest.getPath()).startsWith("/accounts/lock/true");

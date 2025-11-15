@@ -81,6 +81,7 @@ public class AuthenticationWebClient {
                     }
                 }
             }
+
             UUID userId = UUID.fromString(map.get("userId").toString());
             final UserId principal = new UserId(userId.toString(), authentication.getPrincipal().toString(), password, grantedAuths);
 

@@ -1,4 +1,4 @@
-package me.sonam.auth.filter;
+package me.sonam.auth.notused;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -6,27 +6,37 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Enumeration;
 
-@Component
-public class MdcFilter implements Filter {
-    private static final Logger LOG = LoggerFactory.getLogger(MdcFilter.class);
+//@Component // Makes Spring manage this filter as a bean
+//@Order(1)
+public class ClientIdFIlter implements Filter {
+    private static final Logger LOG = LoggerFactory.getLogger(ClientIdFIlter.class);
 
     private static final String REQUEST_ID = "requestId";
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        LOG.trace("checking MDC filter for request");
+        LOG.info("client id filter");
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
         HttpServletRequest httpServletRequest = (HttpServletRequest) request;
+
+        LOG.info("request has name header?: {}", ((HttpServletRequest) request).getHeader("name"));
+
+        LOG.info("request queryString: {}", httpServletRequest.getQueryString());
+        LOG.info("url: {} client_id: {}", ((HttpServletRequest) request).getRequestURL(), request.getParameter("client_id"));
+
+        LOG.info("name header value: {}", ((HttpServletRequest) request).getHeader("name"));
+
+     //   ((HttpServletResponse) request).addHeader("name", "sonam");
 
         if (httpServletRequest.getHeader(REQUEST_ID) != null) {
             String requestId = httpServletRequest.getHeader(REQUEST_ID);
             LOG.trace("add requestId to MDC: {}", requestId);
             MDC.put(REQUEST_ID, requestId);
         }
+
+
 
         chain.doFilter(request, response);
         LOG.trace("remove MDC {}", REQUEST_ID);
