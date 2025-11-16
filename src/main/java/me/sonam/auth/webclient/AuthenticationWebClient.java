@@ -85,11 +85,6 @@ public class AuthenticationWebClient {
             UUID userId = UUID.fromString(map.get("userId").toString());
             final UserId principal = new UserId(userId.toString(), authentication.getPrincipal().toString(), password, grantedAuths);
 
-            if(grantedAuths.isEmpty()) {
-                LOG.info("roles is empty, add a default one for now.");
-                grantedAuths.add(new SimpleGrantedAuthority("USER_ROLE"));
-            }
-
             String ipAddress = "";
             if (authentication.getDetails() instanceof WebAuthenticationDetails) {
                 WebAuthenticationDetails webDetails = (WebAuthenticationDetails) authentication.getDetails();
