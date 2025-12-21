@@ -80,10 +80,6 @@ public class BeanConfig {
     @Value("${setting-rest-service.defaultOrganization}")
     private String defaultOrganizationSettingEndpoint;
 
-    //authIdNotExist: authentication does not exist with authId
-    //authNotActive: Authentication not active, activate your account first
-    //authPasswordNotSet: User needs to set their password.
-
     @Value("${authIdNotExist}")
     private String authIdNotExist;
 

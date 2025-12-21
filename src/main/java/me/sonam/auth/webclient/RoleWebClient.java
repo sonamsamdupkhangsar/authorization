@@ -5,6 +5,7 @@ import org.apache.tomcat.websocket.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -126,15 +127,39 @@ public class RoleWebClient {
 
         LOG.info("get clientOrganizationUserWithRoles with endpoint: {}", endpoint);
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).retrieve();
+                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
 
-        return responseSpec.bodyToMono(String.class).map(s -> {
-            LOG.info("got role for clientOrganizationUser roles: {}", s);
-            return UUID.fromString(s);
+        return responseSpec.bodyToMono(UUID.class).map(s -> {
+            LOG.info("got role for clientOrganizationUser roles: '{}'", s);
+            return s;
         }).onErrorResume(throwable -> {
             LOG.debug("exception occurred in getting roleId for ClientOrganizationUserId", throwable);
 
             LOG.error("failed to get roleId for clientId, organizationId, userId {}", throwable.getMessage());
+            return Mono.empty();
+        });
+    }
+
+    public Mono<String> getRoleNameForClientOrganizationUser(String accessToken, UUID clientId, UUID organizationId, UUID userId) {
+        LOG.info("get roleId for a user using the clientId, organizationId, and userId");
+
+        String endpoint = roleEndpoint + "/clients/{clientId}/organizations/{organizationId}/users/{userId}/roles/name"
+                .replace("{clientId}", clientId.toString())
+                .replace("{organizationId}", organizationId.toString())
+                .replace("{userId}", userId.toString());
+
+
+        LOG.info("get clientOrganizationUserWithRoles with endpoint: {}", endpoint);
+        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
+                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
+
+        return responseSpec.bodyToMono(String.class).map(s -> {
+            LOG.info("got role name for clientOrganizationUser roles: '{}'", s);
+            return s;
+        }).onErrorResume(throwable -> {
+            LOG.debug("exception occurred in getting role name for ClientOrganizationUserId", throwable);
+
+            LOG.error("failed to get role namefor clientId, organizationId, userId {}", throwable.getMessage());
             return Mono.empty();
         });
     }
