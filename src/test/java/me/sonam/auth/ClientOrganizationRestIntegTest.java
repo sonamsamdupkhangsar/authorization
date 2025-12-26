@@ -13,8 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 @AutoConfigureMockMvc
 @SpringBootTest(classes = {DefaultAuthorizationServerApplication.class}, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ExtendWith(SpringExtension.class)
+@AutoConfigureWebTestClient
 public class ClientOrganizationRestIntegTest {
     private static final Logger LOG = LoggerFactory.getLogger(ClientOrganizationRestIntegTest.class);
 
@@ -122,8 +124,8 @@ public class ClientOrganizationRestIntegTest {
 
         LOG.debug("assert that there is no row with that clientId and organizationId after deletion");
         String string = clientOrganizationWebTestClient.findEmptyRow(accessToken, clientId, organizationId, HttpStatus.OK);
-        assertThat(string).isEmpty();
-        LOG.info("String: {}", string);
+        LOG.info("string {}", string);
+        assertThat(string).isNull();
     }
 
     @Test

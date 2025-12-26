@@ -17,6 +17,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+//import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+//import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -24,8 +28,6 @@ import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
@@ -51,8 +53,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+//import static org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer.authorizationServer;
+//import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+//import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+//import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 
-import static org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer.authorizationServer;
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -69,25 +74,31 @@ public class JwtUserInfoMapperSecurityConfig {
     @Value("${allowedOrigins}")
     private String allowedOrigins; //csv allow origins
 
-
     @Bean
     @Order(1)
-    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity httpSecurity) throws Exception {
+        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer =
+                new OAuth2AuthorizationServerConfigurer();
+        return
+             httpSecurity.with(authorizationServerConfigurer, Customizer.withDefaults())
+         .oauth2AuthorizationServer(oAuth2AuthorizationServerConfigurer -> {
+            RequestMatcher endpointsMatcher = oAuth2AuthorizationServerConfigurer.getEndpointsMatcher();
 
-        OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = authorizationServer();
+            Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper = (context) -> {
+                OidcUserInfoAuthenticationToken authentication = context.getAuthentication();
+                JwtAuthenticationToken principal = (JwtAuthenticationToken) authentication.getPrincipal();
 
-        RequestMatcher endpointsMatcher = authorizationServerConfigurer
-              //  .tokenGenerator(tokenGenerator())
-                .getEndpointsMatcher();
+                return new OidcUserInfo(principal.getToken().getClaims());
+            };
 
-        Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper = (context) -> {
-            OidcUserInfoAuthenticationToken authentication = context.getAuthentication();
-            JwtAuthenticationToken principal = (JwtAuthenticationToken) authentication.getPrincipal();
+            securityMatcher( httpSecurity,  endpointsMatcher, oAuth2AuthorizationServerConfigurer, userInfoMapper);
+        }).cors(Customizer.withDefaults()).build();
+    }
 
-            return new OidcUserInfo(principal.getToken().getClaims());
-        };
-
-        http.securityMatcher(endpointsMatcher)
+    private void securityMatcher(HttpSecurity httpSecurity, RequestMatcher endpointsMatcher,
+                                 OAuth2AuthorizationServerConfigurer authorizationServerConfigurer,
+                                 Function<OidcUserInfoAuthenticationContext, OidcUserInfo> userInfoMapper) {
+        httpSecurity.securityMatcher(endpointsMatcher)
                 .with(authorizationServerConfigurer, (authorizationServer) ->
                         authorizationServer.oidc((oidc) -> oidc
                                 .userInfoEndpoint((userInfo) -> userInfo
@@ -100,15 +111,13 @@ public class JwtUserInfoMapperSecurityConfig {
                 .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(Customizer.withDefaults())
-			)
-			.exceptionHandling((exceptions) -> exceptions
-                .defaultAuthenticationEntryPointFor(
-                        new LoginUrlAuthenticationEntryPoint("/"),
-                        new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
                 )
-        );
-
-        return http.cors(Customizer.withDefaults()).build();
+                .exceptionHandling((exceptions) -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/"),
+                                new MediaTypeRequestMatcher(MediaType.TEXT_HTML)
+                        )
+                );
     }
 
     @Bean

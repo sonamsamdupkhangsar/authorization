@@ -1,23 +1,13 @@
 package me.sonam.auth.service;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.function.Consumer;
+
 
 import com.fasterxml.jackson.annotation.*;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import me.sonam.auth.config.BeanConfig;
 import me.sonam.auth.jpa.entity.Authorization;
 import me.sonam.auth.jpa.repo.AuthorizationRepository;
-
 import me.sonam.auth.util.UserId;
 import org.springframework.dao.DataRetrievalFailureException;
-import org.springframework.security.jackson2.SecurityJackson2Modules;
+import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -30,16 +20,24 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module;
+import org.springframework.security.oauth2.server.authorization.jackson.OAuth2AuthorizationServerJacksonModule;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 @Component
 public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService {
     private final AuthorizationRepository authorizationRepository;
     private final RegisteredClientRepository registeredClientRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private JsonMapper jsonMapper;
 
     public JpaOAuth2AuthorizationService(AuthorizationRepository authorizationRepository, RegisteredClientRepository registeredClientRepository) {
         Assert.notNull(authorizationRepository, "authorizationRepository cannot be null");
@@ -48,12 +46,13 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
         this.registeredClientRepository = registeredClientRepository;
 
         ClassLoader classLoader = JpaOAuth2AuthorizationService.class.getClassLoader();
-        List<Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
-
-        this.objectMapper.registerModules(securityModules);
-        this.objectMapper.registerModule(new OAuth2AuthorizationServerJackson2Module());
-        objectMapper.addMixIn(UserId.class, MemberMixin.class);
+        jsonMapper = JsonMapper.builder()
+                .addModules(SecurityJacksonModules.getModules(classLoader))
+                .addModules(new OAuth2AuthorizationServerJacksonModule())
+                .addMixIn(UserId.class, MemberMixin.class)
+                .build();
     }
+
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
     @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE,
             isGetterVisibility = JsonAutoDetect.Visibility.NONE)
@@ -236,8 +235,7 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 
     private Map<String, Object> parseMap(String data) {
         try {
-            return this.objectMapper.readValue(data, new TypeReference<Map<String, Object>>() {
-            });
+            return this.jsonMapper.readValue(data, new TypeReference<>(){});
         } catch (Exception ex) {
             throw new IllegalArgumentException(ex.getMessage(), ex);
         }
@@ -245,7 +243,7 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
 
     private String writeMap(Map<String, Object> metadata) {
         try {
-            return this.objectMapper.writeValueAsString(metadata);
+            return this.jsonMapper.writeValueAsString(metadata);
         } catch (Exception ex) {
             throw new IllegalArgumentException(ex.getMessage(), ex);
         }
