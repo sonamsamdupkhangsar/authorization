@@ -26,6 +26,8 @@ import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 
 import java.time.Instant;
 import java.util.Map;
@@ -37,7 +39,7 @@ import java.util.function.Consumer;
 public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService {
     private final AuthorizationRepository authorizationRepository;
     private final RegisteredClientRepository registeredClientRepository;
-    private JsonMapper jsonMapper;
+    private final JsonMapper jsonMapper;
 
     public JpaOAuth2AuthorizationService(AuthorizationRepository authorizationRepository, RegisteredClientRepository registeredClientRepository) {
         Assert.notNull(authorizationRepository, "authorizationRepository cannot be null");
@@ -46,8 +48,13 @@ public class JpaOAuth2AuthorizationService implements OAuth2AuthorizationService
         this.registeredClientRepository = registeredClientRepository;
 
         ClassLoader classLoader = JpaOAuth2AuthorizationService.class.getClassLoader();
+        BasicPolymorphicTypeValidator.Builder ptvBuilder = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("me.sonam.auth.util.UserId")
+                // Alternatively, allow the entire package for flexibility
+                .allowIfSubType("me.sonam.auth.util");
+
         jsonMapper = JsonMapper.builder()
-                .addModules(SecurityJacksonModules.getModules(classLoader))
+                .addModules(SecurityJacksonModules.getModules(classLoader, ptvBuilder)) // Use the builder here
                 .addModules(new OAuth2AuthorizationServerJacksonModule())
                 .addMixIn(UserId.class, MemberMixin.class)
                 .build();
