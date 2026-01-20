@@ -397,7 +397,7 @@ public class ClientRestServiceIntegTest {
         saveClient(testClient1.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         LOG.info("get associated clients to another user");
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.totalElements()).isEqualTo(1);
 
         assertThat(page.content().getFirst().getFirst()).isNotNull();
         assertThat(page.content().getFirst().getFirst()).isEqualTo(testClient1.toString());
@@ -407,14 +407,14 @@ public class ClientRestServiceIntegTest {
         UUID testClient2= UUID.randomUUID();
         saveClient(testClient2.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.total()).isEqualTo(2);
+        assertThat(page.totalElements()).isEqualTo(2);
         assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
         assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
 
         UUID testClient3 = UUID.randomUUID();
         saveClient(testClient3.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.total()).isEqualTo(3);
+        assertThat(page.totalElements()).isEqualTo(3);
         assertThat(page.content().get(2).getFirst()).isNotNull();
         assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
         assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
@@ -423,7 +423,7 @@ public class ClientRestServiceIntegTest {
         UUID testClient4 = UUID.randomUUID();
         saveClient(testClient4.toString(), "{noop}"+clientSecret, userId,  defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.total()).isEqualTo(4);
+        assertThat(page.totalElements()).isEqualTo(4);
         assertThat(page.content().get(3).getFirst()).isNotNull();
         assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
         assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
@@ -433,7 +433,7 @@ public class ClientRestServiceIntegTest {
         UUID testClient5 = UUID.randomUUID();
         saveClient(testClient5.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.total()).isEqualTo(5);
+        assertThat(page.totalElements()).isEqualTo(5);
         assertThat(page.content().get(4).getFirst()).isNotNull();
         assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
         assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
