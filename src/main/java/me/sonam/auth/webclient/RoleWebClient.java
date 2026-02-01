@@ -166,7 +166,7 @@ public class RoleWebClient {
 
     public Mono<Integer> getCountOfUsersWithUserClientOrganizationRoleByOrgId(String accessToken, UUID organizationId) {
 
-        String endpoint = roleEndpoint + "/users/organizations/"+organizationId+"/count";
+        String endpoint = roleEndpoint + "/organizations/"+organizationId+"/count";
 
 
         LOG.info("get a count of client-organization-user with roles with the organization endpoint: {}", endpoint);
@@ -181,7 +181,7 @@ public class RoleWebClient {
                 .onErrorResume(throwable -> {
             LOG.debug("exception occurred in getting count for ClientOrganizationUserRole by orgId", throwable);
 
-            LOG.error("failed to get count of roles with orgId {}", throwable.getMessage());
+            LOG.error("failed to get count of roles with orgId {}, error message: {}", organizationId, throwable.getMessage());
             return Mono.error(throwable);
         });
     }
