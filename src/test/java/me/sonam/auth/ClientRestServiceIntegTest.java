@@ -597,7 +597,7 @@ public class ClientRestServiceIntegTest {
         recordedRequest = mockWebServer.takeRequest();
 
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/organizations/"+defaultOrgId+"/count");
 
         assertThat(clientRepository.findByClientId(clientId.toString())).isEmpty();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isEmpty();
@@ -651,7 +651,7 @@ public class ClientRestServiceIntegTest {
         recordedRequest = mockWebServer.takeRequest();
 
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/organizations/"+defaultOrgId+"/count");
 
         //the client(s) should not be deleted if we get a count of 1 for roles in client-org-user-roles
 
