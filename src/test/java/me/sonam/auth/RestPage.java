@@ -8,9 +8,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.web.config.EnableSpringDataWebSupport;
 
 import java.util.List;
+import java.util.stream.Stream;
 
+import static org.springframework.data.web.config.EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO;
+
+@EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO)
 @JsonIgnoreProperties(ignoreUnknown = true, value = {"pageable"})
 public class RestPage<T> extends PageImpl<T> {
     private static final Logger LOG = LoggerFactory.getLogger(RestPage.class);
@@ -29,6 +34,7 @@ public class RestPage<T> extends PageImpl<T> {
     public RestPage(Page<T> page) {
         super(page.getContent(), page.getPageable(), page.getTotalElements());
         LOG.info("page.content: {}", page.getContent());
+
     }
 
 

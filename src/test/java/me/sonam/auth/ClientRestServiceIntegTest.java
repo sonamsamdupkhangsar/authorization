@@ -1,34 +1,35 @@
 package me.sonam.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import me.sonam.auth.jpa.entity.ClientOrganization;
-import me.sonam.auth.jpa.entity.ClientUser;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
+import me.sonam.auth.mocks.TestSecurityConfig;
 import me.sonam.auth.mocks.WithMockCustomUser;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
+import me.sonam.auth.util.CustomPair;
+import me.sonam.auth.util.CustomRestPage;
 import me.sonam.auth.util.JwtUtil;
-import me.sonam.auth.util.TokenFilter;
 import me.sonam.auth.util.TokenRequestFilter;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.Resource;
-import org.springframework.data.util.Pair;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -38,39 +39,41 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.reactive.server.EntityExchangeResult;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.client.MockMvcWebTestClient;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.context.WebApplicationContext;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 /**
  * this is for testing 'clients' endpoint
  */
+@Import(TestSecurityConfig.class)
 @EnableAutoConfiguration
 @ExtendWith(SpringExtension.class)
 @SpringBootTest( webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = {DefaultAuthorizationServerApplication.class})
 @AutoConfigureMockMvc
+@AutoConfigureWebTestClient
 public class ClientRestServiceIntegTest {
     private static final Logger LOG = LoggerFactory.getLogger(ClientRestServiceIntegTest.class);
     @Value("classpath:client-credential-access-token.json")
@@ -92,7 +95,7 @@ public class ClientRestServiceIntegTest {
     private PasswordEncoder passwordEncoder;
 
     private final String tokenValue ="my-dummy-token";
-    @Mock
+    @MockitoBean
     ReactiveJwtDecoder jwtDecoder;
 
     @Autowired
@@ -100,6 +103,9 @@ public class ClientRestServiceIntegTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    WebApplicationContext context;
+
     UUID clientId = UUID.randomUUID();
     //UUID messageClient = UUID.randomUUID();
     //String clientId = "test-private-client";  //this is created in the test
@@ -109,6 +115,16 @@ public class ClientRestServiceIntegTest {
             .append(":").append(clientSecret).toString().getBytes());
 
     private static MockWebServer mockWebServer;
+
+    @org.junit.jupiter.api.BeforeEach
+    public void setup() {
+        this.webTestClient = MockMvcWebTestClient
+                .bindToApplicationContext(this.context)
+                // add Spring Security test Support
+                .apply(SecurityMockMvcConfigurers.springSecurity())
+                .configureClient()
+                .build();
+    }
 
     @BeforeAll
     static void setupMockWebServer() throws IOException {
@@ -142,11 +158,15 @@ public class ClientRestServiceIntegTest {
 
         clientOrganizationRepository.deleteAll();
         clientUserRepository.deleteAll();
-
-
     }
 
-    @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
+    @Test
+    public void checkJwtDecoder() {
+        LOG.info("assert jwtDecoder is not null");
+        assertThat(jwtDecoder).isNotNull();
+    }
+
+    @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role= "USER")
     @Test
     public void getClientCountForLoggedInUser() throws Exception {
         UUID defaultOrgId = UUID.randomUUID();
@@ -156,7 +176,8 @@ public class ClientRestServiceIntegTest {
 
         LOG.info("call getClientCount without any clients for a org");
 
-        Mono<Long> longMono = webTestClient.get().uri("/clients/count/users")
+        Mono<Long> longMono = webTestClient
+                .get().uri("/clients/count/users")
                 .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
 
         StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(0)).verifyComplete();
@@ -367,57 +388,58 @@ public class ClientRestServiceIntegTest {
         UUID defaultOrgId = UUID.randomUUID();
 
         LOG.info("get clients assoicated to userId");
-        RestPage<Pair<String, String>> page = getClientIdsAssociatedWithUser(userId, defaultOrgId, true);
+        CustomRestPage<CustomPair<String, String>> page = getClientIdsAssociatedWithUser(userId, defaultOrgId, true);
         assertThat(page).isNotNull();
-        assertThat(page).isEmpty();
+        assertThat(page.content()).isEmpty();
 
         UUID testClient1 = UUID.randomUUID();
         LOG.info("save a client");
         saveClient(testClient1.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         LOG.info("get associated clients to another user");
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.getTotalElements()).isEqualTo(1);
-        assertThat(page.getContent().get(0).getFirst()).isNotNull();
-        assertThat(page.getContent().get(0).getFirst()).isEqualTo(testClient1.toString());
-        assertThat(page.getContent().get(0).getSecond()).isEqualTo(testClient1.toString());
-        assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
+        assertThat(page.totalElements()).isEqualTo(1);
+
+        assertThat(page.content().getFirst().getFirst()).isNotNull();
+        assertThat(page.content().getFirst().getFirst()).isEqualTo(testClient1.toString());
+        assertThat(page.content().getFirst().getSecond()).isEqualTo(testClient1.toString());
+        assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
 
         UUID testClient2= UUID.randomUUID();
         saveClient(testClient2.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.getTotalElements()).isEqualTo(2);
-        assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
-        assertThat(page).contains(Pair.of(testClient2.toString(), testClient2.toString()));
+        assertThat(page.totalElements()).isEqualTo(2);
+        assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
 
         UUID testClient3 = UUID.randomUUID();
         saveClient(testClient3.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.getTotalElements()).isEqualTo(3);
-        assertThat(page.getContent().get(2).getFirst()).isNotNull();
-        assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
-        assertThat(page).contains(Pair.of(testClient2.toString(), testClient2.toString()));
-        assertThat(page).contains(Pair.of(testClient3.toString(), testClient3.toString()));
+        assertThat(page.totalElements()).isEqualTo(3);
+        assertThat(page.content().get(2).getFirst()).isNotNull();
+        assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient3.toString(), testClient3.toString()));
 
         UUID testClient4 = UUID.randomUUID();
         saveClient(testClient4.toString(), "{noop}"+clientSecret, userId,  defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.getTotalElements()).isEqualTo(4);
-        assertThat(page.getContent().get(3).getFirst()).isNotNull();
-        assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
-        assertThat(page).contains(Pair.of(testClient2.toString(), testClient2.toString()));
-        assertThat(page).contains(Pair.of(testClient3.toString(), testClient3.toString()));
-        assertThat(page).contains(Pair.of(testClient4.toString(), testClient4.toString()));
+        assertThat(page.totalElements()).isEqualTo(4);
+        assertThat(page.content().get(3).getFirst()).isNotNull();
+        assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient3.toString(), testClient3.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient4.toString(), testClient4.toString()));
 
         UUID testClient5 = UUID.randomUUID();
         saveClient(testClient5.toString(), "{noop}"+clientSecret, userId, defaultOrgId, true);
         page = getClientIdsAssociatedWithUser(userId, defaultOrgId,true);
-        assertThat(page.getTotalElements()).isEqualTo(5);
-        assertThat(page.getContent().get(4).getFirst()).isNotNull();
-        assertThat(page).contains(Pair.of(testClient1.toString(), testClient1.toString()));
-        assertThat(page).contains(Pair.of(testClient2.toString(), testClient2.toString()));
-        assertThat(page).contains(Pair.of(testClient3.toString(), testClient3.toString()));
-        assertThat(page).contains(Pair.of(testClient4.toString(), testClient4.toString()));
-        assertThat(page).contains(Pair.of(testClient5.toString(), testClient5.toString()));
+        assertThat(page.totalElements()).isEqualTo(5);
+        assertThat(page.content().get(4).getFirst()).isNotNull();
+        assertThat(page.content()).contains(CustomPair.of(testClient1.toString(), testClient1.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient2.toString(), testClient2.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient3.toString(), testClient3.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient4.toString(), testClient4.toString()));
+        assertThat(page.content()).contains(CustomPair.of(testClient5.toString(), testClient5.toString()));
     }
 
     private String getOauth2Token(String clientId, String secret) {
@@ -447,6 +469,8 @@ public class ClientRestServiceIntegTest {
         LOG.info("requestBody: {}", regClientMap);
         String authenticationId = "dave";
         Jwt jwt = JwtUtil.jwt(authenticationId);
+
+        assertThat(jwtDecoder).isNotNull();
 
         //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
         when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
@@ -573,7 +597,7 @@ public class ClientRestServiceIntegTest {
         recordedRequest = mockWebServer.takeRequest();
 
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/organizations/"+defaultOrgId+"/count");
 
         assertThat(clientRepository.findByClientId(clientId.toString())).isEmpty();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isEmpty();
@@ -627,7 +651,7 @@ public class ClientRestServiceIntegTest {
         recordedRequest = mockWebServer.takeRequest();
 
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/roles/users/organizations/"+defaultOrgId+"/count");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/organizations/"+defaultOrgId+"/count");
 
         //the client(s) should not be deleted if we get a count of 1 for roles in client-org-user-roles
 
@@ -707,7 +731,7 @@ public class ClientRestServiceIntegTest {
         return entityExchangeResult.getResponseBody();
     }
 
-    private RestPage<Pair<String, String>> getClientIdsAssociatedWithUser(UUID userId, UUID defaultOrgId, boolean accessTokenPassed) throws Exception {
+    private CustomRestPage<CustomPair<String, String>> getClientIdsAssociatedWithUser(UUID userId, UUID defaultOrgId, boolean accessTokenPassed) throws Exception {
         if (!accessTokenPassed) {
             mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                     .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
@@ -720,10 +744,10 @@ public class ClientRestServiceIntegTest {
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", true))));
 
-        EntityExchangeResult<RestPage<Pair<String, String>>> entityExchangeResult = webTestClient.get()
+        EntityExchangeResult<CustomRestPage<CustomPair<String, String>>> entityExchangeResult = webTestClient.get()
                 .uri("/clients/organizations")
                 .exchange().expectStatus().isOk().expectBody(new ParameterizedTypeReference<
-                        RestPage<Pair<String, String>>>(){}).returnResult();
+                        CustomRestPage<CustomPair<String, String>>>(){}).returnResult();
 
         LOG.info("entityExchange result: {}", entityExchangeResult.getResponseBody());
 
@@ -752,16 +776,10 @@ public class ClientRestServiceIntegTest {
 
 
     private static String getJson(Object object) {
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
-        try {
-            String json = objectMapper.writeValueAsString(object);
-            LOG.info("json for object: {}", json);
-            return json;
-        } catch (JsonProcessingException e) {
-            LOG.error("error occurred", e);
-            return null;
-        }
+        ObjectMapper objectMapper = JsonMapper.builder().build();
+        String json = objectMapper.writeValueAsString(object);
+        LOG.info("json for object: {}", json);
+        return json;
     }
 
     private Map<String, Object> getRegClientMap(String clientId, String clientSecret, UUID userId) {

@@ -8,6 +8,8 @@ import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
 import me.sonam.auth.service.exception.MaxCountException;
+import me.sonam.auth.util.CustomPair;
+import me.sonam.auth.util.CustomRestPage;
 import me.sonam.auth.util.TokenRequestFilter;
 import me.sonam.auth.util.UserIdUtil;
 import me.sonam.auth.webclient.RoleWebClient;
@@ -248,7 +250,7 @@ public class ClientRestService {
      */
     @GetMapping("/organizations")
     @ResponseStatus(HttpStatus.OK)
-    public Mono<Page<Pair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
+    public Mono<CustomRestPage<CustomPair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
         LOG.info("get clientIds for userId");
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -257,7 +259,7 @@ public class ClientRestService {
         UUID userId = UUID.fromString(userIdString);
 
         String accessToken = jwt.getTokenValue();
-        List<Pair<String, String>> list = new ArrayList<>();
+        List<CustomPair<String, String>> list = new ArrayList<>();
 
         return settingWebClient.getDefaultOrganization(accessToken, userId)
                 .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
@@ -274,13 +276,13 @@ public class ClientRestService {
                     LOG.info("defaultOrgId: {}, clientOrganizationList: {}", orgId, clientOrganizationList.size());
                     clientOrganizationList.forEach(clientOrganization -> {
                         Optional<Client> clientOptional = clientRepository.findById(clientOrganization.getClientId().toString());
-                        clientOptional.ifPresent(client -> list.add(Pair.of(client.getId(), client.getClientId())));
+                        clientOptional.ifPresent(client -> list.add(CustomPair.of(client.getId(), client.getClientId())));
                     });
                     LOG.info("list.size {}, list {}", list.size(), list);
+                    LOG.info("pageable: {}", pageable);
 
-
-                    return Mono.just(new PageImpl<>(list, pageable, clientOrganizationRepository.countByOrganizationId(orgId)));
-                }).switchIfEmpty(Mono.just(new PageImpl<>(list, pageable, 0))).flatMap(Mono::just);
+                    return Mono.just(new CustomRestPage<>(list, pageable.getPageNumber(), pageable.getPageSize(), clientOrganizationRepository.countByOrganizationId(orgId)));
+                }).switchIfEmpty(Mono.just(new CustomRestPage<>(list, pageable.getPageNumber(), pageable.getPageSize(), 0))).flatMap(Mono::just);
     }
 
     @PutMapping
