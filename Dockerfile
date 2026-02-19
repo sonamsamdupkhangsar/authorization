@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:experimental
-FROM eclipse-temurin:25-jdk-alpine AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace/app
 
 COPY . /workspace/app
@@ -10,7 +10,7 @@ RUN --mount=type=secret,id=USERNAME --mount=type=secret,id=PERSONAL_ACCESS_TOKEN
      ./gradlew clean build
 RUN  mkdir -p build/dependency && (cd build/dependency; jar -xf ../libs/authorization-1.0.jar)
 
-FROM eclipse-temurin:25-jdk-alpine
+FROM eclipse-temurin:25-jdk
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/build/dependency
 
