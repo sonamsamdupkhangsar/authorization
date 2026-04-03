@@ -151,7 +151,7 @@ public class AccountLockControllerIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith("/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
@@ -189,7 +189,7 @@ public class AccountLockControllerIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith("/oauth2/token");
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");

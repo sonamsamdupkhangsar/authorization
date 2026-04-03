@@ -4,6 +4,7 @@ import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
+import me.sonam.auth.multitenancy.IssuerAwareAuthorizationServerOperations;
 import me.sonam.auth.mocks.TestSecurityConfig;
 import me.sonam.auth.mocks.WithMockCustomUser;
 import me.sonam.auth.service.JpaRegisteredClientRepository;
@@ -25,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Import;
@@ -68,7 +70,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 /**
  * this is for testing 'clients' endpoint
  */
-@Import(TestSecurityConfig.class)
+@Import({TestSecurityConfig.class, ClientInit.class})
 @EnableAutoConfiguration
 @ExtendWith(SpringExtension.class)
 @SpringBootTest( webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = {DefaultAuthorizationServerApplication.class})
@@ -83,6 +85,9 @@ public class ClientRestServiceIntegTest {
 
     @Autowired
     private JpaRegisteredClientRepository jpaRegisteredClientRepository;
+
+    @Autowired
+    private IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations;
 
     @Autowired
     private HClientUserRepository clientUserRepository;
@@ -105,6 +110,9 @@ public class ClientRestServiceIntegTest {
     private MockMvc mockMvc;
     @Autowired
     WebApplicationContext context;
+
+    @LocalServerPort
+    private int port;
 
     UUID clientId = UUID.randomUUID();
     //UUID messageClient = UUID.randomUUID();
@@ -566,7 +574,7 @@ public class ClientRestServiceIntegTest {
         UUID defaultOrgId = UUID.randomUUID();
         saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
 
-        assertThat(clientRepository.findByClientId(clientId.toString()).get()).isNotNull();
+        assertThat(issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString())).isNotNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
@@ -599,7 +607,7 @@ public class ClientRestServiceIntegTest {
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
         assertThat(recordedRequest.getPath()).startsWith("/roles/organizations/"+defaultOrgId+"/count");
 
-        assertThat(clientRepository.findByClientId(clientId.toString())).isEmpty();
+        assertThat(issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString())).isNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isEmpty();
 
         LOG.info("done test");
@@ -620,7 +628,7 @@ public class ClientRestServiceIntegTest {
         UUID defaultOrgId = UUID.randomUUID();
         saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
 
-        assertThat(clientRepository.findByClientId(clientId.toString()).get()).isNotNull();
+        assertThat(issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString())).isNotNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
 
         LOG.info("call client delete");
@@ -655,7 +663,7 @@ public class ClientRestServiceIntegTest {
 
         //the client(s) should not be deleted if we get a count of 1 for roles in client-org-user-roles
 
-        assertThat(clientRepository.findByClientId(clientId.toString())).isNotEmpty();
+        assertThat(issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString())).isNotNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isNotEmpty();
 
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isNotNull();
@@ -755,7 +763,7 @@ public class ClientRestServiceIntegTest {
         RecordedRequest recordedRequest = mockWebServer.takeRequest();
         if(!accessTokenPassed) {
             assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-            assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+            assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 
             LOG.info("take request for mocked response to token-mediator for client when mediateToken field is not present");
             recordedRequest = mockWebServer.takeRequest();
@@ -804,6 +812,10 @@ public class ClientRestServiceIntegTest {
         regClientMap.put("userId", userId);
 
         return regClientMap;
+    }
+
+    private String currentIssuer() {
+        return "http://localhost:" + port;
     }
 
 }

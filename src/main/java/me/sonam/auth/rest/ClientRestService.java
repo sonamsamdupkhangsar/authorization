@@ -2,11 +2,10 @@ package me.sonam.auth.rest;
 
 
 import jakarta.ws.rs.BadRequestException;
-import me.sonam.auth.jpa.entity.Client;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
-import me.sonam.auth.jpa.repo.ClientRepository;
-import me.sonam.auth.service.JpaRegisteredClientRepository;
+import me.sonam.auth.multitenancy.IssuerAwareAuthorizationServerOperations;
+import me.sonam.auth.service.RegisteredClientMapConverter;
 import me.sonam.auth.service.exception.MaxCountException;
 import me.sonam.auth.util.CustomPair;
 import me.sonam.auth.util.CustomRestPage;
@@ -48,8 +47,8 @@ import java.util.*;
 public class ClientRestService {
     private static final Logger LOG = LoggerFactory.getLogger(ClientRestService.class);
 
-    private final ClientRepository clientRepository;
-    private final JpaRegisteredClientRepository jpaRegisteredClientRepository;
+    private final RegisteredClientMapConverter registeredClientMapConverter;
+    private final IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations;
 
 /*    @Autowired
     private HClientUserRepository clientUserRepository;*/
@@ -77,11 +76,12 @@ public class ClientRestService {
 
     private final TransactionTemplate transactionTemplate;
 
-    public ClientRestService(JpaRegisteredClientRepository jpaRegisteredClientRepository,
-                             ClientRepository clientRepository, PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
+    public ClientRestService(RegisteredClientMapConverter registeredClientMapConverter,
+                             IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations,
+                             PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
                              SettingWebClient settingWebClient, TransactionTemplate transactionTemplate) {
-        this.jpaRegisteredClientRepository = jpaRegisteredClientRepository;
-        this.clientRepository = clientRepository;
+        this.registeredClientMapConverter = registeredClientMapConverter;
+        this.issuerAwareAuthorizationServerOperations = issuerAwareAuthorizationServerOperations;
         this.passwordEncoder = passwordEncoder;
         this.roleWebClient = roleWebClient;
         this.settingWebClient = settingWebClient;
@@ -93,6 +93,7 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<Map<String, Object>> createNew(@RequestBody Map<String, Object> map) {
         LOG.info("create new client with map: {}", map);
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
@@ -121,21 +122,21 @@ public class ClientRestService {
                    LOG.info("max number of clients count: {}", maxClients);
                     long clientCount = clientOrganizationRepository.countByOrganizationId(orgId);
                     LOG.info("clientCount: {}", clientCount);
-                    if (clientCount >= maxClients) {
+                   if (clientCount >= maxClients) {
                         LOG.info("client row count max exceeded by organizationId: {}", clientCount);
                         return Mono.error(new MaxCountException("Max number of clients reached"));
                     }
-                   return save(map, userId, orgId);
+                   return save(issuer, map, userId, orgId);
                 });
 
     }
 
-    private Mono<Map<String, Object>> save(Map<String, Object> map, UUID userId, UUID organizationId) {
-        if (jpaRegisteredClientRepository.findByClientId(map.get("clientId").toString()) != null) {
+    private Mono<Map<String, Object>> save(String issuer, Map<String, Object> map, UUID userId, UUID organizationId) {
+        if (issuerAwareAuthorizationServerOperations.findByClientId(issuer, map.get("clientId").toString()) != null) {
             LOG.error("clientId already exists, do an update");
-            RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(map.get("clientId").toString());
+            RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, map.get("clientId").toString());
             if (registeredClient != null) {
-                return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
+                return Mono.just(registeredClientMapConverter.getMapObject(registeredClient));
             }
             throw new BadRequestException("clientId already exists but not able to pull from repository");
         }
@@ -145,18 +146,18 @@ public class ClientRestService {
         LOG.info("saving bcrypt encodedPassword {} as the clientSecret", encodedPassword);
         map.put("clientSecret", encodedPassword);
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.build(map);
+        RegisteredClient registeredClient = registeredClientMapConverter.build(map);
 
         LOG.debug("built registeredClient from map: {}", registeredClient);
 
-        jpaRegisteredClientRepository.save(registeredClient);
-        RegisteredClient savedRedisteredClient = jpaRegisteredClientRepository.findById(registeredClient.getId());
+        issuerAwareAuthorizationServerOperations.save(issuer, registeredClient);
+        RegisteredClient savedRedisteredClient = issuerAwareAuthorizationServerOperations.findById(issuer, registeredClient.getId());
         LOG.info("saved registeredClient: {}", savedRedisteredClient);
 
         LOG.info("saved registeredClient.id: {}", registeredClient.getId());
         UUID clientId = UUID.fromString(registeredClient.getId());
 
-        Map<String, Object> mapToReturn = jpaRegisteredClientRepository.getMapObject(registeredClient);
+        Map<String, Object> mapToReturn = registeredClientMapConverter.getMapObject(registeredClient);
 
         LOG.info("clientId: {}", clientId);
 
@@ -171,6 +172,7 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Object>> getByClientId(@PathVariable("clientId") String clientId) {
         LOG.info("get by clientId: {}", clientId);
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String accessToken = jwt.getTokenValue();
@@ -182,7 +184,7 @@ public class ClientRestService {
 
         return settingWebClient.getDefaultOrganization(accessToken, userId)
                 .flatMap(orgId -> {
-                    RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
+                    RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, clientId);
                     if (registeredClient != null) {
                         UUID uuidClientId = UUID.fromString(registeredClient.getId());
 
@@ -190,7 +192,7 @@ public class ClientRestService {
                                 existsByClientIdAndOrganizationId(uuidClientId, orgId);
                         if (optionalBoolean.isPresent() && optionalBoolean.get()) {
 
-                            return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
+                            return Mono.just(registeredClientMapConverter.getMapObject(registeredClient));
                         }
                         else {
                             LOG.info("clientId and organizationId not associated");
@@ -205,6 +207,7 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Object>> getClientById(@PathVariable("id") String id) {
         LOG.info("get client by id: {}", id);
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String accessToken = jwt.getTokenValue();
@@ -219,9 +222,9 @@ public class ClientRestService {
                     UUID uuid = UUID.fromString(id);
                     Optional<Boolean> optionalBoolean = clientOrganizationRepository.existsByClientIdAndOrganizationId(uuid, orgId);
                     if (optionalBoolean.isPresent() && optionalBoolean.get()) {
-                        RegisteredClient registeredClient = jpaRegisteredClientRepository.findById(id);
+                        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findById(issuer, id);
                         if (registeredClient != null) {
-                            return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient));
+                            return Mono.just(registeredClientMapConverter.getMapObject(registeredClient));
                         }
                     }
                     return Mono.just(Map.of("error", "registeredClient not found with id:"+ id));
@@ -252,6 +255,7 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<CustomRestPage<CustomPair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
         LOG.info("get clientIds for userId");
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
@@ -275,8 +279,10 @@ public class ClientRestService {
 
                     LOG.info("defaultOrgId: {}, clientOrganizationList: {}", orgId, clientOrganizationList.size());
                     clientOrganizationList.forEach(clientOrganization -> {
-                        Optional<Client> clientOptional = clientRepository.findById(clientOrganization.getClientId().toString());
-                        clientOptional.ifPresent(client -> list.add(CustomPair.of(client.getId(), client.getClientId())));
+                        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findById(issuer, clientOrganization.getClientId().toString());
+                        if (registeredClient != null) {
+                            list.add(CustomPair.of(registeredClient.getId(), registeredClient.getClientId()));
+                        }
                     });
                     LOG.info("list.size {}, list {}", list.size(), list);
                     LOG.info("pageable: {}", pageable);
@@ -290,6 +296,7 @@ public class ClientRestService {
     public Mono<Map<String, Object>> update(@RequestBody Map<String, Object> map) {
         LOG.info("update client using map: {}", map);
         LOG.info("clientIdIssuedAt: {}", map.get("clientIdIssuedAt"));
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -300,7 +307,7 @@ public class ClientRestService {
             LOG.error("map does not contain client id");
             return Mono.error(new BadRequestException("No client id"));
         }
-        RegisteredClient fromDb = jpaRegisteredClientRepository.findById(map.get("id").toString());
+        RegisteredClient fromDb = issuerAwareAuthorizationServerOperations.findById(issuer, map.get("id").toString());
         if (fromDb == null) {
             LOG.error("There is no RegisteredClient found with id: {}", map.get("id"));
             return Mono.error(new BadRequestException("Registered client not found with id: "+map.get("id")));
@@ -322,17 +329,16 @@ public class ClientRestService {
                 fromDb, fromDb.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds());
 
         try {
-            RegisteredClient registeredClient = jpaRegisteredClientRepository.build(map);
+            RegisteredClient registeredClient = registeredClientMapConverter.build(map);
 
             LOG.info("built registeredClient from map, authorizationCodeTimeToLive in seconds: {}, registeredClient {}",
                     registeredClient.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds(), registeredClient);
 
-            jpaRegisteredClientRepository.save(registeredClient);
+            issuerAwareAuthorizationServerOperations.save(issuer, registeredClient);
 
             LOG.info("saved registeredClient entity");
-            UUID clientId = UUID.fromString(registeredClient.getId());
-            RegisteredClient registeredClient1 = jpaRegisteredClientRepository.findByClientId(registeredClient.getClientId());
-            return Mono.just(jpaRegisteredClientRepository.getMapObject(registeredClient1));
+            RegisteredClient registeredClient1 = issuerAwareAuthorizationServerOperations.findById(issuer, registeredClient.getId());
+            return Mono.just(registeredClientMapConverter.getMapObject(registeredClient1));
         }
         catch (Exception e) {
             LOG.error("exception can occur if user does not fill right data {}", e.getMessage(), e);
@@ -345,13 +351,14 @@ public class ClientRestService {
     @Transactional
     public Mono<Void> delete(@PathVariable("id") String id) {
         LOG.info("delete client with id: {}", id);
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         String accessToken = jwt.getTokenValue();
         LOG.info("userId: {}, accessToken: {}", jwt.getClaim("userId"), accessToken);
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findById(id);
+        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findById(issuer, id);
 
         if (registeredClient == null) {
             LOG.error("client not found with id: {}", id);
@@ -359,7 +366,7 @@ public class ClientRestService {
         }
         else {
             LOG.info("deleting by id: {}", registeredClient.getId());
-            clientRepository.deleteById(registeredClient.getId());
+            issuerAwareAuthorizationServerOperations.deleteById(issuer, registeredClient.getId());
 
             LOG.info("delete client associated with organization {}", registeredClient.getClientId());
             clientOrganizationRepository.deleteByClientId(UUID.fromString(registeredClient.getId()));
@@ -379,6 +386,7 @@ public class ClientRestService {
     @Transactional
     public Mono<Map<String, String>> delete() {
         LOG.info("delete client-user relationship for logged-in user-id");
+        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         String userIdString = jwt.getClaim("userId");
@@ -406,7 +414,7 @@ public class ClientRestService {
                     if (count <= 0) {
                         //there are no roles setup for any client, org -- this should delete all rows with this orgId
                         transactionTemplate.executeWithoutResult(status -> {
-                            deleteCli(orgId);
+                            deleteCli(issuer, orgId);
                         });
 
                         return Mono.just(Map.of("message", "delete client"));
@@ -416,7 +424,7 @@ public class ClientRestService {
                 });
    }
 
-    private void deleteCli(UUID orgId) {
+    private void deleteCli(String issuer, UUID orgId) {
         List<ClientOrganization> clientOrganizationList = clientOrganizationRepository.findByOrganizationId(orgId);
 
         LOG.info("deleting clientOrganization by organizationId");
@@ -427,7 +435,7 @@ public class ClientRestService {
         clientOrganizationList.forEach(clientOrganization ->
         {
             LOG.info("delete client: {}", clientOrganization.getClientId());
-            clientRepository.deleteById(clientOrganization.getClientId().toString());
+            issuerAwareAuthorizationServerOperations.deleteById(issuer, clientOrganization.getClientId().toString());
         });
         LOG.info("done");
     }

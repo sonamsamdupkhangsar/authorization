@@ -30,7 +30,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationContext;
 import org.springframework.security.oauth2.server.authorization.oidc.authentication.OidcUserInfoAuthenticationToken;
-import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
@@ -67,9 +66,6 @@ public class JwtUserInfoMapperSecurityConfig {
 
     @Autowired
     private OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer;
-
-    @Value("${ISSUER_URI}")
-    private String issuerUri;
 
     @Value("${allowedOrigins}")
     private String allowedOrigins; //csv allow origins
@@ -158,37 +154,6 @@ public class JwtUserInfoMapperSecurityConfig {
     }
 
     @Bean
-    public JWKSource<SecurityContext> jwkSource() {
-        KeyPair keyPair = generateRsaKey();
-        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
-        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
-        RSAKey rsaKey = new RSAKey.Builder(publicKey)
-                .privateKey(privateKey)
-                .keyID(UUID.randomUUID().toString())
-                .build();
-        JWKSet jwkSet = new JWKSet(rsaKey);
-        return new ImmutableJWKSet<>(jwkSet);
-    }
-
-    private static KeyPair generateRsaKey() {
-        KeyPair keyPair;
-        try {
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-            keyPairGenerator.initialize(2048);
-            keyPair = keyPairGenerator.generateKeyPair();
-        }
-        catch (Exception ex) {
-            throw new IllegalStateException(ex);
-        }
-        return keyPair;
-    }
-
-    @Bean
-    public AuthorizationServerSettings authorizationServerSettings() {
-        return AuthorizationServerSettings.builder().issuer(issuerUri).build();
-    }
-
-    @Bean
     public RequestCache requestCache() {
         return new HttpSessionRequestCache();
     }
@@ -233,13 +198,7 @@ public class JwtUserInfoMapperSecurityConfig {
 
    //@Bean
     OAuth2TokenGenerator<?> tokenGenerator() {
-        JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource()));
-        LOG.info("tokenCustomizer: {}", tokenCustomizer);
-
-        jwtGenerator.setJwtCustomizer(tokenCustomizer);
-
-        OAuth2TokenGenerator<OAuth2RefreshToken> refreshTokenGenerator = new CustomRefreshTokenGenerator();
-        return new DelegatingOAuth2TokenGenerator(jwtGenerator, refreshTokenGenerator);
+        return null;
     }
 
     private static final class CustomRefreshTokenGenerator implements OAuth2TokenGenerator<OAuth2RefreshToken> {
@@ -258,4 +217,3 @@ public class JwtUserInfoMapperSecurityConfig {
 
     }
 }
-

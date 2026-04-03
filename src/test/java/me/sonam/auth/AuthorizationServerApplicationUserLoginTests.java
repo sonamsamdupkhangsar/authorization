@@ -43,8 +43,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -60,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(classes = {DefaultAuthorizationServerApplication.class}, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
+@Import(ClientInit.class)
 public class AuthorizationServerApplicationUserLoginTests {
 	private static final Logger LOG = LoggerFactory.getLogger(AuthorizationServerApplicationUserLoginTests.class);
 
@@ -78,6 +85,9 @@ public class AuthorizationServerApplicationUserLoginTests {
 	private JpaRegisteredClientRepository jpaRegisteredClientRepository;
 
 	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Autowired
 	private ClientOrganizationRepository clientOrganizationRepository;
 
 	@Autowired
@@ -86,7 +96,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 	private TokenRequestFilter tokenRequestFilter;
 
 	private void saveClientOrganization(final UUID clientId, UUID organizationId) {
-		RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientsClientId);
+		RegisteredClient registeredClient = ensureMessagingClient();
 		assertThat(registeredClient).isNotNull();
 		assertThat(registeredClient.getClientId()).isEqualTo(clientsClientId);
 		clientIdUuid = UUID.fromString(registeredClient.getId());
@@ -100,7 +110,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 	}
 
 	private void saveClientUser(final UUID clientId, UUID userId) {
-		RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientsClientId);
+		RegisteredClient registeredClient = ensureMessagingClient();
 		assertThat(registeredClient).isNotNull();
 		assertThat(registeredClient.getClientId()).isEqualTo(clientsClientId);
 
@@ -108,6 +118,32 @@ public class AuthorizationServerApplicationUserLoginTests {
 			clientUserRepository.save(new ClientUser(UUID.fromString(registeredClient.getId()), userId));
 			LOG.info("saved clientUser");
 		}
+	}
+
+	private RegisteredClient ensureMessagingClient() {
+		RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientsClientId);
+		if (registeredClient != null) {
+			return registeredClient;
+		}
+
+		registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+				.clientId(clientsClientId)
+				.clientSecret(passwordEncoder.encode("secret"))
+				.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+				.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
+				.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+				.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+				.authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+				.redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
+				.redirectUri("http://127.0.0.1:8080/authorized")
+				.scope(OidcScopes.OPENID)
+				.scope(OidcScopes.PROFILE)
+				.scope("message.read")
+				.scope("message.write")
+				.clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
+				.build();
+		jpaRegisteredClientRepository.save(registeredClient, "localhost");
+		return registeredClient;
 	}
 
 	@BeforeEach
@@ -230,7 +266,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2
@@ -309,7 +345,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2
@@ -406,7 +442,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2
@@ -480,7 +516,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2
@@ -554,12 +590,12 @@ public class AuthorizationServerApplicationUserLoginTests {
 		LOG.info("take request");
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//recordedRequest = mockWebServer.takeRequest();
 		//LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		//AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		//AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		//AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		recordedRequest = mockWebServer.takeRequest();
@@ -617,7 +653,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		LOG.info("take request");
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		recordedRequest = mockWebServer.takeRequest();
@@ -687,7 +723,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2
@@ -778,7 +814,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//1
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		LOG.info("should be acesstoken path for recordedRequest: {}", recordedRequest.getPath());
-		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+		AssertionsForClassTypes.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 		AssertionsForClassTypes.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
 
 		//2

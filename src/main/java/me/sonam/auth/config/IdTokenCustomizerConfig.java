@@ -16,10 +16,12 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
 import java.util.Set;
+import java.net.URI;
 import java.util.stream.Collectors;
 
 
@@ -47,6 +49,7 @@ public class IdTokenCustomizerConfig {
                 context.getClaims().claims(claims -> {
                     LOG.info("add all claims: {}", userInfo.getClaims());
                     claims.putAll(userInfo.getClaims());
+                    claims.put("tenant_id", currentHost());
                     claims.put("profile", "");
                     if (userInfo.getPicture() != null && !userInfo.getPicture().isEmpty()) {
                         LOG.debug("set picture {}", userInfo.getPicture());
@@ -82,10 +85,18 @@ public class IdTokenCustomizerConfig {
                     LOG.info("add roles in claim map");
                     context.getClaims().claim("userRole", authorities);
                 }
+                context.getClaims().claim("tenant_id", currentHost());
 
 
             }
         };
+    }
+
+    private String currentHost() {
+        if (AuthorizationServerContextHolder.getContext() == null || AuthorizationServerContextHolder.getContext().getIssuer() == null) {
+            return "default";
+        }
+        return URI.create(AuthorizationServerContextHolder.getContext().getIssuer()).getHost();
     }
 
 }

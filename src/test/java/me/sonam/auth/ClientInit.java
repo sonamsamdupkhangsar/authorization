@@ -15,8 +15,8 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
-import org.springframework.test.web.reactive.server.WebTestClient;
 
 import java.util.UUID;
 // initilization class for setting up a RegisteredClient used in test cases
@@ -24,6 +24,9 @@ import java.util.UUID;
 @Configuration
 public class ClientInit {
     private static final Logger LOG = LoggerFactory.getLogger(ClientInit.class);
+
+    @Autowired
+    private RegisteredClientRepository registeredClientRepository;
 
     @Autowired
     private JpaRegisteredClientRepository jpaRegisteredClientRepository;
@@ -41,7 +44,7 @@ public class ClientInit {
     public void saveInitialClient() {
         LOG.info("save messaging client for testing");
         clientRepository.deleteAll();
-        if (jpaRegisteredClientRepository.findByClientId(clientId) == null) {
+        if (registeredClientRepository.findByClientId(clientId) == null) {
 
             RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
                     .clientId(clientId)
@@ -59,7 +62,8 @@ public class ClientInit {
                     .scope("message.write")
                     .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
                     .build();
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
+            jpaRegisteredClientRepository.save(registeredClient, "localhost");
 
             LOG.info("saved initial client");
         }

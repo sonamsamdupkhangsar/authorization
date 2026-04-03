@@ -46,10 +46,10 @@ public class TokenFilter {
     private final WebClient.Builder webClientBuilder;
 
     private RequestCache requestCache;
-    @Value("${server.servlet.context-path}${auth-server.oauth2token.path:}")
+    @Value("${server.servlet.context-path:}${auth-server.oauth2token.path:}")
     private String accessTokenPath;
 
-    @Value("${server.servlet.context-path}")
+    @Value("${server.servlet.context-path:}")
     private String servletContextPath;
 
     @Value("${tokenExpireSeconds}")

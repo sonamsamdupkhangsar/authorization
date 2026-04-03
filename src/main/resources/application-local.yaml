@@ -30,16 +30,41 @@ SETTING_REST_SERVICE: http://setting-rest-service
 
 # ISSUER_URL here is used for pulling the public certs from authorization-server for token validation
 ISSUER_ADDRESS: http://api-gateway:9001
-ISSUER_URI: ${ISSUER_ADDRESS}/issuer
+ISSUER_URI: ${ISSUER_ADDRESS}
 
 
 REQUEST_SCOPES: message.read message.write
 BASE64_CLIENT_ID_SECRET: b2F1dGgtY2xpZW50Om9hdXRoLXNlY3JldA==
 
 client-app: http://10.0.0.28:3000
-changePassword: /issuer/forgot/changePassword #@{/forgot/changePassword} use for local
+changePassword: /forgot/changePassword #@{/forgot/changePassword} use for local
 allowedOrigins: http://api-gateway, 10.0.0.28, localhost, 127.0.0.1, api-gateway, 10.0.0.28:8080, 127.0.0.1, *,
 
 NEW_RELIC_ENABLED: false
 authzmanager: http://api-gateway:9093
 AUTHZMANAGER_INITIAL_SECRET: hello
+
+authorization-server:
+  multitenancy:
+    default-hosts:
+      - localhost
+      - 127.0.0.1
+    tenants:
+      business1:
+        hosts:
+          - business1.openissuer.test
+        url: jdbc:hsqldb:mem:business1auth
+        username: sa
+        password-secret-ref: business1-db-password
+        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+      business2:
+        hosts:
+          - business2.openissuer.test
+        url: jdbc:hsqldb:mem:business2auth
+        username: sa
+        password-secret-ref: business2-db-password
+        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+
+tenant-secrets:
+  business1-db-password: ""
+  business2-db-password: ""

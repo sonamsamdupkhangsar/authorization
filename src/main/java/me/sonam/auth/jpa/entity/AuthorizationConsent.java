@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 @IdClass(AuthorizationConsent.AuthorizationConsentId.class)
 public class AuthorizationConsent {
     @Id
+    private String tenantId;
+    @Id
     private String registeredClientId;
     @Id
     private String principalName;
@@ -26,6 +28,14 @@ public class AuthorizationConsent {
 
     public void setRegisteredClientId(String registeredClientId) {
         this.registeredClientId = registeredClientId;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getPrincipalName() {
@@ -45,8 +55,17 @@ public class AuthorizationConsent {
     }
 
     public static class AuthorizationConsentId implements Serializable {
+        private String tenantId;
         private String registeredClientId;
         private String principalName;
+
+        public String getTenantId() {
+            return tenantId;
+        }
+
+        public void setTenantId(String tenantId) {
+            this.tenantId = tenantId;
+        }
 
         public String getRegisteredClientId() {
             return registeredClientId;
@@ -69,13 +88,14 @@ public class AuthorizationConsent {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             AuthorizationConsentId that = (AuthorizationConsentId) o;
-            return registeredClientId.equals(that.registeredClientId) && principalName.equals(that.principalName);
+            return Objects.equals(tenantId, that.tenantId) &&
+                    registeredClientId.equals(that.registeredClientId) &&
+                    principalName.equals(that.principalName);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(registeredClientId, principalName);
+            return Objects.hash(tenantId, registeredClientId, principalName);
         }
     }
 }
-

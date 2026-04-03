@@ -3,7 +3,8 @@ package me.sonam.auth.init;
 import jakarta.annotation.PostConstruct;
 import me.sonam.auth.jpa.entity.Client;
 import me.sonam.auth.jpa.repo.ClientRepository;
-import me.sonam.auth.service.JpaRegisteredClientRepository;
+import me.sonam.auth.multitenancy.AuthorizationServerMultitenancyProperties;
+import me.sonam.auth.multitenancy.IssuerAwareAuthorizationServerOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,12 +15,15 @@ import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 import java.time.Duration;
 import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Configuration
@@ -27,7 +31,13 @@ public class ClientSetup {
     private static final Logger LOG = LoggerFactory.getLogger(ClientSetup.class);
 
     @Autowired
-    private JpaRegisteredClientRepository jpaRegisteredClientRepository;
+    private RegisteredClientRepository registeredClientRepository;
+
+    @Autowired
+    private IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations;
+
+    @Autowired
+    private AuthorizationServerMultitenancyProperties multitenancyProperties;
 
     @Autowired
     private ClientRepository clientRepository;
@@ -53,33 +63,9 @@ public class ClientSetup {
 
     @PostConstruct
     public void createAuthzManagerClient() {
-        LOG.info("create authzManager client if it is not created");
-
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(authzManagerClient);
-
-        if (registeredClient == null) {
-            LOG.info("authzManager client: {}, secret: {}", authzManagerClient, authzManagerInitialSecret);
-
-            TokenSettings tokenSettings = TokenSettings.builder().accessTokenTimeToLive(Duration.ofSeconds(1200)).build();
-
-            registeredClient = RegisteredClient.withId(authzManagerId)
-                    .clientId(authzManagerClient)
-                    .clientSecret(passwordEncoder.encode(authzManagerInitialSecret))
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .redirectUri(authzManagerUri+"/login/oauth2/code/"+authzManagerClient)
-                    .tokenSettings(tokenSettings)
-                    .build();
-
-            jpaRegisteredClientRepository.save(registeredClient);
-            LOG.info("saved authzmanager client");
-        }
-        else {
-            LOG.info("authzmanager exists");
-        }
+        LOG.info("create authzManager client if it is not created for each issuer");
+        seedDefaultIssuerAuthzManagerClient();
+        configuredIssuers().forEach(this::seedIssuerClients);
     }
 
     @PostConstruct
@@ -91,36 +77,12 @@ public class ClientSetup {
 
         LOG.info("clientId: {}, secret: {}", clientId, secret);
 
-        // this client is needed for performing client credential to retrieve access tokens
-        // for internal api calls.
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
-
-        if (registeredClient != null) {
-            LOG.info("registered client exists");
-            LOG.info("delete that client and create a new one");
-            clientRepository.deleteById(registeredClient.getId());
-            LOG.info("deleted client: {}", registeredClient.getClientId());
-        }
-       // else {
-            registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientId(clientId)
-                    .clientSecret(passwordEncoder.encode(secret))
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .scope(OidcScopes.EMAIL)
-                    .scope("message.read")
-                    .scope("message.write")
-                    .build();
-
-            jpaRegisteredClientRepository.save(registeredClient);
-            LOG.info("save a client-credential");
-      //  }
+        seedDefaultIssuerServiceAccount(clientId, secret);
+        configuredIssuers().forEach(this::seedIssuerClients);
 /*
         final String nextJsClientId = "nextjs-client";
 
-        registeredClient = jpaRegisteredClientRepository.findByClientId(nextJsClientId);
+        registeredClient = registeredClientRepository.findByClientId(nextJsClientId);
 
         if (registeredClient != null) {
             LOG.info("found registered client");
@@ -146,7 +108,7 @@ public class ClientSetup {
                     .scope("message.read")
                     .scope("message.write")
                     .build();
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
 
             LOG.info("save a client-credential");
         }*/
@@ -174,7 +136,7 @@ public class ClientSetup {
 
         // Save registered client in db as if in-memory
         //JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-        jpaRegisteredClientRepository.save(registeredClient);
+        registeredClientRepository.save(registeredClient);
 
         //	return registeredClientRepository;
     }
@@ -183,7 +145,7 @@ public class ClientSetup {
     public void saveAnotherClient() {
         LOG.info("save myclient");
         final String myclient = "myclient";
-        if (jpaRegisteredClientRepository.findByClientId(myclient) == null) {
+        if (registeredClientRepository.findByClientId(myclient) == null) {
             RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
                     .clientId(myclient)
                     .clientSecret("{noop}secret")
@@ -203,7 +165,7 @@ public class ClientSetup {
 
             // Save registered client in db as if in-memory
             //JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
         }
         //	return registeredClientRepository;
     }
@@ -214,7 +176,7 @@ public class ClientSetup {
         Optional<Client> cLientOptional = clientRepository.findByClientId(clientId);
         cLientOptional.ifPresent(client -> clientRepository.delete(client));
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
         if (registeredClient != null) {
             LOG.info("registered public client exists");
         }
@@ -233,7 +195,7 @@ public class ClientSetup {
                     .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true)
                             .requireProofKey(true).build())
                     .build();
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
 
             LOG.info("saved registeredClient");
         }
@@ -243,7 +205,7 @@ public class ClientSetup {
   /*  private void savePrivateRegisteredClient() {
         final String clientId = "private-client";
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientId);
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
         if (registeredClient != null) {
             LOG.info("registered private client exists");
         }
@@ -266,7 +228,7 @@ public class ClientSetup {
                     .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false)
                             .requireProofKey(true).build())
                     .build();
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
 
             LOG.info("saved registeredClient");
         }
@@ -279,7 +241,7 @@ public class ClientSetup {
 
         //clientRepository.deleteAll();
 
-        if (jpaRegisteredClientRepository.findByClientId(clientId) != null) {
+        if (registeredClientRepository.findByClientId(clientId) != null) {
             LOG.info("registered articles client exists");
         }
         else {
@@ -301,7 +263,7 @@ public class ClientSetup {
                     .scope("articles.write")
                     .build();
 
-            jpaRegisteredClientRepository.save(registeredClient);
+            registeredClientRepository.save(registeredClient);
             LOG.info("saved arcticles client oidc");
         }
     }
@@ -314,4 +276,93 @@ public class ClientSetup {
    //@PostConstruct
 
 
+    private void seedDefaultIssuerAuthzManagerClient() {
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(authzManagerClient);
+        if (registeredClient != null) {
+            LOG.info("authzmanager exists in default issuer store");
+            return;
+        }
+        registeredClientRepository.save(buildAuthzManagerClient());
+        LOG.info("saved authzmanager client in default issuer store");
+    }
+
+    private void seedAuthzManagerClient(String issuer) {
+        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, authzManagerClient);
+        if (registeredClient != null) {
+            LOG.info("authzmanager exists for issuer {}", issuer);
+            return;
+        }
+        issuerAwareAuthorizationServerOperations.save(issuer, buildAuthzManagerClient());
+        LOG.info("saved authzmanager client for issuer {}", issuer);
+    }
+
+    private RegisteredClient buildAuthzManagerClient() {
+        TokenSettings tokenSettings = TokenSettings.builder().accessTokenTimeToLive(Duration.ofSeconds(1200)).build();
+        return RegisteredClient.withId(authzManagerId)
+                .clientId(authzManagerClient)
+                .clientSecret(passwordEncoder.encode(authzManagerInitialSecret))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .redirectUri(authzManagerUri + "/login/oauth2/code/" + authzManagerClient)
+                .tokenSettings(tokenSettings)
+                .build();
+    }
+
+    private void seedDefaultIssuerServiceAccount(String clientId, String secret) {
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
+        if (registeredClient != null) {
+            LOG.info("keeping existing service-account client in default issuer store: {}", registeredClient.getClientId());
+            return;
+        }
+        registeredClientRepository.save(buildServiceAccount(clientId, secret));
+        LOG.info("saved service-account client in default issuer store");
+    }
+
+    private void seedServiceAccount(String issuer, String clientId, String secret) {
+        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, clientId);
+        if (registeredClient != null) {
+            LOG.info("keeping existing service-account client for issuer {}: {}", issuer, registeredClient.getClientId());
+            return;
+        }
+        issuerAwareAuthorizationServerOperations.save(issuer, buildServiceAccount(clientId, secret));
+        LOG.info("saved service-account client for issuer {}", issuer);
+    }
+
+    private RegisteredClient buildServiceAccount(String clientId, String secret) {
+        return RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId(clientId)
+                .clientSecret(passwordEncoder.encode(secret))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .scope(OidcScopes.EMAIL)
+                .scope("message.read")
+                .scope("message.write")
+                .build();
+    }
+
+    private Set<String> configuredIssuers() {
+        Set<String> issuers = new LinkedHashSet<>();
+        multitenancyProperties.getTenants().values().forEach(tenant ->
+                tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
+        return issuers;
+    }
+
+    private String toIssuer(String host) {
+        if (host.equals("localhost") || host.equals("127.0.0.1")) {
+            return "http://" + host;
+        }
+        return "https://" + host;
+    }
+
+    public void seedIssuerClients(String issuer) {
+        seedAuthzManagerClient(issuer);
+        String decodedString = new String(Base64.getDecoder().decode(base64ClientIdSecret));
+        String[] clientIdSecretArray = decodedString.split(":");
+        seedServiceAccount(issuer, clientIdSecretArray[0], clientIdSecretArray[1]);
+    }
 }

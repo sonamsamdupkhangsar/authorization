@@ -160,7 +160,7 @@ public class UserSignupIntegTest {
         assertThat(entityExchangeResult.getResponseBody()).contains("<strong>User Signup Success!</strong> <span>Sonam, your signup was successful! Please check your email ");
         RecordedRequest recordedRequest = mockWebServer.takeRequest();
         Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+        Assertions.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
 
         recordedRequest = mockWebServer.takeRequest();
         Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
@@ -190,4 +190,3 @@ public class UserSignupIntegTest {
         return objectMapper.writeValueAsString(o);
     }
 }
-

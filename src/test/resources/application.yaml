@@ -1,9 +1,6 @@
 #server:
 #  port: 9000
 AUTH_SERVER_PORT: 9000
-server:
-  servlet:
-    context-path: /issuer
 
 
 logging:
@@ -104,7 +101,7 @@ requestFilters:
 # this is used for getting accesstoken by header filter
 auth-server:
   root: http://localhost:{port}
-  context-path: /issuer
+  context-path:
   oauth2token:
     path: /oauth2/token
     grantType: client_credentials
@@ -114,6 +111,32 @@ BASE64_CLIENT_ID_SECRET: dXNlcjpzZWNyZXQ=
 REQUEST_SCOPES: cmVhZCB3cml0ZQ==
 
 allowedOrigins: 10.0.0.28, localhost, 127.0.0.1
+
+authorization-server:
+  multitenancy:
+    default-hosts:
+      - localhost
+      - 127.0.0.1
+    tenants:
+      business1:
+        hosts:
+          - business1.openissuer.test
+        url: jdbc:hsqldb:mem:business1db
+        username: sa
+        password-secret-ref: business1-db-password
+        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+      business2:
+        hosts:
+          - business2.openissuer.test
+        url: jdbc:hsqldb:mem:business2db
+        username: sa
+        password-secret-ref: business2-db-password
+        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+
+tenant-secrets:
+  business1-db-password: ""
+  business2-db-password: ""
+  dynamic-tenant-db-password: ""
 
 authzmanager: http://localhost:9093
 
