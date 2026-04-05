@@ -7,6 +7,16 @@ POSTGRES_DBNAME: authorization
 POSTGRES_SERVICE: localhost:5432
 DB_SSLMODE: disable
 
+BUSINESS1_AUTH_DB_URL: jdbc:postgresql://localhost:5432/business1auth
+BUSINESS1_AUTH_DB_USERNAME: test
+BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF: business1-db-password
+BUSINESS1_AUTH_DB_DRIVER: org.postgresql.Driver
+
+BUSINESS2_AUTH_DB_URL: jdbc:postgresql://localhost:5432/business2auth
+BUSINESS2_AUTH_DB_USERNAME: test
+BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF: business2-db-password
+BUSINESS2_AUTH_DB_DRIVER: org.postgresql.Driver
+
 EUREKA_HOST: localhost:8761
 EUREKA_USER: test
 EUREKA_PASSWORD: test
@@ -53,18 +63,18 @@ authorization-server:
       business1:
         hosts:
           - business1.openissuer.test
-        url: jdbc:hsqldb:mem:business1auth
-        username: sa
-        password-secret-ref: business1-db-password
-        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+        url: ${BUSINESS1_AUTH_DB_URL}
+        username: ${BUSINESS1_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS1_AUTH_DB_DRIVER}
       business2:
         hosts:
           - business2.openissuer.test
-        url: jdbc:hsqldb:mem:business2auth
-        username: sa
-        password-secret-ref: business2-db-password
-        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+        url: ${BUSINESS2_AUTH_DB_URL}
+        username: ${BUSINESS2_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER}
 
 tenant-secrets:
-  business1-db-password: ""
-  business2-db-password: ""
+  business1-db-password: test
+  business2-db-password: test

@@ -121,6 +121,30 @@ Note:
 - some larger mixed test invocations were flaky due shared integration-test state
 - the focused commands above are the reliable verification set used most recently
 
+## Smoke Test Script
+
+There is now a deploy-time smoke test script:
+- [multitenant-smoke.sh](/Users/sonamsamdupkhangsar/Documents/github/authorization/scripts/multitenant-smoke.sh)
+
+Runbook:
+- [README-multitenant-smoke.md](/Users/sonamsamdupkhangsar/Documents/github/authorization/scripts/README-multitenant-smoke.md)
+
+Purpose:
+- verify discovery matches each issuer host
+- verify token issuance succeeds for the correct tenant secret
+- verify cross-tenant authentication fails with `invalid_client`
+
+Local example:
+
+```bash
+BASE1=http://business1.openissuer.test:9001 \
+BASE2=http://business2.openissuer.test:9001 \
+CLIENT_ID=shared-client \
+SECRET1=business1-secret \
+SECRET2=business2-secret \
+./scripts/multitenant-smoke.sh
+```
+
 ## Known Caveats
 
 - [MapBackedAuthorizationServerContext.java](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/java/me/sonam/auth/config/MapBackedAuthorizationServerContext.java) returns `null` from `getAuthorizationServerSettings()`
@@ -135,4 +159,3 @@ Likely next improvements:
 - harden `MapBackedAuthorizationServerContext` to provide real `AuthorizationServerSettings`
 - reduce remaining dependence on legacy `JpaRegisteredClientRepository` in tests
 - add explicit end-to-end authorize-flow host-header coverage if needed
-

@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.util.List;
 
 @Component
@@ -86,11 +87,26 @@ public class IssuerComponentRegistrar {
 
     private void initializeAuthorizationServerSchema(DataSource dataSource) {
         ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
+        // These scripts are create-only, so repeated startup should ignore "already exists".
         populator.setContinueOnError(true);
         populator.addScript(new ClassPathResource("org/springframework/security/oauth2/server/authorization/client/oauth2-registered-client-schema.sql"));
-        populator.addScript(new ClassPathResource("org/springframework/security/oauth2/server/authorization/oauth2-authorization-schema.sql"));
+        populator.addScript(new ClassPathResource(resolveAuthorizationSchemaPath(dataSource)));
         populator.addScript(new ClassPathResource("org/springframework/security/oauth2/server/authorization/oauth2-authorization-consent-schema.sql"));
         populator.execute(dataSource);
+    }
+
+    private String resolveAuthorizationSchemaPath(DataSource dataSource) {
+        return isPostgreSql(dataSource)
+                ? "db/schema/postgresql/oauth2-authorization-schema.sql"
+                : "org/springframework/security/oauth2/server/authorization/oauth2-authorization-schema.sql";
+    }
+
+    private boolean isPostgreSql(DataSource dataSource) {
+        try (Connection connection = dataSource.getConnection()) {
+            return connection.getMetaData().getDatabaseProductName().toLowerCase().contains("postgresql");
+        } catch (Exception e) {
+            throw new IllegalStateException("failed to detect database product", e);
+        }
     }
 
     private void initializeJwkSchema(JdbcTemplate jdbcTemplate) {
