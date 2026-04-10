@@ -54,7 +54,6 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
@@ -787,21 +786,21 @@ public class AuthorizationServerApplicationUserLoginTests {
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"id\":\""+userId+"\", \"firstName\":\"Dommy\"}"));
 
-		//4 user exists in organization call
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"message\": true}"));
+			//4 user exists in organization call
+			mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+					.setResponseCode(200).setBody("{\"message\": true}"));
 
-		//5 user authentication failure response
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(400).setBody("{\"error\": \"no authentication found with username and password\"}"));
+			//5 user authentication failure response
+			mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+					.setResponseCode(400).setBody("{\"error\": \"no authentication found with username and password\"}"));
 
-		//6 login failure attempt-rest-service call and gets You can retry message indicating a lock out of user
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"message\": \"You can retry login again in 1 hour\"}"));
+			//6 login failure attempt-rest-service call and gets You can retry message indicating a lock out of user
+			mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+					.setResponseCode(200).setBody("{\"message\": \"You can retry login again in 1 hour\"}"));
 
-		//7, on lock-out of login failure in attempt-rest-service, call account-rest-service to lock account
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"message\": \"account is now locked for authenticationId: \"}"));
+			//7, on lock-out of login failure in attempt-rest-service, call account-rest-service to lock account
+			mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+					.setResponseCode(200).setBody("{\"message\": \"account is now locked for authenticationId: \"}"));
 
 
 		LOG.info("sign-in to the location page");
@@ -827,26 +826,26 @@ public class AuthorizationServerApplicationUserLoginTests {
 		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
 		assertThat(recordedRequest.getPath()).startsWith("/users/authentication-id/");
 
-		//4 check user exists in organization
-		recordedRequest = mockWebServer.takeRequest();
-		LOG.info("(recordedRequest.getPath()): {}", recordedRequest.getPath());
-		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-		assertThat(recordedRequest.getPath()).startsWith("/organizations/"+organizationId+"/users/"+userId);
+			//4 check user exists in organization
+			recordedRequest = mockWebServer.takeRequest();
+			LOG.info("(recordedRequest.getPath()): {}", recordedRequest.getPath());
+			assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+			assertThat(recordedRequest.getPath()).startsWith("/organizations/"+organizationId+"/users/"+userId);
 
-		//5 authentication call
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+			//5 authentication call
+			recordedRequest = mockWebServer.takeRequest();
+			assertThat(recordedRequest.getMethod()).isEqualTo("POST");
+			assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
 
-		//6
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-		assertThat(recordedRequest.getPath()).startsWith("/attempts/login/failed");
+			//6
+			recordedRequest = mockWebServer.takeRequest();
+			assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
+			assertThat(recordedRequest.getPath()).startsWith("/attempts/login/failed");
 
-		//7
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-		assertThat(recordedRequest.getPath()).startsWith("/accounts/lock/true");
+			//7
+			recordedRequest = mockWebServer.takeRequest();
+			assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
+			assertThat(recordedRequest.getPath()).startsWith("/accounts/lock/true");
 	}
 
 	private static <P extends Page> P signInOnly(HtmlPage page, String username, String password) throws IOException {

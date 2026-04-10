@@ -19,11 +19,14 @@ public class OrganizationWebClient {
 
     private final String userExistsInOrganizationEndpoint;
     private final String organizationEndpoint;
+    private final String organizationBySubdomainEndpoint;
 
-    public OrganizationWebClient(WebClient.Builder webClientBuilder, String organizationEndpoint, String userExistsInOrganizationEndpoint) {
+    public OrganizationWebClient(WebClient.Builder webClientBuilder, String organizationEndpoint,
+                                 String userExistsInOrganizationEndpoint, String organizationBySubdomainEndpoint) {
         this.webClientBuilder = webClientBuilder;
         this.organizationEndpoint = organizationEndpoint;
         this.userExistsInOrganizationEndpoint = userExistsInOrganizationEndpoint;
+        this.organizationBySubdomainEndpoint = organizationBySubdomainEndpoint;
     }
     public Mono<Map<String, String>> addUserToOrganization(UUID userId, UUID organizationId) {
         LOG.info("add user {} to organization {}", userId, organizationId);
@@ -86,6 +89,25 @@ public class OrganizationWebClient {
                 return Mono.just(false);
             }
         });
+    }
+
+    public Mono<UUID> getOrganizationIdBySubdomain(String subdomain) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain);
+        LOG.info("get organization by subdomain endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(map -> {
+                    Object id = map.get("id");
+                    if (id == null) {
+                        return Mono.empty();
+                    }
+                    return Mono.just(UUID.fromString(id.toString()));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get organization by subdomain {}: {}", subdomain, throwable.getMessage());
+                    return Mono.empty();
+                });
     }
 
 }

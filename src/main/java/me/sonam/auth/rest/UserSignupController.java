@@ -3,7 +3,10 @@ package me.sonam.auth.rest;
 import jakarta.validation.Valid;
 
 import me.sonam.auth.rest.signup.Organization;
+import me.sonam.auth.rest.signup.User;
 import me.sonam.auth.rest.signup.UserSignup;
+import me.sonam.auth.service.HostOrganizationResolver;
+import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.SettingWebClient;
@@ -43,10 +46,16 @@ public class UserSignupController {
     private SettingWebClient settingWebClient;
     @Autowired
     private RoleWebClient roleWebClient;
+    @Autowired
+    private SignupPolicyService signupPolicyService;
+    @Autowired
+    private HostOrganizationResolver hostOrganizationResolver;
 
     public UserSignupController(UserWebClient userWebClient) {
         this.userWebClient = userWebClient;
     }
+
+    // Renders the signup form used by both the public signup subdomain and host-bound signup flows.
     @GetMapping
     public Mono<String> getSignupForm(Model model) {
         final String PATH = "signupform";
@@ -56,10 +65,13 @@ public class UserSignupController {
         return Mono.just(PATH);
     }
 
+    // Validates the current host policy, creates the user, and then either creates a new
+    // organization or attaches the user to the organization already bound to the host.
     @PostMapping
     public Mono<String> signupUserFromForm(@Valid @ModelAttribute("userSignup") UserSignup userSignup,
                                            BindingResult bindingResult, Model model) {
         final String PATH = "signupform";
+        final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
         LOG.info("signing up user: {}", userSignup);
 
         if (bindingResult.hasErrors()) {
@@ -67,6 +79,14 @@ public class UserSignupController {
             model.addAttribute("error", "Data validation failed");
             return Mono.just(PATH);
         }
+
+        var emailValidationError = signupPolicyService.validateEmailForHost(currentHost, userSignup.getEmail());
+        if (emailValidationError.isPresent()) {
+            model.addAttribute("error", emailValidationError.get());
+            model.addAttribute("userSignup", userSignup);
+            return Mono.just(PATH);
+        }
+
         return  userWebClient.signupUser(userSignup)
                 .flatMap(s -> {
 
@@ -81,6 +101,10 @@ public class UserSignupController {
                 })
                 .flatMap(s ->  userWebClient.findByAuthenticationId(userSignup.getAuthenticationId()))
                 .flatMap(user -> {
+                    if (!signupPolicyService.shouldCreateOrganizationOnSignupForHost(currentHost)) {
+                        return attachUserToHostOrganization(user, currentHost).thenReturn(PATH);
+                    }
+
                     String name = userSignup.getOrganization();
                     if (name == null || name.isEmpty()) {
                         name = userSignup.getFirstName() + " " + userSignup.getLastName() + " Company";
@@ -90,12 +114,12 @@ public class UserSignupController {
                     org.setDefaultOrganization(true);
 
                     //create organization and add this user to it
-                    return organizationWebClient.updateOrganization(org, HttpMethod.POST).zipWith(Mono.just(user));
+                    return organizationWebClient.updateOrganization(org, HttpMethod.POST)
+                            .flatMap(createdOrganization -> settingWebClient.addDefaultOrganization(null, user.getId(), createdOrganization.getId())
+                                    .then(roleWebClient.setUserAsRoleNameForOrganization(null,
+                                            "SuperAdmin", user.getId(), createdOrganization.getId()))
+                                    .thenReturn(PATH));
                 })
-                .flatMap(objects -> settingWebClient.addDefaultOrganization(null, objects.getT2().getId(), objects.getT1().getId()).zipWith(Mono.just(objects)))
-                .flatMap(objects -> roleWebClient.setUserAsRoleNameForOrganization(null,
-                        "SuperAdmin", objects.getT2().getT2().getId(), objects.getT2().getT1().getId()))
-                .thenReturn(PATH)
                 .onErrorResume(throwable -> {
                                 setErrorInModel(throwable, model, "failed to signup user");
                                 model.addAttribute("userSignup", userSignup);
@@ -103,7 +127,22 @@ public class UserSignupController {
                 });
     }
 
+    // Uses the current signup host as the source of truth and adds the new user to that host's
+    // existing organization instead of creating another organization.
+    private Mono<Void> attachUserToHostOrganization(User user, String host) {
+        if (host == null) {
+            return Mono.error(new IllegalStateException("No current host found for signup"));
+        }
 
+        return organizationWebClient.getOrganizationIdBySubdomain(host)
+                .switchIfEmpty(Mono.error(new IllegalStateException("No organization bound to current host")))
+                .flatMap(organizationId -> organizationWebClient.addUserToOrganization(user.getId(), organizationId)
+                        .then(settingWebClient.addDefaultOrganization(null, user.getId(), organizationId))
+                        .then());
+    }
+
+
+    // Unwraps downstream WebClient errors into a user-facing signup error message in the model.
     private void setErrorInModel(Throwable throwable, Model model, String defaultErrMessage) {
         LOG.error("exception occured in signup user", throwable);
         LOG.error(defaultErrMessage);

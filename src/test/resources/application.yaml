@@ -51,6 +51,7 @@ organization-rest-service:
   root: http://localhost:8080
   context: ${organization-rest-service.root}/organizations
   userExistsInOrganization: /organizations/{organizationId}/users/{userId}
+  organizationBySubdomain: /organizations/subdomain/{subdomain}
 
 account-rest-service:
   root:  http://localhost:8080
@@ -132,10 +133,20 @@ authorization-server:
         username: sa
         password-secret-ref: business2-db-password
         driver-class-name: org.hsqldb.jdbc.JDBCDriver
+      free:
+        hosts:
+          - free.openissuer.test
+        url: jdbc:hsqldb:mem:freedb
+        username: sa
+        password-secret-ref: free-db-password
+        driver-class-name: org.hsqldb.jdbc.JDBCDriver
+  signup-policy:
+    hosts: {}
 
 tenant-secrets:
   business1-db-password: ""
   business2-db-password: ""
+  free-db-password: ""
   dynamic-tenant-db-password: ""
 
 authzmanager: http://localhost:9093
@@ -155,3 +166,6 @@ maxClients: 5
 maxOrganizations: 1
 maxUserPerOrganization: 5
 maxRoles: 5
+
+organization-seed:
+  organizations: []

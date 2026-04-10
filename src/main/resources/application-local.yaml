@@ -74,7 +74,45 @@ authorization-server:
         username: ${BUSINESS2_AUTH_DB_USERNAME}
         password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER}
-
+  signup-policy:
+    hosts:
+      free.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: true
+        allowed-email-domains:
+          - "*"
+      business1.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business1.com
+      business2.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business2.com
 tenant-secrets:
   business1-db-password: test
   business2-db-password: test
+
+organization-seed:
+  users:
+    - firstName: Business
+      lastName: One
+      email: owner1@openissuer.test
+      authenticationId: owner1@openissuer.test
+      password: owner1-secret
+      active: true
+    - firstName: Business
+      lastName: Two
+      email: owner2@openissuer.test
+      authenticationId: owner2@openissuer.test
+      password: owner2-secret
+      active: true
+  organizations:
+    - name: Business 1
+      creatorAuthenticationId: owner1@openissuer.test
+      subdomain: business1.openissuer.test
+    - name: Business 2
+      creatorAuthenticationId: owner2@openissuer.test
+      subdomain: business2.openissuer.test

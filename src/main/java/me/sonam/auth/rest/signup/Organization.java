@@ -12,6 +12,7 @@ public class Organization {
     @NotEmpty(message = "name cannot be empty")
     private String name;
     private UUID creatorUserId;
+    private String subdomain;
     private boolean defaultOrganization;
     private boolean previousDefaultOrganization;//this is used to check if it was previously a default org
 
@@ -25,6 +26,13 @@ public class Organization {
         this.creatorUserId = creatorUserId;
     }
 
+    public Organization(UUID id, String name, UUID creatorUserId, String subdomain) {
+        this.id = id;
+        this.name = name;
+        this.creatorUserId = creatorUserId;
+        this.subdomain = subdomain;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -35,6 +43,10 @@ public class Organization {
 
     public UUID getCreatorUserId() {
         return creatorUserId;
+    }
+
+    public String getSubdomain() {
+        return subdomain;
     }
 
     public boolean isDefaultOrganization() {
@@ -56,6 +68,7 @@ public class Organization {
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", creatorUserId=" + creatorUserId +
+                ", subdomain='" + subdomain + '\'' +
                 ", defaultOrganization="+defaultOrganization+
                 '}';
     }
@@ -70,5 +83,9 @@ public class Organization {
 
     public void setCreatorUserId(UUID creatorUserId) {
         this.creatorUserId = creatorUserId;
+    }
+
+    public void setSubdomain(String subdomain) {
+        this.subdomain = subdomain;
     }
 }

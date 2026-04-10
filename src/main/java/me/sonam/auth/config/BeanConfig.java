@@ -60,6 +60,8 @@ public class BeanConfig {
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
     private String userExistsInOrganizationEndpoint;
+    @Value("${organization-rest-service.root}${organization-rest-service.organizationBySubdomain}")
+    private String organizationBySubdomainEndpoint;
 
     @Value("${organization-rest-service.context}")
     private String organizationEndpoint;
@@ -126,7 +128,8 @@ public class BeanConfig {
 
     @Bean
     public OrganizationWebClient organizationWebClient() {
-        return new OrganizationWebClient(webClientBuilder, organizationEndpoint, userExistsInOrganizationEndpoint);
+        return new OrganizationWebClient(webClientBuilder, organizationEndpoint,
+                userExistsInOrganizationEndpoint, organizationBySubdomainEndpoint);
     }
 
     @Bean

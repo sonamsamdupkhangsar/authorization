@@ -61,7 +61,8 @@ authorization-server:
         username: ${BUSINESS2_AUTH_DB_USERNAME}
         password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER:org.postgresql.Driver}
-
+  signup-policy:
+    hosts: {}
 application-rest-service:
   root: ${APPLICATION_REST_SERVICE}
   client-role: /applications/clients/{clientId}/users/{authenticationId}
@@ -83,6 +84,7 @@ organization-rest-service:
   root: ${ORGANIZATION_REST_SERVICE}
   context: ${organization-rest-service.root}/organizations
   userExistsInOrganization: /organizations/{organizationId}/users/{userId}
+  organizationBySubdomain: /organizations/subdomain/{subdomain}
 
 account-rest-service:
   root: ${ACCOUNT_REST_SERVICE}
@@ -151,3 +153,6 @@ maxClients: 5
 maxOrganizations: 1
 maxUserPerOrganization: 5
 maxRoles: 5
+
+organization-seed:
+  organizations: []
