@@ -46,6 +46,7 @@ authorization-server:
     default-hosts:
       - localhost
       - 127.0.0.1
+      - authorization-server
     tenants:
       business1:
         hosts:
@@ -155,4 +156,5 @@ maxUserPerOrganization: 5
 maxRoles: 5
 
 organization-seed:
+  delay-seconds: 120
   organizations: []

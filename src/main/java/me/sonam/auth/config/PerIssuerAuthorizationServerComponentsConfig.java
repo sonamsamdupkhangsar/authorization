@@ -21,6 +21,8 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.util.Assert;
 import org.springframework.web.filter.ForwardedHeaderFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.util.Arrays;
@@ -130,6 +132,7 @@ public class PerIssuerAuthorizationServerComponentsConfig {
     }
 
     private static final class DelegatingRegisteredClientRepository implements RegisteredClientRepository {
+        private static final Logger LOG = LoggerFactory.getLogger(DelegatingRegisteredClientRepository.class);
         private final TenantPerHostComponentRegistry componentRegistry;
 
         private DelegatingRegisteredClientRepository(TenantPerHostComponentRegistry componentRegistry) {
@@ -153,7 +156,14 @@ public class PerIssuerAuthorizationServerComponentsConfig {
 
         private RegisteredClientRepository getRegisteredClientRepository() {
             RegisteredClientRepository registeredClientRepository = this.componentRegistry.get(RegisteredClientRepository.class);
-            Assert.state(registeredClientRepository != null, "RegisteredClientRepository not found for requested issuer.");
+            if (registeredClientRepository == null) {
+                String issuer = this.componentRegistry.resolveCurrentIssuer();
+                String host = this.componentRegistry.resolveCurrentHost();
+                LOG.error("RegisteredClientRepository lookup failed for issuer '{}' host '{}' defaultHosts {}",
+                        issuer, host, this.componentRegistry.getDefaultHosts());
+                Assert.state(false, "RegisteredClientRepository not found for requested issuer. issuer="
+                        + issuer + ", host=" + host + ", defaultHosts=" + this.componentRegistry.getDefaultHosts());
+            }
             return registeredClientRepository;
         }
     }
@@ -222,6 +232,7 @@ public class PerIssuerAuthorizationServerComponentsConfig {
     }
 
     private static final class DelegatingJwkSource implements JWKSource<SecurityContext> {
+        private static final Logger LOG = LoggerFactory.getLogger(DelegatingJwkSource.class);
         private final TenantPerHostComponentRegistry componentRegistry;
 
         private DelegatingJwkSource(TenantPerHostComponentRegistry componentRegistry) {
@@ -231,7 +242,14 @@ public class PerIssuerAuthorizationServerComponentsConfig {
         @Override
         public List<JWK> get(JWKSelector jwkSelector, SecurityContext context) throws KeySourceException {
             JWKSet jwkSet = this.componentRegistry.get(JWKSet.class);
-            Assert.state(jwkSet != null, "JWKSet not found for requested issuer.");
+            if (jwkSet == null) {
+                String issuer = this.componentRegistry.resolveCurrentIssuer();
+                String host = this.componentRegistry.resolveCurrentHost();
+                LOG.error("JWKSet lookup failed for issuer '{}' host '{}' defaultHosts {}",
+                        issuer, host, this.componentRegistry.getDefaultHosts());
+                Assert.state(false, "JWKSet not found for requested issuer. issuer="
+                        + issuer + ", host=" + host + ", defaultHosts=" + this.componentRegistry.getDefaultHosts());
+            }
             return jwkSelector.select(jwkSet);
         }
     }

@@ -168,4 +168,5 @@ maxUserPerOrganization: 5
 maxRoles: 5
 
 organization-seed:
+  delay-seconds: 0
   organizations: []

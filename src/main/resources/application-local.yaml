@@ -39,7 +39,7 @@ ROLE_REST_SERVICE: http://role-rest-service
 SETTING_REST_SERVICE: http://setting-rest-service
 
 # ISSUER_URL here is used for pulling the public certs from authorization-server for token validation
-ISSUER_ADDRESS: http://api-gateway:9001
+ISSUER_ADDRESS: http://platform.openissuer.test:9001
 ISSUER_URI: ${ISSUER_ADDRESS}
 
 
@@ -54,11 +54,16 @@ NEW_RELIC_ENABLED: false
 authzmanager: http://api-gateway:9093
 AUTHZMANAGER_INITIAL_SECRET: hello
 
+auth-server:
+  root: http://authorization-server
+
 authorization-server:
   multitenancy:
     default-hosts:
       - localhost
       - 127.0.0.1
+      - authorization-server
+      - platform.openissuer.test
     tenants:
       business1:
         hosts:
@@ -96,6 +101,7 @@ tenant-secrets:
   business2-db-password: test
 
 organization-seed:
+  delay-seconds: 30
   users:
     - firstName: Business
       lastName: One

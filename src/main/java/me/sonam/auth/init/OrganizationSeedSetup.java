@@ -1,6 +1,5 @@
 package me.sonam.auth.init;
 
-import jakarta.annotation.PostConstruct;
 import me.sonam.auth.config.OrganizationSeedProperties;
 import me.sonam.auth.rest.signup.Organization;
 import me.sonam.auth.rest.signup.UserSignup;
@@ -8,11 +7,15 @@ import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.UserWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpMethod;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -24,19 +27,37 @@ public class OrganizationSeedSetup {
     private final OrganizationSeedProperties organizationSeedProperties;
     private final OrganizationWebClient organizationWebClient;
     private final UserWebClient userWebClient;
+    private final TaskScheduler taskScheduler;
 
     public OrganizationSeedSetup(OrganizationSeedProperties organizationSeedProperties,
                                  OrganizationWebClient organizationWebClient,
-                                 UserWebClient userWebClient) {
+                                 UserWebClient userWebClient,
+                                 TaskScheduler taskScheduler) {
         this.organizationSeedProperties = organizationSeedProperties;
         this.organizationWebClient = organizationWebClient;
         this.userWebClient = userWebClient;
+        this.taskScheduler = taskScheduler;
+    }
+
+    // Wait until the application is fully ready, then delay seeding to give downstream clients
+    // and service discovery time to stabilize before making remote seed calls.
+    @EventListener(ApplicationReadyEvent.class)
+    public void scheduleSeeding() {
+        if (organizationSeedProperties.getUsers().isEmpty() && organizationSeedProperties.getOrganizations().isEmpty()) {
+            LOG.info("organization seeding skipped because no seed users or organizations are configured");
+            return;
+        }
+
+        long delaySeconds = Math.max(0, organizationSeedProperties.getDelaySeconds());
+        Instant scheduledTime = Instant.now().plusSeconds(delaySeconds);
+        LOG.info("scheduling organization seeding to run at {} after {} seconds", scheduledTime, delaySeconds);
+        taskScheduler.schedule(this::seedOrganizations, scheduledTime);
     }
 
     // Seeds bootstrap users first and then creates any subdomain-bound organizations that do not
     // already exist in organization-rest-service.
-    @PostConstruct
     public void seedOrganizations() {
+        LOG.info("seeding organizations");
         Map<String, UUID> seededUsers = seedUsers();
 
         organizationSeedProperties.getOrganizations().forEach(seedOrganization -> {

@@ -65,12 +65,25 @@ public class TenantPerHostComponentRegistry {
         return componentClass.cast(components.get(componentClass));
     }
 
+    public Set<String> getDefaultHosts() {
+        return Set.copyOf(this.defaultHosts);
+    }
+
     @Nullable
-    private String resolveCurrentHost() {
+    public String resolveCurrentHost() {
         AuthorizationServerContext context = AuthorizationServerContextHolder.getContext();
         if (context == null || context.getIssuer() == null) {
             return null;
         }
         return URI.create(context.getIssuer()).getHost();
+    }
+
+    @Nullable
+    public String resolveCurrentIssuer() {
+        AuthorizationServerContext context = AuthorizationServerContextHolder.getContext();
+        if (context == null) {
+            return null;
+        }
+        return context.getIssuer();
     }
 }

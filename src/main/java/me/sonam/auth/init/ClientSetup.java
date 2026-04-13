@@ -70,6 +70,7 @@ public class ClientSetup {
 
     @PostConstruct
     public void createServiceAccount() {
+        LOG.info("create service account if it is not created for each issuer");
         String decodedString = new String(Base64.getDecoder().decode(base64ClientIdSecret));
         String[] clientIdSecretArray = decodedString.split(":");
         final String clientId = clientIdSecretArray[0];

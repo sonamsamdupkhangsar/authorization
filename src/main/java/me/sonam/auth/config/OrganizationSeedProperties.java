@@ -8,8 +8,17 @@ import java.util.UUID;
 
 @ConfigurationProperties(prefix = "organization-seed")
 public class OrganizationSeedProperties {
+    private long delaySeconds = 120;
     private final List<SeedUser> users = new ArrayList<>();
     private final List<SeedOrganization> organizations = new ArrayList<>();
+
+    public long getDelaySeconds() {
+        return delaySeconds;
+    }
+
+    public void setDelaySeconds(long delaySeconds) {
+        this.delaySeconds = delaySeconds;
+    }
 
     public List<SeedUser> getUsers() {
         return users;

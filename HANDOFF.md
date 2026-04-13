@@ -13,10 +13,14 @@ The active model is:
 Examples:
 - `https://business1.openissuer.com`
 - `https://business2.openissuer.com`
+- `https://free.openissuer.com`
+- `https://platform.openissuer.com`
 
 Local examples:
+- `http://platform.openissuer.test:9001`
 - `http://business1.openissuer.test:9001`
 - `http://business2.openissuer.test:9001`
+- `http://free.openissuer.test:9001`
 
 ## Main Architecture
 
@@ -68,13 +72,30 @@ Files changed for that move:
 ## Local Dev Setup
 
 Local tenant hosts configured in [application-local.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application-local.yaml):
+- `platform.openissuer.test`
 - `business1.openissuer.test`
 - `business2.openissuer.test`
+- `free.openissuer.test`
+
+Local hostname model:
+- transport for internal service-to-service token calls stays on Eureka service name `authorization-server`
+- default/platform issuer for service-account tokens and JWKS validation is `http://platform.openissuer.test:9001`
+- tenant issuers are host-bound:
+  - `http://business1.openissuer.test:9001`
+  - `http://business2.openissuer.test:9001`
+  - `http://free.openissuer.test:9001`
+
+This split is intentional:
+- `TokenFilter` still posts to `http://authorization-server/oauth2/token`
+- but forwarded host headers are derived from `ISSUER_ADDRESS`
+- so service-account tokens are minted with issuer `http://platform.openissuer.test:9001`
+- while tenant-facing browser and signup flows continue to use the actual tenant host
 
 Recommended `/etc/hosts` entry:
 
 ```text
-127.0.0.1 business1.openissuer.test business2.openissuer.test
+127.0.0.1 platform.openissuer.test
+127.0.0.1 business1.openissuer.test business2.openissuer.test free.openissuer.test
 ```
 
 Then run with:
@@ -84,8 +105,23 @@ Then run with:
 ```
 
 Local issuer URLs:
+- `http://platform.openissuer.test:9001`
 - `http://business1.openissuer.test:9001`
 - `http://business2.openissuer.test:9001`
+- `http://free.openissuer.test:9001`
+
+Sibling local services updated to validate against the platform issuer/JWKS host:
+- `user-rest-service`
+- `organization-rest-service`
+- `authentication-rest-service`
+- `role-rest-service`
+- `email-rest-service`
+- `account-rest-service`
+
+Those services were updated to:
+- stop using `/issuer`
+- use `jwk-set-uri` instead of issuer discovery for local validation
+- point local `ISSUER_ADDRESS` / `JWT_SET_URI` to `http://platform.openissuer.test:9001`
 
 ## Tests Added / Updated
 
