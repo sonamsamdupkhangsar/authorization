@@ -35,6 +35,12 @@ check_discovery() {
     ' >/dev/null
 }
 
+check_jwks() {
+  local base="$1"
+  curl -fsS "$base/oauth2/jwks" |
+    jq -e '.keys and (.keys | length > 0)' >/dev/null
+}
+
 token_request() {
   local base="$1"
   local client_id="$2"
@@ -61,6 +67,17 @@ token_request_with_status() {
 echo "Checking discovery documents..."
 check_discovery "$BASE1"
 check_discovery "$BASE2"
+
+if [[ -n "${PLATFORM_BASE:-}" ]]; then
+  echo "Checking platform discovery and JWKS..."
+  check_discovery "$PLATFORM_BASE"
+  check_jwks "$PLATFORM_BASE"
+fi
+
+if [[ -n "${FREE_BASE:-}" ]]; then
+  echo "Checking free-host discovery..."
+  check_discovery "$FREE_BASE"
+fi
 
 echo "Checking tenant 1 token issuance..."
 token_request "$BASE1" "$CLIENT_ID" "$SECRET1" |
