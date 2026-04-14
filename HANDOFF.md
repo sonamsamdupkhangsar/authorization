@@ -123,6 +123,54 @@ Those services were updated to:
 - use `jwk-set-uri` instead of issuer discovery for local validation
 - point local `ISSUER_ADDRESS` / `JWT_SET_URI` to `http://platform.openissuer.test:9001`
 
+Authzmanager local admin hosts:
+- `http://platform.admin.openissuer.test:9093`
+- `http://business1.admin.openissuer.test:9093`
+- `http://business2.admin.openissuer.test:9093`
+- `http://free.admin.openissuer.test:9093`
+
+Authzmanager host mapping rule:
+- `platform.admin.openissuer.test` -> issuer `http://platform.openissuer.test:9001`
+- `business1.admin.openissuer.test` -> issuer `http://business1.openissuer.test:9001`
+- `business2.admin.openissuer.test` -> issuer `http://business2.openissuer.test:9001`
+- `free.admin.openissuer.test` -> issuer `http://free.openissuer.test:9001`
+
+Additional `/etc/hosts` entry for authzmanager local testing:
+
+```text
+127.0.0.1 platform.admin.openissuer.test
+127.0.0.1 business1.admin.openissuer.test business2.admin.openissuer.test free.admin.openissuer.test
+```
+
+Authzmanager local test flow:
+1. Verify issuer discovery endpoints:
+   - `curl http://platform.openissuer.test:9001/.well-known/openid-configuration`
+   - `curl http://business1.openissuer.test:9001/.well-known/openid-configuration`
+   - `curl http://business2.openissuer.test:9001/.well-known/openid-configuration`
+   - `curl http://free.openissuer.test:9001/.well-known/openid-configuration`
+2. Open one of the admin hosts in the browser:
+   - `http://platform.admin.openissuer.test:9093`
+   - `http://business1.admin.openissuer.test:9093`
+   - `http://business2.admin.openissuer.test:9093`
+   - `http://free.admin.openissuer.test:9093`
+3. Verify the authorization redirect host matches the tenant issuer host:
+   - `business1.admin...` should redirect to `business1.openissuer.test:9001/oauth2/authorize`
+   - `business2.admin...` should redirect to `business2.openissuer.test:9001/oauth2/authorize`
+   - `free.admin...` should redirect to `free.openissuer.test:9001/oauth2/authorize`
+   - `platform.admin...` should redirect to `platform.openissuer.test:9001/oauth2/authorize`
+4. Verify the post-login callback returns to the matching admin host:
+   - `http://<tenant>.admin.openissuer.test:9093/login/oauth2/code/...`
+
+Authzmanager troubleshooting guide:
+- wrong authorize host:
+  - check authzmanager tenant host mapping
+- redirect URI mismatch:
+  - check authzmanager client seeding in authorization `ClientSetup`
+- `invalid_client`:
+  - authzmanager client not seeded for that issuer
+- 401 after callback:
+  - issuer/JWKS mismatch or downstream token validation problem
+
 ## Tests Added / Updated
 
 Most important current multitenancy test:
