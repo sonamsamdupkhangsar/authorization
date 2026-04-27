@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.server.authorization.settings.ClientS
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 import java.time.Duration;
+import java.net.URI;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -57,6 +58,8 @@ public class ClientSetup {
     @Value("${authzmanager}")
     private String authzManagerUri;
 
+    @Value("${authzmanager-admin-label:admin}")
+    private String authzManagerHostLabel;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -278,38 +281,93 @@ public class ClientSetup {
 
 
     private void seedDefaultIssuerAuthzManagerClient() {
+        String expectedAuthzManagerUri = authzManagerUri;
         RegisteredClient registeredClient = registeredClientRepository.findByClientId(authzManagerClient);
-        if (registeredClient != null) {
+        if (registeredClient != null && hasAuthzManagerRedirectUri(registeredClient, expectedAuthzManagerUri)) {
             LOG.info("authzmanager exists in default issuer store");
             return;
         }
-        registeredClientRepository.save(buildAuthzManagerClient());
+        if (registeredClient != null) {
+            LOG.info("updating authzmanager redirect uri in default issuer store to {}", expectedAuthzManagerUri);
+        }
+        registeredClientRepository.save(buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri));
         LOG.info("saved authzmanager client in default issuer store");
     }
 
     private void seedAuthzManagerClient(String issuer) {
+        String expectedAuthzManagerUri = authzManagerUriForIssuer(issuer);
         RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, authzManagerClient);
-        if (registeredClient != null) {
+        if (registeredClient != null && hasAuthzManagerRedirectUri(registeredClient, expectedAuthzManagerUri)) {
             LOG.info("authzmanager exists for issuer {}", issuer);
             return;
         }
-        issuerAwareAuthorizationServerOperations.save(issuer, buildAuthzManagerClient());
+        if (registeredClient != null) {
+            LOG.info("updating authzmanager redirect uri for issuer {} to {}", issuer, expectedAuthzManagerUri);
+        }
+        issuerAwareAuthorizationServerOperations.save(issuer, buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri));
         LOG.info("saved authzmanager client for issuer {}", issuer);
     }
 
-    private RegisteredClient buildAuthzManagerClient() {
+    private boolean hasAuthzManagerRedirectUri(RegisteredClient registeredClient, String authzManagerBaseUri) {
+        return registeredClient.getRedirectUris().contains(authzManagerRedirectUri(authzManagerBaseUri));
+    }
+
+    private String authzManagerRedirectUri(String authzManagerBaseUri) {
+        return authzManagerBaseUri + "/login/oauth2/code/" + authzManagerClient;
+    }
+
+    private RegisteredClient buildAuthzManagerClient(RegisteredClient existingClient, String authzManagerBaseUri) {
+        String id = existingClient == null ? authzManagerId : existingClient.getId();
+        String secret = existingClient == null ? passwordEncoder.encode(authzManagerInitialSecret) : existingClient.getClientSecret();
+        return buildAuthzManagerClient(id, secret, authzManagerBaseUri);
+    }
+
+    private RegisteredClient buildAuthzManagerClient(String authzManagerBaseUri) {
+        return buildAuthzManagerClient(authzManagerId, passwordEncoder.encode(authzManagerInitialSecret), authzManagerBaseUri);
+    }
+
+    private RegisteredClient buildAuthzManagerClient(String id, String clientSecret, String authzManagerBaseUri) {
         TokenSettings tokenSettings = TokenSettings.builder().accessTokenTimeToLive(Duration.ofSeconds(1200)).build();
-        return RegisteredClient.withId(authzManagerId)
+        return RegisteredClient.withId(id)
                 .clientId(authzManagerClient)
-                .clientSecret(passwordEncoder.encode(authzManagerInitialSecret))
+                .clientSecret(clientSecret)
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
-                .redirectUri(authzManagerUri + "/login/oauth2/code/" + authzManagerClient)
+                .redirectUri(authzManagerRedirectUri(authzManagerBaseUri))
                 .tokenSettings(tokenSettings)
                 .build();
+    }
+
+    private String authzManagerUriForIssuer(String issuer) {
+        URI seedBaseUri = URI.create(authzManagerUri);
+        URI issuerUri = URI.create(issuer);
+        String adminHost = toAdminHost(issuerUri.getHost(), seedBaseUri.getHost());
+        int port = seedBaseUri.getPort();
+        boolean defaultPort = port < 0
+                || ("http".equalsIgnoreCase(seedBaseUri.getScheme()) && port == 80)
+                || ("https".equalsIgnoreCase(seedBaseUri.getScheme()) && port == 443);
+        String portSegment = defaultPort ? "" : ":" + port;
+        String path = seedBaseUri.getPath() == null ? "" : seedBaseUri.getPath();
+
+        return seedBaseUri.getScheme() + "://" + adminHost + portSegment + path;
+    }
+
+    private String toAdminHost(String issuerHost, String fallbackHost) {
+        if (issuerHost == null || issuerHost.isBlank()) {
+            return fallbackHost;
+        }
+        String adminSegment = "." + authzManagerHostLabel + ".";
+        if (issuerHost.contains(adminSegment)) {
+            return issuerHost;
+        }
+        int firstDot = issuerHost.indexOf('.');
+        if (firstDot < 0) {
+            return fallbackHost;
+        }
+        return issuerHost.substring(0, firstDot) + adminSegment + issuerHost.substring(firstDot + 1);
     }
 
     private void seedDefaultIssuerServiceAccount(String clientId, String secret) {

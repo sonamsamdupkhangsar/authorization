@@ -4,6 +4,8 @@ import me.sonam.auth.config.OrganizationSeedProperties;
 import me.sonam.auth.rest.signup.Organization;
 import me.sonam.auth.rest.signup.UserSignup;
 import me.sonam.auth.webclient.OrganizationWebClient;
+import me.sonam.auth.webclient.RoleWebClient;
+import me.sonam.auth.webclient.SettingWebClient;
 import me.sonam.auth.webclient.UserWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,15 +28,21 @@ public class OrganizationSeedSetup {
 
     private final OrganizationSeedProperties organizationSeedProperties;
     private final OrganizationWebClient organizationWebClient;
+    private final RoleWebClient roleWebClient;
+    private final SettingWebClient settingWebClient;
     private final UserWebClient userWebClient;
     private final TaskScheduler taskScheduler;
 
     public OrganizationSeedSetup(OrganizationSeedProperties organizationSeedProperties,
                                  OrganizationWebClient organizationWebClient,
+                                 RoleWebClient roleWebClient,
+                                 SettingWebClient settingWebClient,
                                  UserWebClient userWebClient,
                                  TaskScheduler taskScheduler) {
         this.organizationSeedProperties = organizationSeedProperties;
         this.organizationWebClient = organizationWebClient;
+        this.roleWebClient = roleWebClient;
+        this.settingWebClient = settingWebClient;
         this.userWebClient = userWebClient;
         this.taskScheduler = taskScheduler;
     }
@@ -75,16 +83,19 @@ public class OrganizationSeedSetup {
             organizationWebClient.getOrganizationIdBySubdomain(seedOrganization.getSubdomain())
                     .flatMap(existingId -> {
                         LOG.info("organization already exists for subdomain {} with id {}", seedOrganization.getSubdomain(), existingId);
-                        return Mono.<Void>empty();
+                        return Mono.just(existingId);
                     })
                     .switchIfEmpty(organizationWebClient.updateOrganization(
                             new Organization(null, seedOrganization.getName(),
                                     creatorUserId, seedOrganization.getSubdomain()),
                             HttpMethod.POST
                     ).doOnNext(org -> LOG.info("seeded organization {} for subdomain {}", org.getId(), seedOrganization.getSubdomain()))
-                            .then())
+                            .map(Organization::getId))
+                    .then()
                     .block();
         });
+
+        attachSeedUsersToOrganizationsAsSuperAdmins(seededUsers);
     }
 
     // Ensures each configured bootstrap user exists and returns a lookup map that later seed
@@ -109,6 +120,51 @@ public class OrganizationSeedSetup {
             }
         });
         return seededUsers;
+    }
+
+    /*
+     * Grants bootstrap access for configured host-bound organizations.
+     *
+     * Any seed user with organizationSubdomain is attached to that organization and then made
+     * authzmanager SuperAdmin for the same organization. The SuperAdmin role is the important
+     * part for admin login: authzmanager allows login only when the user is SuperAdmin for the
+     * organization resolved from the current tenant host.
+     *
+     * Example:
+     *   business2user@openissuer.test + business2.openissuer.test
+     *   -> add user to Business 2
+     *   -> assign SuperAdmin for Business 2
+     *   -> make Business 2 the user's default organization
+     *   -> allow login at business2.admin.openissuer.test
+     */
+    private void attachSeedUsersToOrganizationsAsSuperAdmins(Map<String, UUID> seededUsers) {
+        organizationSeedProperties.getUsers().forEach(seedUser -> {
+            if (!StringUtils.hasText(seedUser.getOrganizationSubdomain())) {
+                return;
+            }
+
+            UUID userId = seededUsers.get(seedUser.getAuthenticationId());
+            if (userId == null) {
+                LOG.warn("skipping organization membership seed for {} because user id was not resolved",
+                        seedUser.getAuthenticationId());
+                return;
+            }
+
+            organizationWebClient.getOrganizationIdBySubdomain(seedUser.getOrganizationSubdomain())
+                    .switchIfEmpty(Mono.error(new IllegalStateException("No organization bound to seed subdomain "
+                            + seedUser.getOrganizationSubdomain())))
+                    .flatMap(organizationId -> organizationWebClient.addUserToOrganization(userId, organizationId)
+                            .doOnNext( response -> LOG.info("seeded user {} into organization subdomain {}",
+                                    seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain()))
+                            // SuperAdmin is required for this seed user to sign in to authzmanager for this tenant.
+                            .then(roleWebClient.setUserAsRoleNameForOrganization(null, "SuperAdmin", userId, organizationId))
+                            .doOnNext(roleId -> LOG.info("seeded user {} as SuperAdmin for organization subdomain {}",
+                                    seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain()))
+                            .then(settingWebClient.addDefaultOrganization(null, userId, organizationId))
+                            .doOnNext(response -> LOG.info("set seeded user {} default organization to subdomain {}",
+                                    seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain())))
+                    .block();
+        });
     }
 
     // Converts the local YAML seed entry into the signup payload expected by user-rest-service.

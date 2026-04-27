@@ -69,8 +69,9 @@ public class OidcUserInfoService {
                 .profile(map.get("profile"))
                 .picture(map.get("profilePhoto"))
                 .website(map.get("website"))
-                .email(map.get("email"))
+                 .email(map.get("email"))
                 .emailVerified(Boolean.parseBoolean(map.get("emailVerified")))
+                .claim("userId", map.get("id"))
                 .gender(map.get("gender"))
                 .birthdate(map.get("dateOfBirth"))
                 .zoneinfo(map.get("timeZone"))
@@ -84,4 +85,3 @@ public class OidcUserInfoService {
          return builder.build().getClaims();
     }
 }
-

@@ -93,9 +93,9 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<Map<String, Object>> createNew(@RequestBody Map<String, Object> map) {
         LOG.info("create new client with map: {}", map);
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
         String userIdString = jwt.getClaim("userId");
 
         LOG.info("userId: {}", userIdString);
@@ -172,9 +172,9 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Object>> getByClientId(@PathVariable("clientId") String clientId) {
         LOG.info("get by clientId: {}", clientId);
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
         String accessToken = jwt.getTokenValue();
         String userIdString = jwt.getClaim("userId");
 
@@ -207,9 +207,9 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Object>> getClientById(@PathVariable("id") String id) {
         LOG.info("get client by id: {}", id);
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
         String accessToken = jwt.getTokenValue();
         String userIdString = jwt.getClaim("userId");
 
@@ -255,9 +255,9 @@ public class ClientRestService {
     @ResponseStatus(HttpStatus.OK)
     public Mono<CustomRestPage<CustomPair<String, String>>> getClientsForLoggedInUserByTheirOrgId(Pageable pageable) {
         LOG.info("get clientIds for userId");
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
         String userIdString = jwt.getClaim("userId");
         LOG.info("userId: {}", userIdString);
         UUID userId = UUID.fromString(userIdString);
@@ -296,9 +296,9 @@ public class ClientRestService {
     public Mono<Map<String, Object>> update(@RequestBody Map<String, Object> map) {
         LOG.info("update client using map: {}", map);
         LOG.info("clientIdIssuedAt: {}", map.get("clientIdIssuedAt"));
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
 
         String accessToken = jwt.getTokenValue();
         LOG.info("accessToken: {}", accessToken);
@@ -351,9 +351,9 @@ public class ClientRestService {
     @Transactional
     public Mono<Void> delete(@PathVariable("id") String id) {
         LOG.info("delete client with id: {}", id);
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
 
         String accessToken = jwt.getTokenValue();
         LOG.info("userId: {}, accessToken: {}", jwt.getClaim("userId"), accessToken);
@@ -386,9 +386,9 @@ public class ClientRestService {
     @Transactional
     public Mono<Map<String, String>> delete() {
         LOG.info("delete client-user relationship for logged-in user-id");
-        final String issuer = issuerAwareAuthorizationServerOperations.currentIssuer();
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        final String issuer = issuerFromJwt(jwt);
         String userIdString = jwt.getClaim("userId");
         LOG.info("delete client-user for userIdString: {}", userIdString);
 
@@ -438,5 +438,16 @@ public class ClientRestService {
             issuerAwareAuthorizationServerOperations.deleteById(issuer, clientOrganization.getClientId().toString());
         });
         LOG.info("done");
+    }
+
+    private String issuerFromJwt(Jwt jwt) {
+        Object issuer = jwt.getClaims().get("iss");
+        if (issuer != null && !issuer.toString().isBlank()) {
+            LOG.info("using jwt issuer '{}' for client repository lookup", issuer);
+            return issuer.toString();
+        }
+        String requestIssuer = issuerAwareAuthorizationServerOperations.currentIssuer();
+        LOG.warn("jwt issuer missing, falling back to request issuer '{}'", requestIssuer);
+        return requestIssuer;
     }
 }

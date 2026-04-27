@@ -87,6 +87,7 @@ public class UserSignupController {
             return Mono.just(PATH);
         }
 
+        userSignup.setActivationHost(currentHost);
         return  userWebClient.signupUser(userSignup)
                 .flatMap(s -> {
 

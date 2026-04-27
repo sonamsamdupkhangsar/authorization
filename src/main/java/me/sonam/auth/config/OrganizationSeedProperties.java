@@ -35,6 +35,7 @@ public class OrganizationSeedProperties {
         private String authenticationId;
         private String password;
         private boolean active = true;
+        private String organizationSubdomain;
 
         public String getFirstName() {
             return firstName;
@@ -82,6 +83,14 @@ public class OrganizationSeedProperties {
 
         public void setActive(boolean active) {
             this.active = active;
+        }
+
+        public String getOrganizationSubdomain() {
+            return organizationSubdomain;
+        }
+
+        public void setOrganizationSubdomain(String organizationSubdomain) {
+            this.organizationSubdomain = organizationSubdomain;
         }
     }
 

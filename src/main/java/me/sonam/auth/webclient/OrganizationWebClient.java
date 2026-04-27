@@ -106,6 +106,10 @@ public class OrganizationWebClient {
                 })
                 .onErrorResume(throwable -> {
                     LOG.error("failed to get organization by subdomain {}: {}", subdomain, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("organization by subdomain error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
                     return Mono.empty();
                 });
     }

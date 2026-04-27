@@ -51,7 +51,7 @@ changePassword: /forgot/changePassword #@{/forgot/changePassword} use for local
 allowedOrigins: http://api-gateway, 10.0.0.28, localhost, 127.0.0.1, api-gateway, 10.0.0.28:8080, 127.0.0.1, *,
 
 NEW_RELIC_ENABLED: false
-authzmanager: http://api-gateway:9093
+authzmanager: http://platform.admin.openissuer.test:9093
 AUTHZMANAGER_INITIAL_SECRET: hello
 
 auth-server:
@@ -110,11 +110,25 @@ organization-seed:
       password: owner1-secret
       active: true
     - firstName: Business
+      lastName: One User
+      email: business1user@openissuer.test
+      authenticationId: business1user@openissuer.test
+      password: business1user-secret
+      active: true
+      organizationSubdomain: business1.openissuer.test
+    - firstName: Business
       lastName: Two
       email: owner2@openissuer.test
       authenticationId: owner2@openissuer.test
       password: owner2-secret
       active: true
+    - firstName: Business
+      lastName: Two User
+      email: business2user@openissuer.test
+      authenticationId: business2user@openissuer.test
+      password: business2user-secret
+      active: true
+      organizationSubdomain: business2.openissuer.test
   organizations:
     - name: Business 1
       creatorAuthenticationId: owner1@openissuer.test

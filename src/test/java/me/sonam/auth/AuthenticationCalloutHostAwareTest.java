@@ -147,6 +147,8 @@ public class AuthenticationCalloutHostAwareTest {
         bindRequestHost(BUSINESS1_HOST);
         when(organizationWebClient.getOrganizationIdBySubdomain(BUSINESS1_HOST)).thenReturn(Mono.just(organizationId));
         when(organizationWebClient.userExistInOrganization(userId, organizationId)).thenReturn(Mono.just(true));
+        when(clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUuid, organizationId))
+                .thenReturn(Optional.of(true));
 
         UsernamePasswordAuthenticationToken expected =
                 new UsernamePasswordAuthenticationToken("principal", "password");
@@ -161,7 +163,8 @@ public class AuthenticationCalloutHostAwareTest {
         assertThat(result).isSameAs(expected);
         verify(organizationWebClient).getOrganizationIdBySubdomain(BUSINESS1_HOST);
         verify(organizationWebClient, times(2)).userExistInOrganization(userId, organizationId);
-        verify(clientOrganizationRepository, times(2)).findByClientId(clientUuid);
+        verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
+        verify(clientOrganizationRepository).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
         verify(roleWebClient, never()).isSuperAdminInOrgId(any(), any(), any());
     }

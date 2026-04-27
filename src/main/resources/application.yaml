@@ -144,6 +144,7 @@ requestFilters:
 # this is for create authzmanager client if it is not present
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
+authzmanager-admin-label: admin
 tokenExpireSeconds: 180
 
 authIdNotExist: authentication does not exist with authId

@@ -2,7 +2,6 @@ package me.sonam.auth.webclient;
 
 import jakarta.servlet.http.HttpServletRequest;
 import me.sonam.auth.service.exception.BadCredentialsException;
-import me.sonam.auth.util.UserId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -10,6 +9,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -83,7 +83,7 @@ public class AuthenticationWebClient {
             }
 
             UUID userId = UUID.fromString(map.get("userId").toString());
-            final UserId principal = new UserId(userId.toString(), authentication.getPrincipal().toString(), password, grantedAuths);
+            final User principal = new User(authentication.getPrincipal().toString(), "", grantedAuths);
 
             String ipAddress = "";
             if (authentication.getDetails() instanceof WebAuthenticationDetails) {

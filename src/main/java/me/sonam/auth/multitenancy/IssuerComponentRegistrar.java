@@ -5,6 +5,7 @@ import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -13,6 +14,9 @@ import org.springframework.security.oauth2.server.authorization.client.JdbcRegis
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -34,8 +38,7 @@ public class IssuerComponentRegistrar {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         initializeJwkSchema(jdbcTemplate);
         JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-        JdbcOAuth2AuthorizationService authorizationService =
-                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        JdbcOAuth2AuthorizationService authorizationService = authorizationService(jdbcTemplate, registeredClientRepository);
         JdbcOAuth2AuthorizationConsentService authorizationConsentService =
                 new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
 
@@ -53,8 +56,7 @@ public class IssuerComponentRegistrar {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
         initializeJwkSchema(jdbcTemplate);
         JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-        JdbcOAuth2AuthorizationService authorizationService =
-                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        JdbcOAuth2AuthorizationService authorizationService = authorizationService(jdbcTemplate, registeredClientRepository);
         JdbcOAuth2AuthorizationConsentService authorizationConsentService =
                 new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
         JWKSet jwkSet = persistentJwkSetStore.loadOrCreate(jdbcTemplate);
@@ -115,5 +117,29 @@ public class IssuerComponentRegistrar {
         } catch (Exception ignored) {
             // table already exists
         }
+    }
+
+    private JdbcOAuth2AuthorizationService authorizationService(JdbcTemplate jdbcTemplate,
+                                                               RegisteredClientRepository registeredClientRepository) {
+        JsonMapper jsonMapper = authorizationJsonMapper();
+        JdbcOAuth2AuthorizationService authorizationService =
+                new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        authorizationService.setAuthorizationRowMapper(
+                new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationRowMapper(
+                        registeredClientRepository, jsonMapper));
+        authorizationService.setAuthorizationParametersMapper(
+                new JdbcOAuth2AuthorizationService.JsonMapperOAuth2AuthorizationParametersMapper(jsonMapper));
+        return authorizationService;
+    }
+
+    private JsonMapper authorizationJsonMapper() {
+        List<JacksonModule> securityModules = SecurityJacksonModules.getModules(getClass().getClassLoader());
+        BasicPolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("me.sonam.auth.util.")
+                .build();
+        return JsonMapper.builder()
+                .polymorphicTypeValidator(typeValidator)
+                .addModules(securityModules)
+                .build();
     }
 }

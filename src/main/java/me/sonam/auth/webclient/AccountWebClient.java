@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -48,11 +49,16 @@ public class AccountWebClient {
         this.unLockAccountTimeExpire = unLockAccountTimeExpire;
     }
 
-    public Mono<String> emailAccountActivationLink(String email) {
+    public Mono<String> emailAccountActivationLink(String email, String activationHost) {
         LOG.info("email activation link endpoint: {} for email: {}", emailActiveLink, email);
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("email", email);
+        if (activationHost != null && !activationHost.isBlank()) {
+            body.put("activationHost", activationHost);
+        }
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailActiveLink)
-                .bodyValue(Map.of("email", email))
+                .bodyValue(body)
                 .retrieve();
         return responseSpec.bodyToMono(String.class);
     }

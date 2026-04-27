@@ -1,7 +1,6 @@
 package me.sonam.auth.config;
 
 import me.sonam.auth.service.OidcUserInfoService;
-import me.sonam.auth.util.UserId;
 import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.SettingWebClient;
 import org.slf4j.Logger;
@@ -65,11 +64,10 @@ public class IdTokenCustomizerConfig {
                 LOG.info("principal.name: {}", context.getPrincipal().getName());
 
                 if (context.getPrincipal() instanceof  UsernamePasswordAuthenticationToken) {
-                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = context.getPrincipal();
-                    UserId userId = (UserId) usernamePasswordAuthenticationToken.getPrincipal();
+                    OidcUserInfo userInfo = userInfoService.loadUser(context.getPrincipal().getName());
 
                     LOG.info("claims: {}", context.getClaims());
-                    context.getClaims().claim("userId", userId.getUserId());
+                    context.getClaims().claim("userId", userInfo.getClaim("userId"));
 
 
                 }

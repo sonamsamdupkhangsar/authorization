@@ -12,4 +12,4 @@ eureka:
       enabled: false
 
 allowedOrigins: ${ALLOWED_ORIGINS}  #localhost
-authzmanager: https://authzmanager.sonam.cloud
+authzmanager: https://platform.admin.openissuer.com
