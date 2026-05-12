@@ -227,9 +227,9 @@ public class ClientRestServiceIntegTest {
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107");
         UUID defaultOrgId = UUID.randomUUID();
-        saveClient(clientId.toString(),"{noop}"+clientSecret, userId, defaultOrgId, true);
+        saveClient(clientId.toString(), clientSecret, userId, defaultOrgId, true);
 
-        RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(messageClient);
+        RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString());
         assertThat(registeredClient).isNotNull();
 
         assertThat(passwordEncoder.matches("secret", registeredClient.getClientSecret())).isTrue();

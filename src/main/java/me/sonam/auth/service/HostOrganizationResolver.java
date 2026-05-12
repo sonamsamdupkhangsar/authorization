@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -16,6 +17,9 @@ public class HostOrganizationResolver {
 
     @Value("${authzmanager-admin-label:admin}")
     private String adminHostLabel;
+
+    @Value("#{'${authorization-server.multitenancy.default-hosts:localhost,127.0.0.1,authorization-server}'.split(',')}")
+    private List<String> defaultHosts;
 
     /*
      * Reads the current servlet request host and normalizes it to the organization host used
@@ -36,6 +40,10 @@ public class HostOrganizationResolver {
             return Optional.empty();
         }
         String requestHost = request.getServerName();
+        if (defaultHosts != null && defaultHosts.stream().map(String::trim).anyMatch(requestHost::equals)) {
+            LOG.info("request serverName '{}' is a default host, skipping host-bound organization resolution", requestHost);
+            return Optional.empty();
+        }
         String organizationHost = toOrganizationHost(requestHost);
         LOG.info("resolved organization host '{}' from request serverName '{}'", organizationHost, requestHost);
         return Optional.ofNullable(organizationHost);

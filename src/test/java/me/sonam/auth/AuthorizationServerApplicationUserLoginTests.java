@@ -50,6 +50,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -80,8 +81,11 @@ public class AuthorizationServerApplicationUserLoginTests {
 	private static MockWebServer mockWebServer;
 	private static String serverPort;
 	private UUID clientIdUuid;
-	@Autowired
-	private JpaRegisteredClientRepository jpaRegisteredClientRepository;
+    @Autowired
+    private JpaRegisteredClientRepository jpaRegisteredClientRepository;
+
+    @Autowired
+    private RegisteredClientRepository registeredClientRepository;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -119,11 +123,11 @@ public class AuthorizationServerApplicationUserLoginTests {
 		}
 	}
 
-	private RegisteredClient ensureMessagingClient() {
-		RegisteredClient registeredClient = jpaRegisteredClientRepository.findByClientId(clientsClientId);
-		if (registeredClient != null) {
-			return registeredClient;
-		}
+    private RegisteredClient ensureMessagingClient() {
+        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientsClientId);
+        if (registeredClient != null) {
+            return registeredClient;
+        }
 
 		registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
 				.clientId(clientsClientId)
