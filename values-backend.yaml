@@ -17,12 +17,25 @@ fullnameOverride: "authorization-server"
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+rbac:
+  create: true
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - services
+        - endpoints
+      verbs:
+        - get
+        - list
+        - watch
 
 podSecurityContext: {}
 # fsGroup: 2000
@@ -58,7 +71,7 @@ ingress:
         - "*.sonam.cloud"
 
 httproute:
-  gatewayName: "shared-tls-gateway"
+  gatewayName: ""
   namespace: "main"
   hostnames:
     - "platform.openissuer.com"
@@ -122,22 +135,51 @@ envs:
     value: https://platform.openissuer.com
   - name: ALLOWED_ORIGINS
     value: https://platform.openissuer.com
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_0
+    value: localhost
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_1
+    value: 127.0.0.1
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_2
+    value: authorization-server
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_3
+    value: platform.openissuer.com
   - name: NEW_RELIC_ENABLED
     value: false
+  - name: BUSINESS1_AUTH_DB_URL
+    value: jdbc:postgresql://business1-auth-db-rw/business1auth
+  - name: BUSINESS1_AUTH_DB_USERNAME
+    value: business1auth
+  - name: BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF
+    value: business1-db-password
+  - name: BUSINESS2_AUTH_DB_URL
+    value: jdbc:postgresql://business2-auth-db-rw/business2auth
+  - name: BUSINESS2_AUTH_DB_USERNAME
+    value: business2auth
+  - name: BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF
+    value: business2-db-password
 
 health:
-  liveness:
+  startup:
     path: /api/health/liveness
     port: 8080
     initialDelaySeconds: 60
-    periodSeconds: 5
+    periodSeconds: 10
+    failureThreshold: 90
+    timeoutSeconds: 5
+  liveness:
+    path: /api/health/liveness
+    port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
     failureThreshold: 5
+    timeoutSeconds: 5
   readiness:
     path: /api/health/readiness
     port: 8080
-    initialDelaySeconds: 60
-    periodSeconds: 5
+    initialDelaySeconds: 30
+    periodSeconds: 10
     failureThreshold: 5
+    timeoutSeconds: 5
 
 secretFiles:
   - file: service-service-client-credential-flow-secret
@@ -148,7 +190,11 @@ secretFiles:
         name: REQUEST_SCOPES
       - key: authzmanagerInitialSecret
         name: AUTHZMANAGER_INITIAL_SECRET
-  - file: newrelic-secret
+  - file: business1-auth-db-app
     keys:
-      - key: newrelic.license_key
-        name: NEW_RELIC_LICENSE_KEY
+      - key: password
+        name: TENANT_SECRET_BUSINESS1_DB_PASSWORD
+  - file: business2-auth-db-app
+    keys:
+      - key: password
+        name: TENANT_SECRET_BUSINESS2_DB_PASSWORD
