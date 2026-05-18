@@ -48,6 +48,13 @@ authorization-server:
       - 127.0.0.1
       - authorization-server
     tenants:
+      free:
+        hosts:
+          - free.openissuer.com
+        url: ${FREE_AUTH_DB_URL}
+        username: ${FREE_AUTH_DB_USERNAME}
+        password-secret-ref: ${FREE_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${FREE_AUTH_DB_DRIVER:org.postgresql.Driver}
       business1:
         hosts:
           - business1.openissuer.com
@@ -63,7 +70,22 @@ authorization-server:
         password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER:org.postgresql.Driver}
   signup-policy:
-    hosts: {}
+    hosts:
+      free.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: true
+        allowed-email-domains:
+          - "*"
+      business1.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business1.com
+      business2.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business2.com
 application-rest-service:
   root: ${APPLICATION_REST_SERVICE}
   client-role: /applications/clients/{clientId}/users/{authenticationId}

@@ -49,6 +49,9 @@ public class SignupPolicyService {
         String emailDomain = normalizedEmail.substring(at + 1);
         List<String> allowedDomains = policy.getAllowedEmailDomains();
         if (allowedDomains.stream().map(this::normalize).anyMatch("*"::equals)) {
+            if (isDomainReservedForAnotherHost(host, emailDomain)) {
+                return Optional.of("email domain is reserved for another subdomain");
+            }
             return Optional.empty();
         }
 
@@ -100,5 +103,15 @@ public class SignupPolicyService {
     // Normalizes host and email-domain values so policy matching stays case-insensitive.
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isDomainReservedForAnotherHost(String host, String emailDomain) {
+        String normalizedHost = normalize(host);
+        return signupPolicyProperties.getHosts().entrySet().stream()
+                .filter(entry -> !normalize(entry.getKey()).equals(normalizedHost))
+                .flatMap(entry -> entry.getValue().getAllowedEmailDomains().stream())
+                .map(this::normalize)
+                .filter(domain -> !domain.equals("*"))
+                .anyMatch(domain -> domain.equals(emailDomain));
     }
 }

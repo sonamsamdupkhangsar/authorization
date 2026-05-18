@@ -240,6 +240,18 @@ public class UserSignupIntegTest {
     }
 
     @Test
+    public void publicHostSignupRejectsEmailDomainReservedForTenantHost() throws Exception {
+        UserSignup userSignup = new UserSignup("Public", "User", "owner@business1.com",
+                "public-business1-owner", "hello".toCharArray(), false, "Public Org");
+
+        String responseBody = signupWithHost("free.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("email domain is reserved for another subdomain");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    @Test
     public void hostBoundSignupAttachesUserToExistingOrganization() throws Exception {
         UserSignup userSignup = new UserSignup("Bound", "User", "owner@business1.com",
                 "bound-owner", "hello".toCharArray(), false, "Should Not Be Created");

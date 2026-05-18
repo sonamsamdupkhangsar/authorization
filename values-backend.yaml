@@ -71,13 +71,35 @@ ingress:
         - "*.sonam.cloud"
 
 httproute:
-  gatewayName: ""
+  gatewayName: "shared-tls-gateway"
   namespace: "main"
-  hostnames:
-    - "platform.openissuer.com"
-  httpsListenerName: "https-platform"
-  httpListenerName: "http-platform"
-  pathPrefix: "/"
+  exactPaths:
+    - "/"
+  pathPrefixes:
+    - "/oauth2"
+    - "/login"
+    - "/logout"
+    - "/userinfo"
+    - "/.well-known"
+    - "/issuer"
+  hostRoutes:
+    - name: platform
+      hostname: "platform.openissuer.com"
+      httpsListenerName: "https-platform"
+      httpListenerName: "http-platform"
+    - name: business1
+      hostname: "business1.openissuer.com"
+      httpsListenerName: "https-business1"
+      httpListenerName: "http-business1"
+    - name: business2
+      hostname: "business2.openissuer.com"
+      httpsListenerName: "https-business2"
+      httpListenerName: "http-business2"
+    - name: free
+      hostname: "free.openissuer.com"
+      httpsListenerName: "https-free"
+      httpListenerName: "http-free"
+      exactPaths: []
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -133,6 +155,8 @@ envs:
     value: http://oauth2-token-mediator
   - name: ISSUER_URI
     value: https://platform.openissuer.com
+  - name: ISSUER_ADDRESS
+    value: https://platform.openissuer.com
   - name: ALLOWED_ORIGINS
     value: https://platform.openissuer.com
   - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_0
@@ -157,6 +181,12 @@ envs:
     value: business2auth
   - name: BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF
     value: business2-db-password
+  - name: FREE_AUTH_DB_URL
+    value: jdbc:postgresql://free-auth-db-rw/freeauth
+  - name: FREE_AUTH_DB_USERNAME
+    value: freeauth
+  - name: FREE_AUTH_DB_PASSWORD_SECRET_REF
+    value: free-db-password
 
 health:
   startup:
@@ -198,3 +228,76 @@ secretFiles:
     keys:
       - key: password
         name: TENANT_SECRET_BUSINESS2_DB_PASSWORD
+  - file: free-auth-db-app
+    keys:
+      - key: password
+        name: TENANT_SECRET_FREE_DB_PASSWORD
+  - file: authzmanager-seed
+    optional: true
+    keys:
+      - key: ORGANIZATION_SEED_DELAY_SECONDS
+        name: ORGANIZATION_SEED_DELAY_SECONDS
+      - key: ORGANIZATION_SEED_USERS_0_FIRST_NAME
+        name: ORGANIZATION_SEED_USERS_0_FIRST_NAME
+      - key: ORGANIZATION_SEED_USERS_0_LAST_NAME
+        name: ORGANIZATION_SEED_USERS_0_LAST_NAME
+      - key: ORGANIZATION_SEED_USERS_0_EMAIL
+        name: ORGANIZATION_SEED_USERS_0_EMAIL
+      - key: ORGANIZATION_SEED_USERS_0_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_USERS_0_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_USERS_0_PASSWORD
+        name: ORGANIZATION_SEED_USERS_0_PASSWORD
+      - key: ORGANIZATION_SEED_USERS_0_ACTIVE
+        name: ORGANIZATION_SEED_USERS_0_ACTIVE
+      - key: ORGANIZATION_SEED_USERS_1_FIRST_NAME
+        name: ORGANIZATION_SEED_USERS_1_FIRST_NAME
+      - key: ORGANIZATION_SEED_USERS_1_LAST_NAME
+        name: ORGANIZATION_SEED_USERS_1_LAST_NAME
+      - key: ORGANIZATION_SEED_USERS_1_EMAIL
+        name: ORGANIZATION_SEED_USERS_1_EMAIL
+      - key: ORGANIZATION_SEED_USERS_1_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_USERS_1_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_USERS_1_PASSWORD
+        name: ORGANIZATION_SEED_USERS_1_PASSWORD
+      - key: ORGANIZATION_SEED_USERS_1_ACTIVE
+        name: ORGANIZATION_SEED_USERS_1_ACTIVE
+      - key: ORGANIZATION_SEED_USERS_1_ORGANIZATION_SUBDOMAIN
+        name: ORGANIZATION_SEED_USERS_1_ORGANIZATION_SUBDOMAIN
+      - key: ORGANIZATION_SEED_USERS_2_FIRST_NAME
+        name: ORGANIZATION_SEED_USERS_2_FIRST_NAME
+      - key: ORGANIZATION_SEED_USERS_2_LAST_NAME
+        name: ORGANIZATION_SEED_USERS_2_LAST_NAME
+      - key: ORGANIZATION_SEED_USERS_2_EMAIL
+        name: ORGANIZATION_SEED_USERS_2_EMAIL
+      - key: ORGANIZATION_SEED_USERS_2_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_USERS_2_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_USERS_2_PASSWORD
+        name: ORGANIZATION_SEED_USERS_2_PASSWORD
+      - key: ORGANIZATION_SEED_USERS_2_ACTIVE
+        name: ORGANIZATION_SEED_USERS_2_ACTIVE
+      - key: ORGANIZATION_SEED_USERS_3_FIRST_NAME
+        name: ORGANIZATION_SEED_USERS_3_FIRST_NAME
+      - key: ORGANIZATION_SEED_USERS_3_LAST_NAME
+        name: ORGANIZATION_SEED_USERS_3_LAST_NAME
+      - key: ORGANIZATION_SEED_USERS_3_EMAIL
+        name: ORGANIZATION_SEED_USERS_3_EMAIL
+      - key: ORGANIZATION_SEED_USERS_3_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_USERS_3_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_USERS_3_PASSWORD
+        name: ORGANIZATION_SEED_USERS_3_PASSWORD
+      - key: ORGANIZATION_SEED_USERS_3_ACTIVE
+        name: ORGANIZATION_SEED_USERS_3_ACTIVE
+      - key: ORGANIZATION_SEED_USERS_3_ORGANIZATION_SUBDOMAIN
+        name: ORGANIZATION_SEED_USERS_3_ORGANIZATION_SUBDOMAIN
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_0_NAME
+        name: ORGANIZATION_SEED_ORGANIZATIONS_0_NAME
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_0_CREATOR_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_ORGANIZATIONS_0_CREATOR_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_0_SUBDOMAIN
+        name: ORGANIZATION_SEED_ORGANIZATIONS_0_SUBDOMAIN
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_1_NAME
+        name: ORGANIZATION_SEED_ORGANIZATIONS_1_NAME
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_1_CREATOR_AUTHENTICATION_ID
+        name: ORGANIZATION_SEED_ORGANIZATIONS_1_CREATOR_AUTHENTICATION_ID
+      - key: ORGANIZATION_SEED_ORGANIZATIONS_1_SUBDOMAIN
+        name: ORGANIZATION_SEED_ORGANIZATIONS_1_SUBDOMAIN
