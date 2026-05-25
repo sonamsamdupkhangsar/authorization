@@ -11,8 +11,8 @@ import me.sonam.auth.util.CustomPair;
 import me.sonam.auth.util.CustomRestPage;
 import me.sonam.auth.util.TokenRequestFilter;
 import me.sonam.auth.util.UserIdUtil;
+import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
-import me.sonam.auth.webclient.SettingWebClient;
 import org.apache.tomcat.websocket.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +66,7 @@ public class ClientRestService {
     private final RoleWebClient roleWebClient;
 
     @Autowired
-    private SettingWebClient settingWebClient;
+    private final OrganizationWebClient organizationWebClient;
 
     @Value("${maxClients}")
     private int maxClients;
@@ -79,12 +79,13 @@ public class ClientRestService {
     public ClientRestService(RegisteredClientMapConverter registeredClientMapConverter,
                              IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations,
                              PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
-                             SettingWebClient settingWebClient, TransactionTemplate transactionTemplate) {
+                             OrganizationWebClient organizationWebClient,
+                             TransactionTemplate transactionTemplate) {
         this.registeredClientMapConverter = registeredClientMapConverter;
         this.issuerAwareAuthorizationServerOperations = issuerAwareAuthorizationServerOperations;
         this.passwordEncoder = passwordEncoder;
         this.roleWebClient = roleWebClient;
-        this.settingWebClient = settingWebClient;
+        this.organizationWebClient = organizationWebClient;
         this.transactionTemplate = transactionTemplate;
         LOG.info("initialized clientRestService");
     }
@@ -107,7 +108,7 @@ public class ClientRestService {
         LOG.info("userId {}, accessToken: {}", userId, accessToken);
 
 
-       return settingWebClient.getDefaultOrganization(accessToken, userId)
+       return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                .flatMap(objects -> {
@@ -182,7 +183,7 @@ public class ClientRestService {
 
         UUID userId = UUID.fromString(userIdString);
 
-        return settingWebClient.getDefaultOrganization(accessToken, userId)
+        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .flatMap(orgId -> {
                     RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, clientId);
                     if (registeredClient != null) {
@@ -216,7 +217,7 @@ public class ClientRestService {
         LOG.info("userId: {}", userIdString);
         UUID userId = UUID.fromString(userIdString);
 
-        return settingWebClient.getDefaultOrganization(accessToken, userId)
+        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .flatMap(orgId -> {
                     LOG.info("orgId: '{}'", id);
                     UUID uuid = UUID.fromString(id);
@@ -240,7 +241,7 @@ public class ClientRestService {
         String accessToken = uuidTokenPair.getSecond();
         UUID userId = uuidTokenPair.getFirst();
 
-        return settingWebClient.getDefaultOrganization(accessToken, userId)
+        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .flatMap(orgId -> Mono.just(clientOrganizationRepository.countByOrganizationId(orgId)))
                 .doOnNext(aLong -> LOG.info("found {} clients for organization", aLong));
     }
@@ -265,7 +266,7 @@ public class ClientRestService {
         String accessToken = jwt.getTokenValue();
         List<CustomPair<String, String>> list = new ArrayList<>();
 
-        return settingWebClient.getDefaultOrganization(accessToken, userId)
+        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
                 .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                 .flatMap(objects -> {
@@ -395,7 +396,7 @@ public class ClientRestService {
         UUID userId = UUID.fromString(userIdString);
         String accessToken = jwt.getTokenValue();
 
-        return settingWebClient.getDefaultOrganization(accessToken, userId)
+        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
                 .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                 .flatMap(objects -> {

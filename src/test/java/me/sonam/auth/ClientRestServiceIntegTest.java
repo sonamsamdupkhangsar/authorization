@@ -155,6 +155,7 @@ public class ClientRestServiceIntegTest {
         r.add("oauth2-token-mediator.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("setting-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("role-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
+        r.add("organization-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
     }
 
 
@@ -179,8 +180,7 @@ public class ClientRestServiceIntegTest {
     public void getClientCountForLoggedInUser() throws Exception {
         UUID defaultOrgId = UUID.randomUUID();
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         LOG.info("call getClientCount without any clients for a org");
 
@@ -191,18 +191,14 @@ public class ClientRestServiceIntegTest {
         StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(0)).verifyComplete();
 
 
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         LOG.info("create 3 client organizations");
         clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
         clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
         clientOrganizationRepository.save(new ClientOrganization(UUID.randomUUID(), defaultOrgId));
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         LOG.info("call getClientCount without any clients for a org");
 
@@ -212,10 +208,7 @@ public class ClientRestServiceIntegTest {
         StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(3)).verifyComplete();
 
 
-        recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        recordedRequest = takeDefaultOrganizationRequest();
 
 
     }
@@ -281,8 +274,7 @@ public class ClientRestServiceIntegTest {
         //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
         when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", false))));
@@ -299,10 +291,7 @@ public class ClientRestServiceIntegTest {
         }
 
         // take request for mocked response of access token
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -483,8 +472,7 @@ public class ClientRestServiceIntegTest {
         //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
         when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
@@ -505,9 +493,7 @@ public class ClientRestServiceIntegTest {
 
 
         // take request for mocked response of access token
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -526,8 +512,7 @@ public class ClientRestServiceIntegTest {
             //this is needed to let the service endpoint be called and still use the userId from the @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107"
             when(this.jwtDecoder.decode(anyString())).thenReturn(Mono.just(jwt));
 
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+            enqueueDefaultOrganizationResponse(defaultOrgId);
 
             mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                     .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
@@ -545,10 +530,7 @@ public class ClientRestServiceIntegTest {
             LOG.error("Exception occured: {}", e.getMessage());
         }
             // take request for mocked response of access token
-            RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-            assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-            assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+            RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
             recordedRequest = mockWebServer.takeRequest();
             assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -577,8 +559,7 @@ public class ClientRestServiceIntegTest {
         assertThat(issuerAwareAuthorizationServerOperations.findByClientId(currentIssuer(), clientId.toString())).isNotNull();
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", true))));
@@ -593,10 +574,7 @@ public class ClientRestServiceIntegTest {
                 .accept(MediaType.APPLICATION_JSON).exchange().expectBody(new ParameterizedTypeReference<Map<String, Object>>() {}).returnResult();
 
         LOG.info("response: {}", entityExchangeResult.getResponseBody());
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -632,8 +610,7 @@ public class ClientRestServiceIntegTest {
         assertThat(clientOrganizationRepository.findByClientId(clientId)).isPresent();
 
         LOG.info("call client delete");
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", true))));
@@ -647,10 +624,7 @@ public class ClientRestServiceIntegTest {
                 .accept(MediaType.APPLICATION_JSON).exchange().expectBody(new ParameterizedTypeReference<Map<String, Object>>() {}).returnResult();
 
         LOG.info("response: {}", entityExchangeResult.getResponseBody());
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -672,10 +646,9 @@ public class ClientRestServiceIntegTest {
 
     }
 
-    private RegisteredClient getRegisteredClientFromRestService(String clientId, UUID defaultOrgId) throws InterruptedException {
+    private RegisteredClient getRegisteredClientFromRestService(String clientId, UUID defaultOrgId) throws Exception {
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         EntityExchangeResult<Map<String, Object>> entityExchangeResult = webTestClient.get()
                 .uri("/clients/client-id/"+clientId)
@@ -684,9 +657,7 @@ public class ClientRestServiceIntegTest {
         assertThat(entityExchangeResult).isNotNull();
         assertThat(entityExchangeResult.getResponseBody()).isNotNull();
 
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         Map<String, Object> map = entityExchangeResult.getResponseBody();
         RegisteredClient registeredClient = jpaRegisteredClientRepository.build(map);
@@ -706,9 +677,8 @@ public class ClientRestServiceIntegTest {
         return entityExchangeResult.getResponseBody();
     }
 
-    private Map<String, Object> getClientById(String id, UUID defaultOrgId) throws InterruptedException {
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+    private Map<String, Object> getClientById(String id, UUID defaultOrgId) throws Exception {
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         EntityExchangeResult<Map<String, Object>> entityExchangeResult = webTestClient.get().uri("/clients/"+id)
                 .exchange().expectStatus().isOk().expectBody(new ParameterizedTypeReference<Map<String, Object>>(){}).returnResult();
@@ -716,37 +686,26 @@ public class ClientRestServiceIntegTest {
         assertThat(entityExchangeResult).isNotNull();
         assertThat(entityExchangeResult.getResponseBody()).isNotNull();
 
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         return entityExchangeResult.getResponseBody();
     }
 
-    private Map<String, Object> getClientByClientId(String clientId, UUID defaultOrgId) throws InterruptedException {
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+    private Map<String, Object> getClientByClientId(String clientId, UUID defaultOrgId) throws Exception {
+        enqueueDefaultOrganizationResponse(defaultOrgId);
         EntityExchangeResult<Map<String, Object>> entityExchangeResult = webTestClient.get().uri("/clients/client-id/"+clientId)
                 .exchange().expectStatus().isOk().expectBody(new ParameterizedTypeReference<Map<String, Object>>(){}).returnResult();
 
         assertThat(entityExchangeResult).isNotNull();
         assertThat(entityExchangeResult.getResponseBody()).isNotNull();
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         return entityExchangeResult.getResponseBody();
     }
 
     private CustomRestPage<CustomPair<String, String>> getClientIdsAssociatedWithUser(UUID userId, UUID defaultOrgId, boolean accessTokenPassed) throws Exception {
-        if (!accessTokenPassed) {
-            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
-        }
         //get defaultOrganization response
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", Map.of("defaultOrganizationId", defaultOrgId)))));
+        enqueueDefaultOrganizationResponse(defaultOrgId);
 
         //isSuperAdminInOrgId response
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
@@ -759,18 +718,7 @@ public class ClientRestServiceIntegTest {
 
         LOG.info("entityExchange result: {}", entityExchangeResult.getResponseBody());
 
-        // take request for mocked response of access token
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        if(!accessTokenPassed) {
-            assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-            assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
-
-            LOG.info("take request for mocked response to token-mediator for client when mediateToken field is not present");
-            recordedRequest = mockWebServer.takeRequest();
-        }
-
-        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        assertThat(recordedRequest.getPath()).startsWith("/settings/users");
+        RecordedRequest recordedRequest = takeDefaultOrganizationRequest();
 
         recordedRequest = mockWebServer.takeRequest();
         assertThat(recordedRequest.getMethod()).isEqualTo("GET");
@@ -780,6 +728,27 @@ public class ClientRestServiceIntegTest {
         assertThat(entityExchangeResult.getResponseBody()).isNotNull();
 
         return entityExchangeResult.getResponseBody();
+    }
+
+    private void enqueueDefaultOrganizationResponse(UUID defaultOrgId) throws IOException {
+        if (tokenRequestFilter.getRequestFilters().stream()
+                .anyMatch(requestFilter -> requestFilter.getAccessToken() != null
+                        && requestFilter.getAccessToken().getAccessToken() == null)) {
+            mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                    .setResponseCode(200).setBody(refreshTokenResource.getContentAsString(StandardCharsets.UTF_8)));
+        }
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody(getJson(Map.of("message", defaultOrgId))));
+    }
+
+    private RecordedRequest takeDefaultOrganizationRequest() throws InterruptedException {
+        RecordedRequest recordedRequest = mockWebServer.takeRequest();
+        if ("POST".equals(recordedRequest.getMethod()) && recordedRequest.getPath().startsWith("/oauth2/token")) {
+            recordedRequest = mockWebServer.takeRequest();
+        }
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/organizations/users");
+        return recordedRequest;
     }
 
 

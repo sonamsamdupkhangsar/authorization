@@ -9,7 +9,6 @@ import me.sonam.auth.service.HostOrganizationResolver;
 import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
-import me.sonam.auth.webclient.SettingWebClient;
 import me.sonam.auth.webclient.UserWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,8 +41,6 @@ public class UserSignupController {
     @Autowired
     private OrganizationWebClient organizationWebClient;
 
-    @Autowired
-    private SettingWebClient settingWebClient;
     @Autowired
     private RoleWebClient roleWebClient;
     @Autowired
@@ -116,7 +113,8 @@ public class UserSignupController {
 
                     //create organization and add this user to it
                     return organizationWebClient.updateOrganization(org, HttpMethod.POST)
-                            .flatMap(createdOrganization -> settingWebClient.addDefaultOrganization(null, user.getId(), createdOrganization.getId())
+                            .flatMap(createdOrganization -> organizationWebClient.addOrganizationToSubdomain(currentHost, createdOrganization.getId())
+                                    .then(organizationWebClient.setDefaultOrganization(createdOrganization.getId(), user.getId()))
                                     .then(roleWebClient.setUserAsRoleNameForOrganization(null,
                                             "SuperAdmin", user.getId(), createdOrganization.getId()))
                                     .thenReturn(PATH));
@@ -137,8 +135,8 @@ public class UserSignupController {
 
         return organizationWebClient.getOrganizationIdBySubdomain(host)
                 .switchIfEmpty(Mono.error(new IllegalStateException("No organization bound to current host")))
-                .flatMap(organizationId -> organizationWebClient.addUserToOrganization(user.getId(), organizationId)
-                        .then(settingWebClient.addDefaultOrganization(null, user.getId(), organizationId))
+                .flatMap(organizationId -> organizationWebClient.addUserToOrganization(user.getId(), organizationId, host, true)
+                        .then(organizationWebClient.setDefaultOrganization(organizationId, user.getId()))
                         .then());
     }
 

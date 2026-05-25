@@ -11,7 +11,6 @@ import me.sonam.auth.webclient.AuthenticationWebClient;
 import me.sonam.auth.webclient.LoginAttemptWebClient;
 import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
-import me.sonam.auth.webclient.SettingWebClient;
 import me.sonam.auth.webclient.UserWebClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,8 +70,6 @@ public class AuthenticationCalloutHostAwareTest {
     @Mock
     private AccountWebClient accountWebClient;
     @Mock
-    private SettingWebClient settingWebClient;
-    @Mock
     private RoleWebClient roleWebClient;
     @Mock
     private ClientOrganizationRepository clientOrganizationRepository;
@@ -87,7 +84,7 @@ public class AuthenticationCalloutHostAwareTest {
     void setUp() {
         authenticationCallout = new AuthenticationCallout(mock(WebClient.Builder.class), requestCache,
                 loginAttemptWebClient, organizationWebClient, authenticationWebClient, userWebClient,
-                accountWebClient, settingWebClient, roleWebClient);
+                accountWebClient, roleWebClient);
 
         ReflectionTestUtils.setField(authenticationCallout, "clientOrganizationRepository", clientOrganizationRepository);
         ReflectionTestUtils.setField(authenticationCallout, "clientUserRepository", clientUserRepository);
@@ -119,9 +116,12 @@ public class AuthenticationCalloutHostAwareTest {
     }
 
     @Test
-    void publicHostLoginFallsBackToClientOrganizationFlow() {
+    void publicHostLoginChecksMappedUserOrganizationBeforeAuthenticating() {
         bindRequestHost(FREE_HOST);
-        when(organizationWebClient.getOrganizationIdBySubdomain(FREE_HOST)).thenReturn(Mono.empty());
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
+        when(clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUuid, organizationId))
+                .thenReturn(Optional.of(true));
         when(organizationWebClient.userExistInOrganization(userId, organizationId)).thenReturn(Mono.just(true));
 
         UsernamePasswordAuthenticationToken expected =
@@ -135,8 +135,9 @@ public class AuthenticationCalloutHostAwareTest {
         Object result = authenticationCallout.authenticate(request);
 
         assertThat(result).isSameAs(expected);
-        verify(organizationWebClient).getOrganizationIdBySubdomain(FREE_HOST);
+        verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId);
         verify(organizationWebClient, times(1)).userExistInOrganization(userId, organizationId);
+        verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository, times(1)).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
         verify(roleWebClient, never()).isSuperAdminInOrgId(any(), any(), any());
@@ -145,7 +146,8 @@ public class AuthenticationCalloutHostAwareTest {
     @Test
     void hostBoundLoginChecksHostOrganizationBeforeAuthenticating() {
         bindRequestHost(BUSINESS1_HOST);
-        when(organizationWebClient.getOrganizationIdBySubdomain(BUSINESS1_HOST)).thenReturn(Mono.just(organizationId));
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(BUSINESS1_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
         when(organizationWebClient.userExistInOrganization(userId, organizationId)).thenReturn(Mono.just(true));
         when(clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUuid, organizationId))
                 .thenReturn(Optional.of(true));
@@ -161,8 +163,8 @@ public class AuthenticationCalloutHostAwareTest {
         Object result = authenticationCallout.authenticate(request);
 
         assertThat(result).isSameAs(expected);
-        verify(organizationWebClient).getOrganizationIdBySubdomain(BUSINESS1_HOST);
-        verify(organizationWebClient, times(2)).userExistInOrganization(userId, organizationId);
+        verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(BUSINESS1_HOST, userId);
+        verify(organizationWebClient, times(1)).userExistInOrganization(userId, organizationId);
         verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));

@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -38,7 +39,11 @@ public class SettingWebClient {
 
         //get all user setting and find the defaultOrganizationId field
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
+                .headers(httpHeaders -> {
+                    if (StringUtils.hasText(accessToken)) {
+                        httpHeaders.setBearerAuth(accessToken);
+                    }
+                }).accept(MediaType.APPLICATION_JSON).retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, Object>>(){})
                 .doOnNext(stringObjectMap -> LOG.info("got data: {}", stringObjectMap))
                 .flatMap(this::getDefaultOrganizationId)
@@ -54,7 +59,11 @@ public class SettingWebClient {
         LOG.info("add defaultOrganizationId for userId: {}, orgId: {} using endpoint: {}", userId, organizationId, userSettingEndpoint);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(userSettingEndpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken))
+                .headers(httpHeaders -> {
+                    if (StringUtils.hasText(accessToken)) {
+                        httpHeaders.setBearerAuth(accessToken);
+                    }
+                })
                 .bodyValue(Map.of("userId", userId, "defaultOrganizationId", organizationId)).retrieve();
 
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>(){})
@@ -71,7 +80,11 @@ public class SettingWebClient {
         LOG.info("remove defaultOrganizationId for userId: {} using endpoint: {}", userId, endpoint);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().delete().uri(endpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken))
+                .headers(httpHeaders -> {
+                    if (StringUtils.hasText(accessToken)) {
+                        httpHeaders.setBearerAuth(accessToken);
+                    }
+                })
                 .retrieve();
 
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>(){})

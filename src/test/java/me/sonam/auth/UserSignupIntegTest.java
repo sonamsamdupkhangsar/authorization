@@ -222,7 +222,8 @@ public class UserSignupIntegTest {
 
         Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), user.getId());
         mockWebServer.enqueue(jsonResponse(200, getJson(org)));
-        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "added defaultOrganizationId"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "organization added to subdomain"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
         mockWebServer.enqueue(jsonResponse(201, getJson(
                 Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
                         "userId", user.getId(), "organizationId", org.getId()))));
@@ -235,7 +236,8 @@ public class UserSignupIntegTest {
         assertRequest("POST", "/users");
         assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
         assertRequest("POST", "/organizations");
-        assertRequest("PUT", "/settings/users");
+        assertRequest("POST", "/organizations/subdomain/free.openissuer.test/organizations/" + org.getId());
+        assertRequest("PUT", "/organizations/" + org.getId() + "/users/" + user.getId() + "/default");
         assertRequest("POST", "/roles/authzmanagerroles/names/users/organizations");
     }
 
@@ -257,10 +259,10 @@ public class UserSignupIntegTest {
                 "bound-owner", "hello".toCharArray(), false, "Should Not Be Created");
         UUID boundOrganizationId = UUID.randomUUID();
 
-        enqueueTokenAndUserResponses(userSignup);
+        User user = enqueueTokenAndUserResponses(userSignup);
         mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("id", boundOrganizationId))));
         mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "added user to organization"))));
-        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "added defaultOrganizationId"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
 
         String responseBody = signupWithHost("business1.openissuer.test", userSignup);
 
@@ -271,7 +273,7 @@ public class UserSignupIntegTest {
         assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
         assertRequest("GET", "/organizations/subdomain/business1.openissuer.test");
         assertRequest("POST", "/organizations/users");
-        assertRequest("PUT", "/settings/users");
+        assertRequest("PUT", "/organizations/" + boundOrganizationId + "/users/" + user.getId() + "/default");
 
         RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
         Assertions.assertThat(recordedRequest).isNull();
