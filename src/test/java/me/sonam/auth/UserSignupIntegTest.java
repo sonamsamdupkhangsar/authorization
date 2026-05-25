@@ -132,85 +132,26 @@ public class UserSignupIntegTest {
         UserSignup userSignup = new UserSignup("Sonam", "Wangyal", "mugambo@1234sonam.com",
                 "mugambo", "hello".toCharArray(), false, "my lucky company");
 
-        //on signup we need to return a token because the user is not logged-in.  The app will generate a token and send to /users endpoint
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(token));
+        User user = enqueueTokenAndUserResponses(userSignup);
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody("{\"message\": \"user created\"}"));
-
-        UUID userId = UUID.randomUUID();
-        User user = new User();
-        user.setId(userId);
-        user.setAuthenticationId(userSignup.getAuthenticationId());
-        user.setFirstName(userSignup.getFirstName());
-        user.setLastName(userSignup.getLastName());
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(user)));
-
-        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), userId);
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(org)));
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(Map.of("message", "added defaultOrganizationId"))));
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(201).setBody(getJson(
+        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), user.getId());
+        mockWebServer.enqueue(jsonResponse(200, getJson(org)));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "organization added to subdomain"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
+        mockWebServer.enqueue(jsonResponse(201, getJson(
                         Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
                                 "userId", user.getId(), "organizationId", org.getId()))));
 
-/*
-        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post("/signup")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("firstName", userSignup.getFirstName())
-                        .param("lastName", userSignup.getLastName())
-                        .param("email", userSignup.getEmail())
-                        .param("authenticationId", userSignup.getAuthenticationId())
-                        .param("password", "1234567890")
-                        .param("active", "false")).andDo(print()).andExpect(status().isOk()).andReturn();*/
+        String responseBody = signupWithHost("free.openissuer.test", userSignup);
 
-        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        formData.add("firstName", userSignup.getFirstName());
-        formData.add("lastName", userSignup.getLastName());
-        formData.add("email", userSignup.getEmail());
-        formData.add("authenticationId", userSignup.getAuthenticationId());
-        formData.add("password", "1234567890");
-        formData.add("active", "false");
-
-        // use webtestClient to get response and assert.  The MockMvc does not give the response back.
-        EntityExchangeResult<String> entityExchangeResult = webTestClient.post().uri("/signup")
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .bodyValue(formData)
-                                .exchange().expectStatus().isOk().expectBody(String.class).returnResult();
-
-        LOG.info("response: {}",entityExchangeResult.getResponseBody());
-
-        assertThat(entityExchangeResult.getResponseBody()).contains("<strong>User Signup Success!</strong> <span>Sonam, your signup was successful! Please check your email ");
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/oauth2/token");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/users");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/users/authentication-id/"+userSignup.getAuthenticationId());
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/organizations");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/settings/users");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/names/users/organizations");
+        assertThat(responseBody).contains("your signup was successful");
+        assertRequest("POST", "/oauth2/token");
+        assertRequest("POST", "/users");
+        assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
+        assertRequest("POST", "/organizations");
+        assertRequest("POST", "/organizations/subdomain/free.openissuer.test/organizations/" + org.getId());
+        assertRequest("PUT", "/organizations/" + org.getId() + "/users/" + user.getId() + "/default");
+        assertRequest("POST", "/roles/authzmanagerroles/names/users/organizations");
     }
 
     @Test
@@ -358,7 +299,8 @@ public class UserSignupIntegTest {
     }
 
     private void assertRequest(String method, String pathPrefix) throws InterruptedException {
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(2, TimeUnit.SECONDS);
+        Assertions.assertThat(recordedRequest).isNotNull();
         Assertions.assertThat(recordedRequest.getMethod()).isEqualTo(method);
         Assertions.assertThat(recordedRequest.getPath()).startsWith(pathPrefix);
     }
