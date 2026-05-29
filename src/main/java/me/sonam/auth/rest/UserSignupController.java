@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.StringUtils;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -80,6 +81,12 @@ public class UserSignupController {
         var emailValidationError = signupPolicyService.validateEmailForHost(currentHost, userSignup.getEmail());
         if (emailValidationError.isPresent()) {
             model.addAttribute("error", emailValidationError.get());
+            model.addAttribute("userSignup", userSignup);
+            return Mono.just(PATH);
+        }
+
+        if (!StringUtils.hasText(currentHost)) {
+            model.addAttribute("error", "signup must be performed from a tenant subdomain");
             model.addAttribute("userSignup", userSignup);
             return Mono.just(PATH);
         }

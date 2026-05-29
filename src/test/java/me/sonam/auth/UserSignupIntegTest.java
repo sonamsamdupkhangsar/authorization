@@ -195,6 +195,18 @@ public class UserSignupIntegTest {
     }
 
     @Test
+    public void defaultHostSignupRejectsBeforeCreatingUser() throws Exception {
+        UserSignup userSignup = new UserSignup("Local", "User", "local@any-domain.com",
+                "local-owner", "hello".toCharArray(), false, "Local Org");
+
+        String responseBody = signupWithHost("localhost", userSignup);
+
+        assertThat(responseBody).contains("signup must be performed from a tenant subdomain");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    @Test
     public void hostBoundSignupAttachesUserToExistingOrganization() throws Exception {
         UserSignup userSignup = new UserSignup("Bound", "User", "owner@business1.com",
                 "bound-owner", "hello".toCharArray(), false, "Should Not Be Created");

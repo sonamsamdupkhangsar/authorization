@@ -1,6 +1,7 @@
 package me.sonam.auth.multitenancy;
 
 import com.nimbusds.jose.jwk.JWKSet;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -72,12 +73,17 @@ public class IssuerComponentRegistrar {
     }
 
     public DataSource createDataSource(AuthorizationServerMultitenancyProperties.Tenant tenant) {
-        return DataSourceBuilder.create()
+        HikariDataSource dataSource = DataSourceBuilder.create()
+                .type(HikariDataSource.class)
                 .driverClassName(tenant.getDriverClassName())
                 .url(tenant.getUrl())
                 .username(tenant.getUsername())
                 .password(resolvePassword(tenant))
                 .build();
+        if (tenant.getMaximumPoolSize() != null) {
+            dataSource.setMaximumPoolSize(tenant.getMaximumPoolSize());
+        }
+        return dataSource;
     }
 
     private String resolvePassword(AuthorizationServerMultitenancyProperties.Tenant tenant) {

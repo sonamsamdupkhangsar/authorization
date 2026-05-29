@@ -34,6 +34,7 @@ public class AuthorizationServerMultitenancyProperties {
         private String username;
         private String passwordSecretRef;
         private String driverClassName;
+        private Integer maximumPoolSize;
 
         public List<String> getHosts() {
             return hosts;
@@ -73,6 +74,14 @@ public class AuthorizationServerMultitenancyProperties {
 
         public void setDriverClassName(String driverClassName) {
             this.driverClassName = driverClassName;
+        }
+
+        public Integer getMaximumPoolSize() {
+            return maximumPoolSize;
+        }
+
+        public void setMaximumPoolSize(Integer maximumPoolSize) {
+            this.maximumPoolSize = maximumPoolSize;
         }
     }
 }
