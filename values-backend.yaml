@@ -109,17 +109,13 @@ httproute:
       httpsListenerName: "https-free"
       httpListenerName: "http-free"
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-#   memory: 128Mi
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 1536Mi
 
 #nodeSelector:
 #  node.kubernetes.io/instance-type: s-2vcpu-4gb
@@ -133,6 +129,8 @@ postgres:
   dbname: authorization
 
 envs:
+  - name: JAVA_TOOL_OPTIONS
+    value: "-XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=25"
   - name: SPRING_PROFILES_ACTIVE
     value: kubernetes
   - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_NAMESPACES_0
