@@ -136,6 +136,7 @@ public class UserSignupController {
     // Uses the current signup host as the source of truth and adds the new user to that host's
     // existing organization instead of creating another organization.
     private Mono<Void> attachUserToHostOrganization(User user, String host) {
+        LOG.info("attach user to host organization for host-bound signup flow, user: {}, host: {}", user, host);
         if (host == null) {
             return Mono.error(new IllegalStateException("No current host found for signup"));
         }
@@ -150,7 +151,7 @@ public class UserSignupController {
 
     // Unwraps downstream WebClient errors into a user-facing signup error message in the model.
     private void setErrorInModel(Throwable throwable, Model model, String defaultErrMessage) {
-        LOG.error("exception occured in signup user", throwable);
+        LOG.error("exception occurred in signup user", throwable);
         LOG.error(defaultErrMessage);
 
         if (throwable instanceof WebClientResponseException webClientResponseException) {

@@ -38,8 +38,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -106,7 +108,7 @@ public class AuthenticationCalloutHostAwareTest {
 
         when(accountWebClient.isAccountLocked("user1")).thenReturn(Mono.just(false));
         when(userWebClient.getUserId("user1")).thenReturn(Mono.just(userId));
-        when(clientOrganizationRepository.findByClientId(clientUuid))
+        lenient().when(clientOrganizationRepository.findByClientId(clientUuid))
                 .thenReturn(Optional.of(new ClientOrganization(clientUuid, organizationId)));
     }
 
@@ -169,6 +171,26 @@ public class AuthenticationCalloutHostAwareTest {
         verify(clientOrganizationRepository).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
         verify(roleWebClient, never()).isSuperAdminInOrgId(any(), any(), any());
+    }
+
+    @Test
+    void authzManagerLoginRequiresSuperAdminForHostOrganization() {
+        bindRequestHost(FREE_HOST);
+        ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", clientUuid);
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
+        when(roleWebClient.isSuperAdminInOrgId(null, userId, organizationId)).thenReturn(Mono.just(false));
+        when(loginAttemptWebClient.loginFailed("user1", "")).thenReturn(Mono.just("Please try again"));
+
+        UsernamePasswordAuthenticationToken request =
+                new UsernamePasswordAuthenticationToken("user1", "password");
+
+        assertThatThrownBy(() -> authenticationCallout.authenticate(request))
+                .isInstanceOf(me.sonam.auth.service.exception.BadCredentialsException.class)
+                .hasMessageContaining("You must be a super admin for this organization to sign in to the admin site");
+
+        verify(roleWebClient).isSuperAdminInOrgId(null, userId, organizationId);
+        verify(authenticationWebClient, never()).getAuth(any(), any());
     }
 
     private void bindRequestHost(String host) {

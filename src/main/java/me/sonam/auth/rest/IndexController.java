@@ -3,6 +3,7 @@ package me.sonam.auth.rest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import me.sonam.auth.service.ClientIdUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +47,13 @@ public class IndexController {
         SavedRequest savedRequest = requestCache.getRequest(request, response);
         if (savedRequest == null) {
             LOG.debug("no saved OAuth request found for login page");
+            Object sessionClientId = request.getSession().getAttribute(ClientIdUtil.CLIENT_ID_SESSION_ATTRIBUTE);
+            if (request.getParameter("error") != null
+                    && sessionClientId != null
+                    && StringUtils.hasText(sessionClientId.toString())) {
+                model.addAttribute("clientId", sessionClientId.toString());
+                LOG.debug("added session OAuth client_id to login form");
+            }
             return;
         }
 
@@ -56,6 +64,7 @@ public class IndexController {
         }
 
         model.addAttribute("clientId", clientIds[0]);
+        request.getSession().setAttribute(ClientIdUtil.CLIENT_ID_SESSION_ATTRIBUTE, clientIds[0]);
         LOG.debug("added saved OAuth client_id to login form");
     }
 }

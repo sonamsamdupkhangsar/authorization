@@ -3,7 +3,6 @@ package me.sonam.auth.service;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
-import me.sonam.auth.service.exception.AuthorizationException;
 import me.sonam.auth.service.exception.BadCredentialsException;
 import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
@@ -255,10 +254,17 @@ public class AuthenticationCallout implements AuthenticationProvider {
              * host-bound organization.
              */
             Mono<UUID> targetOrganization = resolveDefaultHostOrganization(currentHost, userId)
+                    .switchIfEmpty(Mono.error(new BadCredentialsException(
+                            "This admin site is not associated with your organization")))
                     .flatMap(organizationId -> roleWebClient.isSuperAdminInOrgId(null, userId, organizationId)
-                            .filter(Boolean::booleanValue)
-                            .map(ignored -> organizationId))
-                    .switchIfEmpty(Mono.error(new AuthorizationException("No organization bound to current host for authzmanager login")));
+                            .flatMap(isSuperAdmin -> {
+                                if (isSuperAdmin) {
+                                    return Mono.just(organizationId);
+                                }
+                                LOG.info("user logging is not a super admin");
+                                return Mono.error(new BadCredentialsException(
+                                        "You must be a super admin for this organization to sign in to the admin site"));
+                            }));
 
             return targetOrganization
                     .flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of(
