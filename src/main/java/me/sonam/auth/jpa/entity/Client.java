@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 public class Client {
     @Id
     private String id;
+    private String tenantId;
     private String clientId;
     private Instant clientIdIssuedAt;
     private String clientSecret;
@@ -44,6 +45,14 @@ public class Client {
 
     public void setClientId(String clientId) {
         this.clientId = clientId;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public Instant getClientIdIssuedAt() {
@@ -127,4 +136,3 @@ public class Client {
     }
 
 }
-

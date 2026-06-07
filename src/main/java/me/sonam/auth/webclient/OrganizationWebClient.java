@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,13 +20,21 @@ public class OrganizationWebClient {
 
     private final String userExistsInOrganizationEndpoint;
     private final String organizationEndpoint;
+    private final String organizationBySubdomainEndpoint;
 
-    public OrganizationWebClient(WebClient.Builder webClientBuilder, String organizationEndpoint, String userExistsInOrganizationEndpoint) {
+    public OrganizationWebClient(WebClient.Builder webClientBuilder, String organizationEndpoint,
+                                 String userExistsInOrganizationEndpoint, String organizationBySubdomainEndpoint) {
         this.webClientBuilder = webClientBuilder;
         this.organizationEndpoint = organizationEndpoint;
         this.userExistsInOrganizationEndpoint = userExistsInOrganizationEndpoint;
+        this.organizationBySubdomainEndpoint = organizationBySubdomainEndpoint;
     }
     public Mono<Map<String, String>> addUserToOrganization(UUID userId, UUID organizationId) {
+        return addUserToOrganization(userId, organizationId, null, false);
+    }
+
+    public Mono<Map<String, String>> addUserToOrganization(UUID userId, UUID organizationId,
+                                                           String subdomain, boolean restrictToSubdomain) {
         LOG.info("add user {} to organization {}", userId, organizationId);
 
         final StringBuilder stringBuilder = new StringBuilder(organizationEndpoint);
@@ -33,8 +42,13 @@ public class OrganizationWebClient {
 
         LOG.info("add user to organization endpoint: {}", stringBuilder);
 
+        Map<String, Object> body = subdomain == null
+                ? Map.of("userId", userId, "organizationId", organizationId)
+                : Map.of("userId", userId, "organizationId", organizationId,
+                "subdomain", subdomain, "restrictToSubdomain", restrictToSubdomain);
+
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().post().uri(stringBuilder.toString())
-                .bodyValue(Map.of("userId", userId, "organizationId", organizationId)).retrieve();
+                .bodyValue(body).retrieve();
 
         return responseSpec.bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {});
     }
@@ -86,6 +100,154 @@ public class OrganizationWebClient {
                 return Mono.just(false);
             }
         });
+    }
+
+    public Mono<UUID> getOrganizationIdBySubdomain(String subdomain) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain);
+        LOG.info("get organization by subdomain endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(map -> {
+                    Object id = map.get("id");
+                    if (id == null) {
+                        return Mono.empty();
+                    }
+                    return Mono.just(UUID.fromString(id.toString()));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get organization by subdomain {}: {}", subdomain, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("organization by subdomain error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.empty();
+                });
+    }
+
+    public Mono<List<UUID>> getOrganizationIdsBySubdomain(String subdomain) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain) + "/organizations";
+        LOG.info("get organizations by subdomain endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .map(organizations -> organizations.stream()
+                        .map(organization -> organization.get("id"))
+                        .filter(id -> id != null)
+                        .map(id -> UUID.fromString(id.toString()))
+                        .toList())
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get organizations by subdomain {}: {}", subdomain, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("organizations by subdomain error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.just(List.of());
+                });
+    }
+
+    public Mono<Boolean> userExistsInSubdomainOrganization(String subdomain, UUID userId, UUID organizationId) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain)
+                + "/users/" + userId + "/organizations/" + organizationId;
+        LOG.info("check user exists in subdomain organization endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .map(map -> Boolean.TRUE.equals(map.get("message")))
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to check subdomain {} user {} organization {}: {}",
+                            subdomain, userId, organizationId, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("check user exists in subdomain organization error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.just(false);
+                });
+    }
+
+    public Mono<UUID> getDefaultOrganizationIdBySubdomainAndUserId(String subdomain, UUID userId) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain)
+                + "/users/" + userId + "/default-organization-id";
+        LOG.info("get default organization by subdomain and user endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(map -> {
+                    Object organizationId = map.get("message");
+                    if (organizationId == null) {
+                        return Mono.empty();
+                    }
+                    return Mono.just(UUID.fromString(organizationId.toString()));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get default organization by subdomain {} and user {}: {}",
+                            subdomain, userId, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("get default organization by subdomain and user error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.empty();
+                });
+    }
+
+    public Mono<UUID> getDefaultOrganizationIdForUser(UUID userId) {
+        String endpoint = organizationEndpoint + "/users/" + userId + "/default-organization-id";
+        LOG.info("get default organization by user endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(map -> {
+                    Object organizationId = map.get("message");
+                    if (organizationId == null) {
+                        return Mono.empty();
+                    }
+                    return Mono.just(UUID.fromString(organizationId.toString()));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get default organization by user {}: {}", userId, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("get default organization by user error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.empty();
+                });
+    }
+
+    public Mono<String> setDefaultOrganization(UUID organizationId, UUID userId) {
+        String endpoint = organizationEndpoint + "/" + organizationId + "/users/" + userId + "/default";
+        LOG.info("set default organization endpoint: {}", endpoint);
+
+        return webClientBuilder.build().put().uri(endpoint).retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
+                .map(map -> map.get("message"))
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to set default organization {} for user {}: {}",
+                            organizationId, userId, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("set default organization error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.error(throwable);
+                });
+    }
+
+    public Mono<String> addOrganizationToSubdomain(String subdomain, UUID organizationId) {
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain)
+                + "/organizations/" + organizationId;
+        LOG.info("add organization {} to subdomain {} endpoint: {}", organizationId, subdomain, endpoint);
+
+        return webClientBuilder.build().post().uri(endpoint).retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {})
+                .map(map -> map.get("message"))
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to add organization {} to subdomain {}: {}",
+                            organizationId, subdomain, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("add organization to subdomain error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.error(throwable);
+                });
     }
 
 }

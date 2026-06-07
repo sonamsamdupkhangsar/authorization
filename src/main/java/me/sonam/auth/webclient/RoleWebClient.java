@@ -57,7 +57,7 @@ public class RoleWebClient {
     }
 
     public Mono<UUID> setUserAsRoleNameForOrganization(String accessToken, final String authzManagerRoleName, UUID userId, UUID organizationId) {
-        LOG.info("get superAdmin organizations count for this user in accessToken");
+        LOG.info("set authzManagerRoleName for organization and userId");
 
         final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
         stringBuilder.append("/authzmanagerroles/names/users/organizations");
@@ -69,7 +69,7 @@ public class RoleWebClient {
         }
 
         return requestBodySpec.bodyValue(Map.of("userId", userId, "organizationId", organizationId,
-                        "authzManagerRoleName", "SuperAdmin"))
+                        "authzManagerRoleName", authzManagerRoleName))
                 .retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .flatMap(map -> {
                     LOG.info("user set as authzManagerRoleName: {}", map);

@@ -16,6 +16,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.*;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -34,6 +35,9 @@ public class TokenFilter {
     @Value("${auth-server.root}${auth-server.context-path}${auth-server.oauth2token.path}")
     private String oauth2TokenEndpoint;
 
+    @Value("${ISSUER_ADDRESS:${auth-server.root}}")
+    private String issuerAddress;
+
     @Value("${auth-server.oauth2token.grantType}")
     private String grantType;
 
@@ -46,10 +50,10 @@ public class TokenFilter {
     private final WebClient.Builder webClientBuilder;
 
     private RequestCache requestCache;
-    @Value("${server.servlet.context-path}${auth-server.oauth2token.path:}")
+    @Value("${server.servlet.context-path:}${auth-server.oauth2token.path:}")
     private String accessTokenPath;
 
-    @Value("${server.servlet.context-path}")
+    @Value("${server.servlet.context-path:}")
     private String servletContextPath;
 
     @Value("${tokenExpireSeconds}")
@@ -225,9 +229,30 @@ public class TokenFilter {
 
         LOG.info("add body payload for grant type and scopes: {}", body);
 
+        URI logicalIssuerUri = URI.create(issuerAddress);
+        String logicalHost = logicalIssuerUri.getHost();
+        int port = logicalIssuerUri.getPort();
+        String hostHeader = port > 0 ? logicalHost + ":" + port : logicalHost;
+        String scheme = logicalIssuerUri.getScheme();
+
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().post().uri(oauthEndpoint)
                 .bodyValue(body)
-                .headers(httpHeaders -> httpHeaders.setBasicAuth(base64EncodeClientIdSecret))
+                .headers(httpHeaders -> {
+                    httpHeaders.setBasicAuth(base64EncodeClientIdSecret);
+                    // Preserve the logical authorization-server host across load-balanced resolution so
+                    // SAS routes this internal client-credentials call through the default issuer store.
+                    if (logicalHost != null && !logicalHost.isBlank()) {
+                        httpHeaders.set(HttpHeaders.HOST, hostHeader);
+                        httpHeaders.set("X-Forwarded-Host", hostHeader);
+                        if (scheme != null && !scheme.isBlank()) {
+                            httpHeaders.set("X-Forwarded-Proto", scheme);
+                        }
+                        if (port > 0) {
+                            httpHeaders.set("X-Forwarded-Port", Integer.toString(port));
+                        }
+                        LOG.info("set stable token request host headers host={} scheme={} port={}", logicalHost, scheme, port);
+                    }
+                })
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve();
 

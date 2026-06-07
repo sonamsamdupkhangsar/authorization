@@ -17,7 +17,7 @@ java.sourceCompatibility = JavaVersion.VERSION_21
 
 repositories {
     mavenCentral()
-    maven { url 'https://repo.spring.io/milestone' }
+    maven { url = uri('https://repo.spring.io/milestone') }
     mavenLocal()
     maven {
         url = uri("https://maven.pkg.github.com/sonamsamdupkhangsar/token-filter")
@@ -55,7 +55,7 @@ dependencies {
     testImplementation 'io.projectreactor:reactor-test:3.8.1'
     testImplementation 'org.htmlunit:htmlunit:4.7.0'
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.0.1'
-    testImplementation group: 'org.hsqldb', name: 'hsqldb', version: '2.7.1'
+    testImplementation 'org.hsqldb:hsqldb:2.7.1'
     testImplementation platform('org.junit:junit-bom:5.11.0') // Use the latest stable version
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
@@ -78,6 +78,7 @@ tasks.named('test', Test) {
     useJUnitPlatform()
 
     maxHeapSize = '1G'
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
 
     testLogging {
         events "passed"

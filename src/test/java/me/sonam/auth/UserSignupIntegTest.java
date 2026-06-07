@@ -2,6 +2,7 @@ package me.sonam.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import me.sonam.auth.config.SignupPolicyProperties;
 import me.sonam.auth.mocks.WithMockCustomUser;
 import me.sonam.auth.rest.signup.Organization;
 import me.sonam.auth.rest.signup.User;
@@ -34,18 +35,21 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import me.sonam.auth.util.TokenRequestFilter;
 import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -66,6 +70,10 @@ public class UserSignupIntegTest {
 
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private TokenRequestFilter tokenRequestFilter;
+    @Autowired
+    private SignupPolicyProperties signupPolicyProperties;
     private static MockWebServer mockWebServer;
 
     private RegisteredClientUtil registeredClientUtil = new RegisteredClientUtil();
@@ -94,7 +102,29 @@ public class UserSignupIntegTest {
         r.add("role-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
         r.add("user-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
         r.add("setting-rest-service.root", () -> "http://localhost:" + mockWebServer.getPort());
+    }
 
+    @BeforeEach
+    void clearAccessTokens() {
+        for (TokenRequestFilter.RequestFilter requestFilter : tokenRequestFilter.getRequestFilters()) {
+            if (requestFilter.getAccessToken() != null) {
+                requestFilter.getAccessToken().setAccessToken(null);
+            }
+        }
+
+        signupPolicyProperties.getHosts().clear();
+
+        SignupPolicyProperties.HostPolicy freeHostPolicy = new SignupPolicyProperties.HostPolicy();
+        freeHostPolicy.setAllowSignup(true);
+        freeHostPolicy.setCreateOrganizationOnSignup(true);
+        freeHostPolicy.getAllowedEmailDomains().add("*");
+        signupPolicyProperties.getHosts().put("free.openissuer.test", freeHostPolicy);
+
+        SignupPolicyProperties.HostPolicy business1Policy = new SignupPolicyProperties.HostPolicy();
+        business1Policy.setAllowSignup(true);
+        business1Policy.setCreateOrganizationOnSignup(false);
+        business1Policy.getAllowedEmailDomains().add("business1.com");
+        signupPolicyProperties.getHosts().put("business1.openissuer.test", business1Policy);
     }
 
     @Test
@@ -102,45 +132,134 @@ public class UserSignupIntegTest {
         UserSignup userSignup = new UserSignup("Sonam", "Wangyal", "mugambo@1234sonam.com",
                 "mugambo", "hello".toCharArray(), false, "my lucky company");
 
-        //on signup we need to return a token because the user is not logged-in.  The app will generate a token and send to /users endpoint
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(token));
+        User user = enqueueTokenAndUserResponses(userSignup);
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody("{\"message\": \"user created\"}"));
+        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), user.getId());
+        mockWebServer.enqueue(jsonResponse(200, getJson(org)));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "organization added to subdomain"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
+        mockWebServer.enqueue(jsonResponse(201, getJson(
+                        Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
+                                "userId", user.getId(), "organizationId", org.getId()))));
 
-        UUID userId = UUID.randomUUID();
+        String responseBody = signupWithHost("free.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("your signup was successful");
+        assertRequest("POST", "/oauth2/token");
+        assertRequest("POST", "/users");
+        assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
+        assertRequest("POST", "/organizations");
+        assertRequest("POST", "/organizations/subdomain/free.openissuer.test/organizations/" + org.getId());
+        assertRequest("PUT", "/organizations/" + org.getId() + "/users/" + user.getId() + "/default");
+        assertRequest("POST", "/roles/authzmanagerroles/names/users/organizations");
+    }
+
+    @Test
+    public void publicHostSignupCreatesOrganization() throws Exception {
+        UserSignup userSignup = new UserSignup("Public", "User", "owner@any-domain.com",
+                "public-owner", "hello".toCharArray(), false, "Public Org");
+
+        User user = enqueueTokenAndUserResponses(userSignup);
+
+        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), user.getId());
+        mockWebServer.enqueue(jsonResponse(200, getJson(org)));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "organization added to subdomain"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
+        mockWebServer.enqueue(jsonResponse(201, getJson(
+                Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
+                        "userId", user.getId(), "organizationId", org.getId()))));
+
+        String responseBody = signupWithHost("free.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("your signup was successful");
+
+        assertRequest("POST", "/oauth2/token");
+        assertRequest("POST", "/users");
+        assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
+        assertRequest("POST", "/organizations");
+        assertRequest("POST", "/organizations/subdomain/free.openissuer.test/organizations/" + org.getId());
+        assertRequest("PUT", "/organizations/" + org.getId() + "/users/" + user.getId() + "/default");
+        assertRequest("POST", "/roles/authzmanagerroles/names/users/organizations");
+    }
+
+    @Test
+    public void publicHostSignupRejectsEmailDomainReservedForTenantHost() throws Exception {
+        UserSignup userSignup = new UserSignup("Public", "User", "owner@business1.com",
+                "public-business1-owner", "hello".toCharArray(), false, "Public Org");
+
+        String responseBody = signupWithHost("free.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("email domain is reserved for another subdomain");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    @Test
+    public void defaultHostSignupRejectsBeforeCreatingUser() throws Exception {
+        UserSignup userSignup = new UserSignup("Local", "User", "local@any-domain.com",
+                "local-owner", "hello".toCharArray(), false, "Local Org");
+
+        String responseBody = signupWithHost("localhost", userSignup);
+
+        assertThat(responseBody).contains("signup must be performed from a tenant subdomain");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    @Test
+    public void hostBoundSignupAttachesUserToExistingOrganization() throws Exception {
+        UserSignup userSignup = new UserSignup("Bound", "User", "owner@business1.com",
+                "bound-owner", "hello".toCharArray(), false, "Should Not Be Created");
+        UUID boundOrganizationId = UUID.randomUUID();
+
+        User user = enqueueTokenAndUserResponses(userSignup);
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("id", boundOrganizationId))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "added user to organization"))));
+        mockWebServer.enqueue(jsonResponse(200, getJson(Map.of("message", "default organization updated"))));
+
+        String responseBody = signupWithHost("business1.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("your signup was successful");
+
+        assertRequest("POST", "/oauth2/token");
+        assertRequest("POST", "/users");
+        assertRequest("GET", "/users/authentication-id/" + userSignup.getAuthenticationId());
+        assertRequest("GET", "/organizations/subdomain/business1.openissuer.test");
+        assertRequest("POST", "/organizations/users");
+        assertRequest("PUT", "/organizations/" + boundOrganizationId + "/users/" + user.getId() + "/default");
+
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    @Test
+    public void hostBoundSignupRejectsEmailOutsideAllowedDomain() throws Exception {
+        UserSignup userSignup = new UserSignup("Wrong", "Domain", "owner@other.com",
+                "wrong-domain", "hello".toCharArray(), false, "Ignored Org");
+
+        String responseBody = signupWithHost("business1.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("email domain is not allowed for this subdomain");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
+    private User enqueueTokenAndUserResponses(UserSignup userSignup) throws JsonProcessingException {
+        mockWebServer.enqueue(jsonResponse(200, token));
+        mockWebServer.enqueue(jsonResponse(200, "{\"message\": \"user created\"}"));
+
+        UUID currentUserId = UUID.randomUUID();
         User user = new User();
-        user.setId(userId);
+        user.setId(currentUserId);
         user.setAuthenticationId(userSignup.getAuthenticationId());
         user.setFirstName(userSignup.getFirstName());
         user.setLastName(userSignup.getLastName());
 
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(user)));
+        mockWebServer.enqueue(jsonResponse(200, getJson(user)));
+        return user;
+    }
 
-        Organization org = new Organization(UUID.randomUUID(), userSignup.getOrganization(), userId);
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(org)));
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(200).setBody(getJson(Map.of("message", "added defaultOrganizationId"))));
-
-        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
-                .setResponseCode(201).setBody(getJson(
-                        Map.of("id", UUID.randomUUID(), "authzManagerRoleId", UUID.randomUUID(),
-                                "userId", user.getId(), "organizationId", org.getId()))));
-
-/*
-        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post("/signup")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("firstName", userSignup.getFirstName())
-                        .param("lastName", userSignup.getLastName())
-                        .param("email", userSignup.getEmail())
-                        .param("authenticationId", userSignup.getAuthenticationId())
-                        .param("password", "1234567890")
-                        .param("active", "false")).andDo(print()).andExpect(status().isOk()).andReturn();*/
-
+    private EntityExchangeResult<String> signup(String host, UserSignup userSignup) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("firstName", userSignup.getFirstName());
         formData.add("lastName", userSignup.getLastName());
@@ -148,39 +267,54 @@ public class UserSignupIntegTest {
         formData.add("authenticationId", userSignup.getAuthenticationId());
         formData.add("password", "1234567890");
         formData.add("active", "false");
+        if (userSignup.getOrganization() != null) {
+            formData.add("organization", userSignup.getOrganization());
+        }
 
-        // use webtestClient to get response and assert.  The MockMvc does not give the response back.
-        EntityExchangeResult<String> entityExchangeResult = webTestClient.post().uri("/signup")
+        return webTestClient.post().uri("/signup")
+                .header("Host", host)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .bodyValue(formData)
-                                .exchange().expectStatus().isOk().expectBody(String.class).returnResult();
+                .bodyValue(formData)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult();
+    }
 
-        LOG.info("response: {}",entityExchangeResult.getResponseBody());
+    private String signupWithHost(String host, UserSignup userSignup) throws Exception {
+        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post("/signup")
+                        .with(request -> {
+                            request.setServerName(host);
+                            return request;
+                        })
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("firstName", userSignup.getFirstName())
+                        .param("lastName", userSignup.getLastName())
+                        .param("email", userSignup.getEmail())
+                        .param("authenticationId", userSignup.getAuthenticationId())
+                        .param("password", "1234567890")
+                        .param("active", "false")
+                        .param("organization", userSignup.getOrganization() == null ? "" : userSignup.getOrganization()))
+                .andExpect(status().isOk())
+                .andReturn();
 
-        assertThat(entityExchangeResult.getResponseBody()).contains("<strong>User Signup Success!</strong> <span>Sonam, your signup was successful! Please check your email ");
-        RecordedRequest recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/issuer/oauth2/token");
+        MvcResult asyncResult = mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andReturn();
+        return asyncResult.getResponse().getContentAsString();
+    }
 
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/users");
+    private MockResponse jsonResponse(int status, String body) {
+        return new MockResponse().setHeader("Content-Type", MediaType.APPLICATION_JSON)
+                .setResponseCode(status)
+                .setBody(body);
+    }
 
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("GET");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/users/authentication-id/"+userSignup.getAuthenticationId());
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/organizations");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/settings/users");
-
-        recordedRequest = mockWebServer.takeRequest();
-        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-        Assertions.assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/names/users/organizations");
+    private void assertRequest(String method, String pathPrefix) throws InterruptedException {
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(2, TimeUnit.SECONDS);
+        Assertions.assertThat(recordedRequest).isNotNull();
+        Assertions.assertThat(recordedRequest.getMethod()).isEqualTo(method);
+        Assertions.assertThat(recordedRequest.getPath()).startsWith(pathPrefix);
     }
 
 
@@ -190,4 +324,3 @@ public class UserSignupIntegTest {
         return objectMapper.writeValueAsString(o);
     }
 }
-

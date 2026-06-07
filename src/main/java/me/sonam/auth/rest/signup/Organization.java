@@ -71,4 +71,5 @@ public class Organization {
     public void setCreatorUserId(UUID creatorUserId) {
         this.creatorUserId = creatorUserId;
     }
+
 }

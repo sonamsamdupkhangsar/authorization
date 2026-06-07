@@ -26,6 +26,8 @@ public class UserSignup {
 
     private boolean active; //this field is used to activate a user using the admin
 
+    private String activationHost;
+
     public UserSignup() {
 
     }
@@ -115,5 +117,13 @@ public class UserSignup {
 
     public void setOrganization(String organization) {
         this.organization = organization;
+    }
+
+    public String getActivationHost() {
+        return activationHost;
+    }
+
+    public void setActivationHost(String activationHost) {
+        this.activationHost = activationHost;
     }
 }

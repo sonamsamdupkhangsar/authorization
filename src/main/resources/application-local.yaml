@@ -6,6 +6,23 @@ POSTGRES_PASSWORD: test
 POSTGRES_DBNAME: authorization
 POSTGRES_SERVICE: localhost:5432
 DB_SSLMODE: disable
+AUTH_DB_MAX_POOL_SIZE: 2
+TENANT_AUTH_DB_MAX_POOL_SIZE: 2
+
+BUSINESS1_AUTH_DB_URL: jdbc:postgresql://localhost:5432/business1auth
+BUSINESS1_AUTH_DB_USERNAME: test
+BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF: business1-db-password
+BUSINESS1_AUTH_DB_DRIVER: org.postgresql.Driver
+
+BUSINESS2_AUTH_DB_URL: jdbc:postgresql://localhost:5432/business2auth
+BUSINESS2_AUTH_DB_USERNAME: test
+BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF: business2-db-password
+BUSINESS2_AUTH_DB_DRIVER: org.postgresql.Driver
+
+FREE_AUTH_DB_URL: jdbc:postgresql://localhost:5432/freeauth
+FREE_AUTH_DB_USERNAME: test
+FREE_AUTH_DB_PASSWORD_SECRET_REF: free-db-password
+FREE_AUTH_DB_DRIVER: org.postgresql.Driver
 
 EUREKA_HOST: localhost:8761
 EUREKA_USER: test
@@ -18,6 +35,11 @@ eureka:
     serviceUrl:
       defaultZone: http://${EUREKA_USER}:${EUREKA_PASSWORD}@${EUREKA_HOST}/eureka
 
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: ${AUTH_DB_MAX_POOL_SIZE}
+
 APPLICATION_REST_SERVICE: http://application-rest-service
 AUTHENTICATION_REST_SERVICE: http://authentication-rest-service
 USER_REST_SERVICE: http://user-rest-service
@@ -29,17 +51,111 @@ ROLE_REST_SERVICE: http://role-rest-service
 SETTING_REST_SERVICE: http://setting-rest-service
 
 # ISSUER_URL here is used for pulling the public certs from authorization-server for token validation
-ISSUER_ADDRESS: http://api-gateway:9001
-ISSUER_URI: ${ISSUER_ADDRESS}/issuer
+ISSUER_ADDRESS: http://platform.openissuer.test:9001
+ISSUER_URI: ${ISSUER_ADDRESS}
 
 
 REQUEST_SCOPES: message.read message.write
 BASE64_CLIENT_ID_SECRET: b2F1dGgtY2xpZW50Om9hdXRoLXNlY3JldA==
 
 client-app: http://10.0.0.28:3000
-changePassword: /issuer/forgot/changePassword #@{/forgot/changePassword} use for local
+changePassword: /forgot/changePassword #@{/forgot/changePassword} use for local
 allowedOrigins: http://api-gateway, 10.0.0.28, localhost, 127.0.0.1, api-gateway, 10.0.0.28:8080, 127.0.0.1, *,
 
 NEW_RELIC_ENABLED: false
-authzmanager: http://api-gateway:9093
+authzmanager: http://platform.admin.openissuer.test:9093
 AUTHZMANAGER_INITIAL_SECRET: hello
+
+auth-server:
+  root: http://authorization-server
+
+authorization-server:
+  multitenancy:
+    default-hosts:
+      - localhost
+      - 127.0.0.1
+      - authorization-server
+      - platform.openissuer.test
+    tenants:
+      free:
+        hosts:
+          - free.openissuer.test
+        url: ${FREE_AUTH_DB_URL}
+        username: ${FREE_AUTH_DB_USERNAME}
+        password-secret-ref: ${FREE_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${FREE_AUTH_DB_DRIVER}
+        maximum-pool-size: ${TENANT_AUTH_DB_MAX_POOL_SIZE}
+      business1:
+        hosts:
+          - business1.openissuer.test
+        url: ${BUSINESS1_AUTH_DB_URL}
+        username: ${BUSINESS1_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS1_AUTH_DB_DRIVER}
+        maximum-pool-size: ${TENANT_AUTH_DB_MAX_POOL_SIZE}
+      business2:
+        hosts:
+          - business2.openissuer.test
+        url: ${BUSINESS2_AUTH_DB_URL}
+        username: ${BUSINESS2_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER}
+        maximum-pool-size: ${TENANT_AUTH_DB_MAX_POOL_SIZE}
+  signup-policy:
+    hosts:
+      free.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: true
+        allowed-email-domains:
+          - "*"
+      business1.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business1.com
+      business2.openissuer.test:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business2.com
+tenant-secrets:
+  business1-db-password: test
+  business2-db-password: test
+  free-db-password: test
+
+organization-seed:
+  delay-seconds: 30
+  users:
+    - firstName: Business
+      lastName: One
+      email: owner1@openissuer.test
+      authenticationId: owner1@openissuer.test
+      password: owner1-secret
+      active: true
+    - firstName: Business
+      lastName: One User
+      email: business1user@openissuer.test
+      authenticationId: business1user@openissuer.test
+      password: business1user-secret
+      active: true
+      organizationSubdomain: business1.openissuer.test
+    - firstName: Business
+      lastName: Two
+      email: owner2@openissuer.test
+      authenticationId: owner2@openissuer.test
+      password: owner2-secret
+      active: true
+    - firstName: Business
+      lastName: Two User
+      email: business2user@openissuer.test
+      authenticationId: business2user@openissuer.test
+      password: business2user-secret
+      active: true
+      organizationSubdomain: business2.openissuer.test
+  organizations:
+    - name: Business 1
+      creatorAuthenticationId: owner1@openissuer.test
+      subdomain: business1.openissuer.test
+    - name: Business 2
+      creatorAuthenticationId: owner2@openissuer.test
+      subdomain: business2.openissuer.test

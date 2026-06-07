@@ -13,6 +13,7 @@ public class Authorization {
     @Id
     @Column
     private String id;
+    private String tenantId;
     private String registeredClientId;
     private String principalName;
     private String authorizationGrantType;
@@ -69,6 +70,14 @@ public class Authorization {
 
     public void setRegisteredClientId(String registeredClientId) {
         this.registeredClientId = registeredClientId;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 
     public String getPrincipalName() {
@@ -264,4 +273,3 @@ public class Authorization {
     }
 
 }
-

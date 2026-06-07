@@ -10,7 +10,6 @@ import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
-import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.jackson.OAuth2AuthorizationServerJacksonModule;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
@@ -26,7 +25,7 @@ import java.time.Instant;
 import java.util.*;
 
 @Component
-public class JpaRegisteredClientRepository implements RegisteredClientRepository {
+public class JpaRegisteredClientRepository {
     private static final Logger LOG = LoggerFactory.getLogger(JpaRegisteredClientRepository.class);
     private final ClientRepository clientRepository;
     private JsonMapper jsonMapper;
@@ -42,24 +41,27 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
                 .build();
     }
 
-    @Override
     public void save(RegisteredClient registeredClient) {
-        Assert.notNull(registeredClient, "registeredClient cannot be null");
-        this.clientRepository.save(toEntity(registeredClient));
+        save(registeredClient, "default");
     }
 
-    @Override
+    public void save(RegisteredClient registeredClient, String tenantId) {
+        Assert.notNull(registeredClient, "registeredClient cannot be null");
+        this.clientRepository.save(toEntity(registeredClient, tenantId));
+    }
+
     public RegisteredClient findById(String id) {
         LOG.info("findBy id: {}", id);
         Assert.hasText(id, "id cannot be empty");
         return this.clientRepository.findById(id).map(this::toObject).orElse(null);
     }
 
-    @Override
     public RegisteredClient findByClientId(String clientId) {
         LOG.info("findByClientId: {}", clientId);
         Assert.hasText(clientId, "clientId cannot be empty");
-        return this.clientRepository.findByClientId(clientId).map(this::toObject).orElse(null);
+        return this.clientRepository.findByClientId(clientId)
+                .map(this::toObject)
+                .orElse(null);
     }
 
     private RegisteredClient toObject(Client client) {
@@ -99,7 +101,7 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
         return builder.build();
     }
 
-    private Client toEntity(RegisteredClient registeredClient) {
+    private Client toEntity(RegisteredClient registeredClient, String tenantId) {
         List<String> clientAuthenticationMethods = new ArrayList<>(registeredClient.getClientAuthenticationMethods().size());
         registeredClient.getClientAuthenticationMethods().forEach(clientAuthenticationMethod ->
                 clientAuthenticationMethods.add(clientAuthenticationMethod.getValue()));
@@ -110,6 +112,7 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
 
         Client entity = new Client();
         entity.setId(registeredClient.getId());
+        entity.setTenantId(tenantId);
         entity.setClientId(registeredClient.getClientId());
         entity.setClientIdIssuedAt(registeredClient.getClientIdIssuedAt());
         entity.setClientSecret(registeredClient.getClientSecret());
@@ -193,6 +196,12 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
         if (secondsSinceEpochInExponential == null || secondsSinceEpochInExponential.isEmpty()) {
             LOG.info("secondsSinceEpochInExponential is null/empty: {}", secondsSinceEpochInExponential);
             return null;
+        }
+
+        if (secondsSinceEpochInExponential.contains("-") || secondsSinceEpochInExponential.contains("T")) {
+            Instant instant = Instant.parse(secondsSinceEpochInExponential);
+            LOG.info("parsed iso instant: {}", instant);
+            return instant;
         }
 
         long secondsSinceEpoch = Double.valueOf(secondsSinceEpochInExponential).longValue();
@@ -318,4 +327,3 @@ public class JpaRegisteredClientRepository implements RegisteredClientRepository
         return new ClientAuthenticationMethod(clientAuthenticationMethod);      // Custom client authentication method
     }
 }
-

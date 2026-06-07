@@ -6,6 +6,8 @@
 replicaCount: 1
 
 image:
+  repository: ghcr.io/sonamsamdupkhangsar/authorization
+  tag: multitenancy
   pullPolicy: Always
 
 imagePullSecrets:
@@ -15,12 +17,25 @@ fullnameOverride: "authorization-server"
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: false
+  create: true
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name:
+
+rbac:
+  create: true
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - services
+        - endpoints
+      verbs:
+        - get
+        - list
+        - watch
 
 podSecurityContext: {}
 # fsGroup: 2000
@@ -43,7 +58,7 @@ istio:
   enabled: false
 
 ingress:
-  enabled: true
+  enabled: false
   ingressClass: nginx
   hosts:
     - host: authorization.sonam.cloud
@@ -55,17 +70,52 @@ ingress:
       hosts:
         - "*.sonam.cloud"
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-#   memory: 128Mi
+httproute:
+  gatewayName: "shared-tls-gateway"
+  namespace: "main"
+  exactPaths:
+    - "/"
+    - "/accounts/active"
+    - "/accounts/lock"
+    - "/accounts/lock/secret"
+    - "/accounts/lock/email"
+    - "/accounts/lock/email/secret"
+  pathPrefixes:
+    - "/oauth2"
+    - "/login"
+    - "/logout"
+    - "/signup"
+    - "/password"
+    - "/username"
+    - "/loginHelp"
+    - "/userinfo"
+    - "/.well-known"
+    - "/issuer"
+  hostRoutes:
+    - name: platform
+      hostname: "platform.openissuer.com"
+      httpsListenerName: "https-platform"
+      httpListenerName: "http-platform"
+    - name: business1
+      hostname: "business1.openissuer.com"
+      httpsListenerName: "https-business1"
+      httpListenerName: "http-business1"
+    - name: business2
+      hostname: "business2.openissuer.com"
+      httpsListenerName: "https-business2"
+      httpListenerName: "http-business2"
+    - name: free
+      hostname: "free.openissuer.com"
+      httpsListenerName: "https-free"
+      httpListenerName: "http-free"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1000m
+    memory: 1536Mi
 
 #nodeSelector:
 #  node.kubernetes.io/instance-type: s-2vcpu-4gb
@@ -74,11 +124,17 @@ affinity: {}
 
 postgres:
   port: "5432"
-  service: authorization-minimal-cluster
-  secretfile: sonam.authorization-minimal-cluster.credentials.postgresql.acid.zalan.do
+  service: authorization-db-rw
+  secretfile: authorization-db-app
   dbname: authorization
 
 envs:
+  - name: JAVA_TOOL_OPTIONS
+    value: "-XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=25"
+  - name: SPRING_PROFILES_ACTIVE
+    value: kubernetes
+  - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_NAMESPACES_0
+    value: main
   - name: SPRING_AUTH_SERVER_PORT
     value: 8080
   - name: APPLICATION_REST_SERVICE
@@ -104,25 +160,62 @@ envs:
   - name: TOKEN_MEDIATOR
     value: http://oauth2-token-mediator
   - name: ISSUER_URI
-    value: https://authorization.sonam.cloud/issuer
+    value: https://platform.openissuer.com
+  - name: ISSUER_ADDRESS
+    value: https://platform.openissuer.com
   - name: ALLOWED_ORIGINS
-    value: https://api-gateway.sonam.cloud
+    value: https://platform.openissuer.com
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_0
+    value: localhost
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_1
+    value: 127.0.0.1
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_2
+    value: authorization-server
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_3
+    value: platform.openissuer.com
   - name: NEW_RELIC_ENABLED
     value: false
+  - name: BUSINESS1_AUTH_DB_URL
+    value: jdbc:postgresql://business1-auth-db-rw/business1auth
+  - name: BUSINESS1_AUTH_DB_USERNAME
+    value: business1auth
+  - name: BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF
+    value: business1-db-password
+  - name: BUSINESS2_AUTH_DB_URL
+    value: jdbc:postgresql://business2-auth-db-rw/business2auth
+  - name: BUSINESS2_AUTH_DB_USERNAME
+    value: business2auth
+  - name: BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF
+    value: business2-db-password
+  - name: FREE_AUTH_DB_URL
+    value: jdbc:postgresql://free-auth-db-rw/freeauth
+  - name: FREE_AUTH_DB_USERNAME
+    value: freeauth
+  - name: FREE_AUTH_DB_PASSWORD_SECRET_REF
+    value: free-db-password
 
 health:
+  startup:
+    path: /api/health/liveness
+    port: 8080
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 90
+    timeoutSeconds: 5
   liveness:
-    path: /issuer/api/health/liveness
+    path: /api/health/liveness
     port: 8080
-    initialDelaySeconds: 60
-    periodSeconds: 5
+    initialDelaySeconds: 30
+    periodSeconds: 10
     failureThreshold: 5
+    timeoutSeconds: 5
   readiness:
-    path: /issuer/api/health/readiness
+    path: /api/health/readiness
     port: 8080
-    initialDelaySeconds: 60
-    periodSeconds: 5
+    initialDelaySeconds: 30
+    periodSeconds: 10
     failureThreshold: 5
+    timeoutSeconds: 5
 
 secretFiles:
   - file: service-service-client-credential-flow-secret
@@ -133,7 +226,20 @@ secretFiles:
         name: REQUEST_SCOPES
       - key: authzmanagerInitialSecret
         name: AUTHZMANAGER_INITIAL_SECRET
-  - file: newrelic-secret
+  - file: business1-auth-db-app
     keys:
-      - key: newrelic.license_key
-        name: NEW_RELIC_LICENSE_KEY
+      - key: password
+        name: TENANT_SECRET_BUSINESS1_DB_PASSWORD
+  - file: business2-auth-db-app
+    keys:
+      - key: password
+        name: TENANT_SECRET_BUSINESS2_DB_PASSWORD
+  - file: free-auth-db-app
+    keys:
+      - key: password
+        name: TENANT_SECRET_FREE_DB_PASSWORD
+  - file: authorization-seed
+    optional: true
+    keys:
+      - key: SPRING_APPLICATION_JSON
+        name: SPRING_APPLICATION_JSON

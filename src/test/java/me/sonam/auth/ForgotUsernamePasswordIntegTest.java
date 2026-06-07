@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 public class ForgotUsernamePasswordIntegTest {
     private static final Logger LOG = LoggerFactory.getLogger(ForgotUsernamePasswordIntegTest.class);
+    private static final String TOKEN_PATH_PREFIX = "/oauth2/token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -126,7 +127,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith(TOKEN_PATH_PREFIX);
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
@@ -155,7 +156,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith(TOKEN_PATH_PREFIX);
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
@@ -180,7 +181,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("serve the queued mock response for email username http callout");
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith(TOKEN_PATH_PREFIX);
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");
@@ -209,7 +210,7 @@ public class ForgotUsernamePasswordIntegTest {
 
         RecordedRequest request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("POST");
-        assertThat(request.getPath()).startsWith("/issuer/oauth2/token");
+        assertThat(request.getPath()).startsWith(TOKEN_PATH_PREFIX);
 
         request = mockWebServer.takeRequest();
         assertThat(request.getMethod()).isEqualTo("PUT");

@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
@@ -60,6 +62,8 @@ public class BeanConfig {
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
     private String userExistsInOrganizationEndpoint;
+    @Value("${organization-rest-service.root}${organization-rest-service.organizationBySubdomain}")
+    private String organizationBySubdomainEndpoint;
 
     @Value("${organization-rest-service.context}")
     private String organizationEndpoint;
@@ -126,7 +130,8 @@ public class BeanConfig {
 
     @Bean
     public OrganizationWebClient organizationWebClient() {
-        return new OrganizationWebClient(webClientBuilder, organizationEndpoint, userExistsInOrganizationEndpoint);
+        return new OrganizationWebClient(webClientBuilder, organizationEndpoint,
+                userExistsInOrganizationEndpoint, organizationBySubdomainEndpoint);
     }
 
     @Bean
@@ -137,5 +142,14 @@ public class BeanConfig {
     @Bean
     public SettingWebClient settingWebClient() {
         return new SettingWebClient(webClientBuilder, userSettingEndpoint, defaultOrganizationSettingEndpoint);
+    }
+
+    @Bean
+    public TaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
+        taskScheduler.setPoolSize(1);
+        taskScheduler.setThreadNamePrefix("organization-seed-");
+        taskScheduler.initialize();
+        return taskScheduler;
     }
 }

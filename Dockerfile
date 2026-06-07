@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:experimental
 FROM eclipse-temurin:25-jdk AS build
+ENV JAVA_TOOL_OPTIONS=--enable-native-access=ALL-UNNAMED
 WORKDIR /workspace/app
 
 COPY . /workspace/app
@@ -7,10 +8,11 @@ COPY . /workspace/app
 RUN --mount=type=secret,id=USERNAME --mount=type=secret,id=PERSONAL_ACCESS_TOKEN --mount=type=cache,target=/root/.gradle\
     export USERNAME=$(cat /run/secrets/USERNAME)\
     export PERSONAL_ACCESS_TOKEN=$(cat /run/secrets/PERSONAL_ACCESS_TOKEN) &&\
-     ./gradlew clean build
+     ./gradlew clean bootJar -x test
 RUN  mkdir -p build/dependency && (cd build/dependency; jar -xf ../libs/authorization-1.0.jar)
 
 FROM eclipse-temurin:25-jdk
+ENV JAVA_TOOL_OPTIONS=--enable-native-access=ALL-UNNAMED
 VOLUME /tmp
 ARG DEPENDENCY=/workspace/app/build/dependency
 

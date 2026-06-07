@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Spring Authorization sign in</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
     <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
 </head>
@@ -81,6 +82,7 @@
 <div class="container">
 
     <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
+        <input type="hidden" name="client_id" th:if="${clientId}" th:value="${clientId}">
         <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
             <span id="userIdCheckSpan"></span>
         </div>
@@ -104,10 +106,10 @@
             <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
         <div class="mt-5">
-            <div class="mt-2"><a href="/issuer/password" style="color: dimgrey !important;">Forgot password?</a></div>
-            <div class="mt-2"><a href="/issuer/username" style="color: dimgrey !important;">Forgot username?</a></div>
-            <div class="mt-2"><a href="/issuer/accounts/active" style="color: dimgrey !important;">Email activation link</a></div>
-            <div class="mt-2"><a href="/issuer/accounts/lock" style="color: dimgrey !important;">Unlock account</a></div>
+            <div class="mt-2"><a href="/password" style="color: dimgrey !important;">Forgot password?</a></div>
+            <div class="mt-2"><a href="/username" style="color: dimgrey !important;">Forgot username?</a></div>
+            <div class="mt-2"><a href="/accounts/active" style="color: dimgrey !important;">Email activation link</a></div>
+            <div class="mt-2"><a href="/accounts/lock" style="color: dimgrey !important;">Unlock account</a></div>
         </div>
         <div class="row justify-content-around mt-3">
             <div class="col"></div>

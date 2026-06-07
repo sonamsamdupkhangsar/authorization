@@ -5,11 +5,11 @@ spring:
       enabled: true
       discovery:
         namespaces:
-           - backend
+           - main
         include-not-ready-addresses: true
 eureka:
   client:
       enabled: false
 
 allowedOrigins: ${ALLOWED_ORIGINS}  #localhost
-authzmanager: https://authzmanager.sonam.cloud
+authzmanager: https://platform.admin.openissuer.com

@@ -1,7 +1,6 @@
 package me.sonam.auth.config;
 
 import me.sonam.auth.service.OidcUserInfoService;
-import me.sonam.auth.util.UserId;
 import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.SettingWebClient;
 import org.slf4j.Logger;
@@ -16,10 +15,12 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContextHolder;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 
 import java.util.Set;
+import java.net.URI;
 import java.util.stream.Collectors;
 
 
@@ -47,6 +48,7 @@ public class IdTokenCustomizerConfig {
                 context.getClaims().claims(claims -> {
                     LOG.info("add all claims: {}", userInfo.getClaims());
                     claims.putAll(userInfo.getClaims());
+                    claims.put("tenant_id", currentHost());
                     claims.put("profile", "");
                     if (userInfo.getPicture() != null && !userInfo.getPicture().isEmpty()) {
                         LOG.debug("set picture {}", userInfo.getPicture());
@@ -62,11 +64,10 @@ public class IdTokenCustomizerConfig {
                 LOG.info("principal.name: {}", context.getPrincipal().getName());
 
                 if (context.getPrincipal() instanceof  UsernamePasswordAuthenticationToken) {
-                    UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = context.getPrincipal();
-                    UserId userId = (UserId) usernamePasswordAuthenticationToken.getPrincipal();
+                    OidcUserInfo userInfo = userInfoService.loadUser(context.getPrincipal().getName());
 
                     LOG.info("claims: {}", context.getClaims());
-                    context.getClaims().claim("userId", userId.getUserId());
+                    context.getClaims().claim("userId", userInfo.getClaim("userId"));
 
 
                 }
@@ -82,10 +83,18 @@ public class IdTokenCustomizerConfig {
                     LOG.info("add roles in claim map");
                     context.getClaims().claim("userRole", authorities);
                 }
+                context.getClaims().claim("tenant_id", currentHost());
 
 
             }
         };
+    }
+
+    private String currentHost() {
+        if (AuthorizationServerContextHolder.getContext() == null || AuthorizationServerContextHolder.getContext().getIssuer() == null) {
+            return "default";
+        }
+        return URI.create(AuthorizationServerContextHolder.getContext().getIssuer()).getHost();
     }
 
 }

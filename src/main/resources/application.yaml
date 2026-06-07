@@ -1,7 +1,5 @@
 server:
   port: ${AUTH_SERVER_PORT}
-  servlet:
-    context-path: /issuer
 
 logging:
   level:
@@ -43,6 +41,51 @@ spring:
   authorization-server:
     forward-cookies: false
 
+authorization-server:
+  multitenancy:
+    default-hosts:
+      - localhost
+      - 127.0.0.1
+      - authorization-server
+    tenants:
+      free:
+        hosts:
+          - free.openissuer.com
+        url: ${FREE_AUTH_DB_URL}
+        username: ${FREE_AUTH_DB_USERNAME}
+        password-secret-ref: ${FREE_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${FREE_AUTH_DB_DRIVER:org.postgresql.Driver}
+      business1:
+        hosts:
+          - business1.openissuer.com
+        url: ${BUSINESS1_AUTH_DB_URL}
+        username: ${BUSINESS1_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS1_AUTH_DB_DRIVER:org.postgresql.Driver}
+      business2:
+        hosts:
+          - business2.openissuer.com
+        url: ${BUSINESS2_AUTH_DB_URL}
+        username: ${BUSINESS2_AUTH_DB_USERNAME}
+        password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER:org.postgresql.Driver}
+  signup-policy:
+    hosts:
+      free.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: true
+        allowed-email-domains:
+          - "*"
+      business1.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business1.com
+      business2.openissuer.com:
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - business2.com
 application-rest-service:
   root: ${APPLICATION_REST_SERVICE}
   client-role: /applications/clients/{clientId}/users/{authenticationId}
@@ -64,6 +107,7 @@ organization-rest-service:
   root: ${ORGANIZATION_REST_SERVICE}
   context: ${organization-rest-service.root}/organizations
   userExistsInOrganization: /organizations/{organizationId}/users/{userId}
+  organizationBySubdomain: /organizations/subdomain/{subdomain}
 
 account-rest-service:
   root: ${ACCOUNT_REST_SERVICE}
@@ -82,11 +126,11 @@ account-rest-service:
 # this is used for getting accesstoken by header filter
 auth-server:
   root: http://authorization-server
-  context-path: /issuer
+  context-path:
   oauth2token:
     path: /oauth2/token
     grantType: client_credentials
-    issuerTokenPath: /issuer/oauth2/token
+    issuerTokenPath: /oauth2/token
 
 attempt-rest-service:
   root: ${ATTEMPT_REST_SERVICE}
@@ -122,6 +166,7 @@ requestFilters:
 # this is for create authzmanager client if it is not present
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
+authzmanager-admin-label: admin
 tokenExpireSeconds: 180
 
 authIdNotExist: authentication does not exist with authId
@@ -132,3 +177,7 @@ maxClients: 5
 maxOrganizations: 1
 maxUserPerOrganization: 5
 maxRoles: 5
+
+organization-seed:
+  delay-seconds: 120
+  organizations: []

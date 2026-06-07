@@ -3,7 +3,6 @@ package me.sonam.auth.service;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
-import me.sonam.auth.service.exception.AuthorizationException;
 import me.sonam.auth.service.exception.BadCredentialsException;
 import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
@@ -57,9 +56,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
     @Autowired
     private final UserWebClient userWebClient;
     @Autowired
-    private AccountWebClient accountWebClient;
+    private HostOrganizationResolver hostOrganizationResolver;
     @Autowired
-    private SettingWebClient settingWebClient;
+    private AccountWebClient accountWebClient;
     @Autowired
     private RoleWebClient roleWebClient;
 
@@ -73,7 +72,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                  OrganizationWebClient organizationWebClient,
                                  AuthenticationWebClient authenticationWebClient,
                                  UserWebClient userWebClient, AccountWebClient accountWebClient,
-                                 SettingWebClient settingWebClient, RoleWebClient roleWebClient) {
+                                 RoleWebClient roleWebClient) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
         this.loginAttemptWebClient = loginAttemptWebClient;
@@ -81,10 +80,11 @@ public class AuthenticationCallout implements AuthenticationProvider {
         this.authenticationWebClient = authenticationWebClient;
         this.userWebClient = userWebClient;
         this.accountWebClient = accountWebClient;
-        this.settingWebClient = settingWebClient;
         this.roleWebClient = roleWebClient;
     }
 
+    // Loads the saved OAuth client context, applies account lock checks, and then routes login
+    // through the new host-aware user/client authorization flow.
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         LOG.info("authenticate with username and password");
@@ -112,6 +112,18 @@ public class AuthenticationCallout implements AuthenticationProvider {
              throw new BadCredentialsException("Please go back to your main application that brought you here to this sign-in page");
          }
 
+        /*
+         * Capture the request host on the servlet thread before entering the reactive chain.
+         *
+         * Example:
+         *   login request host = business2.admin.openissuer.test
+         *   currentHost        = business2.openissuer.test
+         *
+         * That normalized host is later used to resolve the host-bound organization for
+         * authzmanager login checks.
+         */
+        final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
+        LOG.info("captured current host '{}' for authenticationId {}", currentHost, authenticationId);
 
          return accountWebClient.isAccountLocked(authenticationId)
                  .flatMap(aBoolean -> {
@@ -148,12 +160,14 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
                     UUID clientUuidId = UUID.fromString(registeredClient.getId());
                     LOG.info("got clientUuid: {}", clientUuidId);
-                    return checkUserAndClient(authentication, clientUuidId);
+                    return checkUserAndClient(authentication, clientUuidId, currentHost);
                 })
                  .block();
     }
 
-    private Mono<UsernamePasswordAuthenticationToken> checkUserAndClient(Authentication authentication, UUID clientId) {
+    // Resolves the user id first, enforces any host-bound organization boundary, and then
+    // continues with either authzmanager-specific authorization or the existing client-org check.
+    private Mono<UsernamePasswordAuthenticationToken> checkUserAndClient(Authentication authentication, UUID clientId, String currentHost) {
         final String authenticationId = authentication.getName();
         LOG.info("check user and client relationship");
 
@@ -180,8 +194,12 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
         }
-        ).flatMap(userId -> isClientAuthzManager(userId, clientId, authentication)
+        ).flatMap(userId ->
+                // Blocks cross-tenant login before issuing tokens for a host-bound issuer.
+                enforceHostOrganizationBoundary(userId, clientId, currentHost)
+                .then(isClientAuthzManager(userId, clientId, authentication, currentHost)
                 .switchIfEmpty(checkClientInOrganization(authentication, userId, clientId))
+                )
 
                     .onErrorResume(throwable -> {
                         LOG.debug("exception occurred when going thru client organization check", throwable);
@@ -218,23 +236,39 @@ public class AuthenticationCallout implements AuthenticationProvider {
      * @param authentication authentication object
      * @return if authentication is success or fail object
      */
-    private Mono<UsernamePasswordAuthenticationToken> isClientAuthzManager(final UUID userId, final UUID clientId, final Authentication authentication) {
+    private Mono<UsernamePasswordAuthenticationToken> isClientAuthzManager(final UUID userId, final UUID clientId, final Authentication authentication,
+                                                                          final String currentHost) {
         LOG.info("checking if the clientId: {} is for authzManagerId: {}", clientId, authzManagerId);
 
         if (authzManagerId.equals(clientId)) {
             LOG.info("client is authzManager, authenticate user");
 
-            return settingWebClient.getDefaultOrganization(null, userId)
-                    .switchIfEmpty(Mono.error(new AuthorizationException("No default org found four userId " + userId)))
-                    //.flatMap(uuid -> roleWebClient.setUserAsRoleNameForOrganization(null, "SuperAdmin", userId, uuid).thenReturn(uuid))
-                            .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(null, userId, orgId).zipWith(Mono.just(orgId)))
-                    .flatMap(objects -> {
-                                        if (!objects.getT1()) {
-                                            return Mono.error(new BadCredentialsException("User is not a superadmin in the default orgId: "+ objects.getT2()));
-                                        }
-                                        return Mono.just(objects.getT2()); //return orgId
-                                    }).flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of(
-                                            "authenticationId", authentication.getPrincipal().toString(),
+            /*
+             * Resolve the organization from the normalized host captured at login time.
+             *
+             * Example:
+             *   currentHost        = business2.openissuer.test
+             *   targetOrganization = organization-rest-service row with subdomain business2.openissuer.test
+             *
+             * Authzmanager login is allowed only when the user is SuperAdmin for this
+             * host-bound organization.
+             */
+            Mono<UUID> targetOrganization = resolveDefaultHostOrganization(currentHost, userId)
+                    .switchIfEmpty(Mono.error(new BadCredentialsException(
+                            "This admin site is not associated with your organization")))
+                    .flatMap(organizationId -> roleWebClient.isSuperAdminInOrgId(null, userId, organizationId)
+                            .flatMap(isSuperAdmin -> {
+                                if (isSuperAdmin) {
+                                    return Mono.just(organizationId);
+                                }
+                                LOG.info("user logging is not a super admin");
+                                return Mono.error(new BadCredentialsException(
+                                        "You must be a super admin for this organization to sign in to the admin site"));
+                            }));
+
+            return targetOrganization
+                    .flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of(
+                                    "authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),
                                     "clientId", clientId)));
         }
@@ -244,6 +278,79 @@ public class AuthenticationCallout implements AuthenticationProvider {
         }
     }
 
+    // If the current host is bound to an organization, require the user to belong to that
+    // organization and require normal clients to be associated with the same organization.
+    private Mono<Void> enforceHostOrganizationBoundary(UUID userId, UUID clientId, String currentHost) {
+        return Mono.defer(() -> {
+            String host = currentHost;
+            if (host == null) {
+                return Mono.empty();
+            }
+
+            /*
+             * For tenant issuer hosts, resolve the current host to its organization before
+             * allowing the login to continue.
+             *
+             * Example:
+             *   host               = business1.openissuer.test
+             *   hostOrganizationId = retrieves organization id for Business 1 from organization-rest-service
+             */
+            return resolveDefaultHostOrganization(host, userId)
+                    .switchIfEmpty(Mono.error(new BadCredentialsException("user is not allowed for this issuer")))
+                    .flatMap(hostOrganizationId -> {
+                        LOG.info("enforcing host organization boundary for host {} default organization {}",
+                                host, hostOrganizationId);
+                        if (authzManagerId.equals(clientId)) {
+                            return Mono.<Void>empty();
+                        }
+
+                        // Verify the client is registered to the user's default organization for this issuer host.
+                        boolean clientOrganizationExists = clientOrganizationRepository
+                                .existsByClientIdAndOrganizationId(clientId, hostOrganizationId)
+                                .orElse(false);
+                        if (!clientOrganizationExists) {
+                            return Mono.error(new BadCredentialsException("client organization does not match issuer organization"));
+                        }
+                        return Mono.<Void>empty();
+                    });
+        });
+    }
+
+    // Resolves the first organization bound to the current request host through organization-rest-service.
+    private Mono<UUID> resolveHostOrganization(String host) {
+        return Mono.defer(() -> {
+            if (host == null) {
+                LOG.warn("no current host found while resolving host-bound organization");
+                return Mono.empty();
+            }
+
+            LOG.info("resolving host-bound organization for host {}", host);
+            return organizationWebClient.getOrganizationIdBySubdomain(host)
+                    .doOnNext(organizationId -> LOG.info("resolved host {} to organization {}", host, organizationId))
+                    .switchIfEmpty(Mono.fromRunnable(() ->
+                            LOG.warn("no organization found for host {}", host)).then(Mono.empty()));
+        });
+    }
+
+    private Mono<UUID> resolveDefaultHostOrganization(String host, UUID userId) {
+        return Mono.defer(() -> {
+            if (host == null) {
+                LOG.warn("no current host found while resolving default host-bound organization for user");
+                return Mono.empty();
+            }
+
+            LOG.info("resolving default organization for host {} and user {}", host, userId);
+            return organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(host, userId)
+                    .doOnNext(organizationId -> LOG.info("resolved host {} and user {} to default organization {}",
+                            host, userId, organizationId))
+                    .switchIfEmpty(Mono.fromRunnable(() ->
+                            LOG.warn("default organization for user {} is not valid for host {}", userId, host))
+                            .then(Mono.empty()));
+        });
+    }
+
+    // Preserves the original client-organization login rule for non-authzmanager clients after
+    // the host-bound organization checks have already run.
     private Mono<UsernamePasswordAuthenticationToken> checkClientInOrganization(Authentication authentication, UUID userId, UUID clientId) {
         return Mono.defer(() -> {
             LOG.info("checkClientInOrganization() - checking client exists in clientOrganization");
@@ -271,6 +378,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
         });
     }
 
+    // Keeps this provider scoped to username/password authentication requests.
     @Override
     public boolean supports(Class<?> authentication) {
         return authentication.equals(UsernamePasswordAuthenticationToken.class);

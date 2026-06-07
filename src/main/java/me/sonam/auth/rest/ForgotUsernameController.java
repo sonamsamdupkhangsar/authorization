@@ -1,6 +1,7 @@
 package me.sonam.auth.rest;
 
 import me.sonam.auth.webclient.AccountWebClient;
+import me.sonam.auth.service.HostOrganizationResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -24,11 +25,13 @@ public class ForgotUsernameController {
     private static final Logger LOG = LoggerFactory.getLogger(ForgotUsernameController.class);
 
     private final AccountWebClient accountWebClient;
+    private final HostOrganizationResolver hostOrganizationResolver;
     private final String USERNAME_PAGE = "username";
     private final String EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE = "account/active";
 
-    public ForgotUsernameController(AccountWebClient accountWebClient) {
+    public ForgotUsernameController(AccountWebClient accountWebClient, HostOrganizationResolver hostOrganizationResolver) {
         this.accountWebClient = accountWebClient;
+        this.hostOrganizationResolver = hostOrganizationResolver;
     }
 
     @GetMapping("/loginHelp")
@@ -69,7 +72,8 @@ public class ForgotUsernameController {
     public String handleEmailAccountActivateLink(String emailAddress, Model model) {
         LOG.info("send email account activate link if inactive");
 
-        return accountWebClient.emailAccountActivationLink(emailAddress).doOnNext(s -> {
+        return accountWebClient.emailAccountActivationLink(emailAddress,
+                hostOrganizationResolver.currentHost().orElse(null)).doOnNext(s -> {
             LOG.info("email sent");
             model.addAttribute("message", "email sent successfully, check your email");
         }).onErrorResume(throwable -> {
