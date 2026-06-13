@@ -76,6 +76,7 @@ authorization-server:
       - 127.0.0.1
       - authorization-server
       - platform.openissuer.test
+      - 10.0.0.244
     tenants:
       free:
         hosts:
@@ -124,7 +125,7 @@ tenant-secrets:
   free-db-password: test
 
 organization-seed:
-  delay-seconds: 30
+  delay-seconds: 120
   users:
     - firstName: Business
       lastName: One

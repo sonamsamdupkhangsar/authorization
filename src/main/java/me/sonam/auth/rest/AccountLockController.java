@@ -1,5 +1,9 @@
 package me.sonam.auth.rest;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import me.sonam.auth.service.HostOrganizationResolver;
+import me.sonam.auth.service.LoginReturnContextService;
 import me.sonam.auth.webclient.AccountWebClient;
 import me.sonam.auth.webclient.LoginAttemptWebClient;
 import org.slf4j.Logger;
@@ -33,12 +37,18 @@ public class AccountLockController {
 
     private final LoginAttemptWebClient loginAttemptWebClient;
     private final AccountWebClient accountWebClient;
+    private final LoginReturnContextService loginReturnContextService;
+    private final HostOrganizationResolver hostOrganizationResolver;
     private final String lockAccounnt = "account/lock";
     private final String lockSecret = "account/lock-secret";
 
-    public AccountLockController(AccountWebClient accountWebClient, LoginAttemptWebClient loginAttemptWebClient ) {
+    public AccountLockController(AccountWebClient accountWebClient, LoginAttemptWebClient loginAttemptWebClient,
+                                 LoginReturnContextService loginReturnContextService,
+                                 HostOrganizationResolver hostOrganizationResolver) {
         this.accountWebClient = accountWebClient;
         this.loginAttemptWebClient = loginAttemptWebClient;
+        this.loginReturnContextService = loginReturnContextService;
+        this.hostOrganizationResolver = hostOrganizationResolver;
     }
 
     /**
@@ -47,14 +57,16 @@ public class AccountLockController {
      * @return
      */
     @GetMapping("/accounts/lock")
-    public String getLockAccountPage() {
+    public String getLockAccountPage(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", lockAccounnt);
+        loginReturnContextService.addReturnContext(model, request, response);
         return lockAccounnt;
     }
 
     @GetMapping("/accounts/lock/secret")
-    public String getLockAccountWithSecretPage() {
+    public String getLockAccountWithSecretPage(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", lockAccounnt);
+        loginReturnContextService.addReturnContext(model, request, response);
         return lockSecret;
     }
 
@@ -68,16 +80,18 @@ public class AccountLockController {
      * @return
      */
     @PostMapping("/accounts/lock/email")
-    public Mono<String> emailUserToUnLockAccount(String email, Model model) {
+    public Mono<String> emailUserToUnLockAccount(String email, Model model,
+                                                 HttpServletRequest request, HttpServletResponse response) {
         LOG.info("email secret to unlock account for email: {}", email);
+        loginReturnContextService.addReturnContext(model, request, response);
 
-        return accountWebClient.emailSecretForAccountUnlock(email).flatMap(s -> {
+        return accountWebClient.emailSecretForAccountUnlock(email,
+                hostOrganizationResolver.currentHost().orElse(null)).flatMap(s -> {
             LOG.info("Email has been sent with a secret to unlock the user account");
             model.addAttribute("message", "Check the associated email to unlock account.");
             return Mono.just(lockAccounnt);
         }).onErrorResume(throwable -> {
-            LOG.error("error occurred in sending email for unlocking account with secret {}", throwable.getMessage());
-            LOG.debug("exception is ", throwable);
+            logAccountRestError("error occurred in sending email for unlocking account with secret", throwable);
             setErrorInModel(throwable, model, "error on calling emailSecretForAccountUnlock");
             return Mono.just(lockAccounnt);
         });
@@ -89,8 +103,10 @@ public class AccountLockController {
      * which contains the explanation for the secret (UNLOCK_ACCOUNT).
      */
     @PostMapping("/accounts/lock/email/secret")
-    public Mono<String> unLockAccount(String email, String secret, Model model) {
+    public Mono<String> unLockAccount(String email, String secret, Model model,
+                                      HttpServletRequest request, HttpServletResponse response) {
         LOG.info("unlock account with email and secret");
+        loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.unLockAccount(email, secret).flatMap(map -> {
             LOG.info("The account has been successfully unlocked, response: {}", map);
@@ -111,18 +127,27 @@ public class AccountLockController {
                     new ParameterizedTypeReference<>() {});
 
             if (map != null) {
-                LOG.error("{}: {}", defaultErrMessage, map.get("error"));
+                logAccountRestError(defaultErrMessage + ": " + map.get("error"), throwable);
 
                 model.addAttribute("error", map.get("error"));
             }
             else {
-                LOG.error("map is null on response for throwable", throwable);
+                logAccountRestError("map is null on response for throwable", throwable);
                 model.addAttribute("error", defaultErrMessage + throwable.getMessage());
             }
-            LOG.error("{}: {}", defaultErrMessage, throwable.getMessage());
         } else {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
+        }
+    }
+
+    private void logAccountRestError(String message, Throwable throwable) {
+        if (throwable instanceof WebClientResponseException webClientResponseException
+                && webClientResponseException.getStatusCode().value() == 400) {
+            LOG.warn("{}: {}", message, webClientResponseException.getResponseBodyAsString());
+        }
+        else {
+            LOG.error(message, throwable);
         }
     }
 

@@ -1,5 +1,8 @@
 package me.sonam.auth.rest;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import me.sonam.auth.service.LoginReturnContextService;
 import me.sonam.auth.webclient.AccountWebClient;
 import me.sonam.auth.service.HostOrganizationResolver;
 import org.slf4j.Logger;
@@ -26,30 +29,37 @@ public class ForgotUsernameController {
 
     private final AccountWebClient accountWebClient;
     private final HostOrganizationResolver hostOrganizationResolver;
+    private final LoginReturnContextService loginReturnContextService;
     private final String USERNAME_PAGE = "username";
     private final String EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE = "account/active";
 
-    public ForgotUsernameController(AccountWebClient accountWebClient, HostOrganizationResolver hostOrganizationResolver) {
+    public ForgotUsernameController(AccountWebClient accountWebClient, HostOrganizationResolver hostOrganizationResolver,
+                                    LoginReturnContextService loginReturnContextService) {
         this.accountWebClient = accountWebClient;
         this.hostOrganizationResolver = hostOrganizationResolver;
+        this.loginReturnContextService = loginReturnContextService;
     }
 
     @GetMapping("/loginHelp")
-    public String getLoginHelp() {
+    public String getLoginHelp(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("return login help page");
+        loginReturnContextService.addReturnContext(model, request, response);
         return "loginHelp";
     }
 
 
     @GetMapping("/username")
-    public String forgotUsername() {
+    public String forgotUsername(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning forgotUsername");
+        loginReturnContextService.addReturnContext(model, request, response);
         return USERNAME_PAGE;
     }
 
     @PostMapping("/username")
-    public Mono<String> emailUsername(String emailAddress, Model model) {
+    public Mono<String> emailUsername(String emailAddress, Model model,
+                                      HttpServletRequest request, HttpServletResponse response) {
         LOG.info("email username for email: {}", emailAddress);
+        loginReturnContextService.addReturnContext(model, request, response);
 
       return  accountWebClient.emailUsername(emailAddress).flatMap(s -> {
                 LOG.info("add message attribute");
@@ -62,15 +72,18 @@ public class ForgotUsernameController {
     }
 
     @GetMapping("/accounts/active")
-    public String emailAccountActivateLink() {
+    public String emailAccountActivateLink(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning emailAccountActivateLink page");
+        loginReturnContextService.addReturnContext(model, request, response);
 
         return EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE;
     }
 
     @PostMapping("/accounts/active")
-    public String handleEmailAccountActivateLink(String emailAddress, Model model) {
+    public String handleEmailAccountActivateLink(String emailAddress, Model model,
+                                                HttpServletRequest request, HttpServletResponse response) {
         LOG.info("send email account activate link if inactive");
+        loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.emailAccountActivationLink(emailAddress,
                 hostOrganizationResolver.currentHost().orElse(null)).doOnNext(s -> {
@@ -89,18 +102,27 @@ public class ForgotUsernameController {
                     new ParameterizedTypeReference<>() {});
 
             if (map != null) {
-                LOG.error("{}: {}", defaultErrMessage, map.get("error"));
+                logAccountRestError(defaultErrMessage + ": " + map.get("error"), throwable);
 
                 model.addAttribute("error", map.get("error"));
             }
             else {
-                LOG.error("map is null on response for throwable", throwable);
+                logAccountRestError("map is null on response for throwable", throwable);
                 model.addAttribute("error", defaultErrMessage + throwable.getMessage());
             }
-            LOG.error("{}: {}", defaultErrMessage, throwable.getMessage());
         } else {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
+        }
+    }
+
+    private void logAccountRestError(String message, Throwable throwable) {
+        if (throwable instanceof WebClientResponseException webClientResponseException
+                && webClientResponseException.getStatusCode().value() == 400) {
+            LOG.warn("{}: {}", message, webClientResponseException.getResponseBodyAsString());
+        }
+        else {
+            LOG.error(message, throwable);
         }
     }
 
