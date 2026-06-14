@@ -2,10 +2,13 @@ package me.sonam.auth.rest;
 
 import jakarta.validation.Valid;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.rest.signup.Organization;
 import me.sonam.auth.rest.signup.User;
 import me.sonam.auth.rest.signup.UserSignup;
 import me.sonam.auth.service.HostOrganizationResolver;
+import me.sonam.auth.service.LoginReturnContextService;
 import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
@@ -48,6 +51,8 @@ public class UserSignupController {
     private SignupPolicyService signupPolicyService;
     @Autowired
     private HostOrganizationResolver hostOrganizationResolver;
+    @Autowired
+    private LoginReturnContextService loginReturnContextService;
 
     public UserSignupController(UserWebClient userWebClient) {
         this.userWebClient = userWebClient;
@@ -55,11 +60,12 @@ public class UserSignupController {
 
     // Renders the signup form used by both the public signup subdomain and host-bound signup flows.
     @GetMapping
-    public Mono<String> getSignupForm(Model model) {
+    public Mono<String> getSignupForm(Model model, HttpServletRequest request, HttpServletResponse response) {
         final String PATH = "signupform";
         LOG.info("returning {}", PATH);
 
         model.addAttribute("userSignup", new UserSignup());
+        loginReturnContextService.addReturnContext(model, request, response);
         return Mono.just(PATH);
     }
 
@@ -67,10 +73,12 @@ public class UserSignupController {
     // organization or attaches the user to the organization already bound to the host.
     @PostMapping
     public Mono<String> signupUserFromForm(@Valid @ModelAttribute("userSignup") UserSignup userSignup,
-                                           BindingResult bindingResult, Model model) {
+                                           BindingResult bindingResult, Model model,
+                                           HttpServletRequest request, HttpServletResponse response) {
         final String PATH = "signupform";
         final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
         LOG.info("signing up user: {}", userSignup);
+        loginReturnContextService.addReturnContext(model, request, response);
 
         if (bindingResult.hasErrors()) {
             LOG.info("user didn't enter required fields");

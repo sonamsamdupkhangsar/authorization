@@ -33,6 +33,7 @@
 
 
     <form th:if="${userSignup}" class="form-signin w-100 m-auto" method="post" th:object="${userSignup}" th:action="@{/signup}"  onsubmit='disableButton()'>
+        <input type="hidden" name="returnTo" th:if="${returnTo}" th:value="${returnTo}">
         <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
             Login failed. <span th:text="${errorMsg}"></span>.
         </div>
@@ -82,7 +83,8 @@
             <button id="submitButton" class="w-100 btn btn-lg btn-primary btn-block" type="submit">Sign up</button>
         </div>
         <div class="mt-3">
-            <div class="mt-2"><a href="/" style="color: dimgrey !important;">Go back to Signin page</a></div>
+            <div class="mt-2"><a th:if="${returnTo}" th:href="${returnTo}" style="color: dimgrey !important;">Go back to Signin page</a></div>
+            <div class="mt-2"><a th:unless="${returnTo}" href="/" style="color: dimgrey !important;">Go back to Signin page</a></div>
         </div>
 
     </form>

@@ -2,6 +2,10 @@ package me.sonam.auth.rest;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import me.sonam.auth.service.HostOrganizationResolver;
+import me.sonam.auth.service.LoginReturnContextService;
 import me.sonam.auth.webclient.AccountWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,22 +26,29 @@ public class PasswordChangeController {
     private static final Logger LOG = LoggerFactory.getLogger(PasswordChangeController.class);
 
     private final AccountWebClient accountWebClient;
+    private final LoginReturnContextService loginReturnContextService;
+    private final HostOrganizationResolver hostOrganizationResolver;
     private final String PASSWORD_PAGE = "/password/password";
     private final String PASSWORD_SECRET_PAGE = "/password/password-secret";
 
-    public PasswordChangeController(AccountWebClient accountWebClient) {
+    public PasswordChangeController(AccountWebClient accountWebClient, LoginReturnContextService loginReturnContextService,
+                                    HostOrganizationResolver hostOrganizationResolver) {
         this.accountWebClient = accountWebClient;
+        this.loginReturnContextService = loginReturnContextService;
+        this.hostOrganizationResolver = hostOrganizationResolver;
     }
 
     @GetMapping("/password")
-    public String forgotPassword() {
+    public String forgotPassword(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", PASSWORD_PAGE);
+        loginReturnContextService.addReturnContext(model, request, response);
         return PASSWORD_PAGE;
     }
 
     @GetMapping("/password/secret")
-    public String getPasswordSecretPage() {
+    public String getPasswordSecretPage(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", PASSWORD_SECRET_PAGE);
+        loginReturnContextService.addReturnContext(model, request, response);
         return PASSWORD_SECRET_PAGE;
     }
 
@@ -51,23 +62,26 @@ public class PasswordChangeController {
      * @return
      */
     @PostMapping("/password")
-    public Mono<String> emailSecret(String email, Model model) {
+    public Mono<String> emailSecret(String email, Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("password change for email: {}", email);
+        loginReturnContextService.addReturnContext(model, request, response);
 
-        return accountWebClient.emailMySecret(email).flatMap(s -> {
+        return accountWebClient.emailMySecret(email, hostOrganizationResolver.currentHost().orElse(null)).flatMap(s -> {
             LOG.info("secret sent to email for password change");
             model.addAttribute("message", "Check your email for changing your password.");
             return Mono.just(PASSWORD_PAGE);
         }).onErrorResume(throwable -> {
-            LOG.error("error occurred in sending secret for password change", throwable);
+            logAccountRestError("error occurred in sending secret for password change", throwable);
             setErrorInModel(throwable, model, "error on calling emailMySecret endpoint  with error ");
             return Mono.just(PASSWORD_PAGE);
         });
     }
 
     @PostMapping("/password/secret")
-    public Mono<String> passwordChange(@NotEmpty String password ,@NotEmpty String email, @NotEmpty String secret, Model model) {
+    public Mono<String> passwordChange(@NotEmpty String password ,@NotEmpty String email, @NotEmpty String secret,
+                                       Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("change password {} for email {} and secret: {}", password, email, secret);
+        loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.updateAuthenticationPassword(email, secret, password)
                 .flatMap(stringStringMap -> {
@@ -88,18 +102,27 @@ public class PasswordChangeController {
                     new ParameterizedTypeReference<>() {});
 
             if (map != null) {
-                LOG.error("{}: {}", defaultErrMessage, map.get("error"));
+                logAccountRestError(defaultErrMessage + ": " + map.get("error"), throwable);
 
                 model.addAttribute("error", map.get("error"));
             }
             else {
-                LOG.error("map is null on response for throwable", throwable);
+                logAccountRestError("map is null on response for throwable", throwable);
                 model.addAttribute("error", defaultErrMessage + throwable.getMessage());
             }
-            LOG.error("{}: {}", defaultErrMessage, throwable.getMessage());
         } else {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
+        }
+    }
+
+    private void logAccountRestError(String message, Throwable throwable) {
+        if (throwable instanceof WebClientResponseException webClientResponseException
+                && webClientResponseException.getStatusCode().value() == 400) {
+            LOG.warn("{}: {}", message, webClientResponseException.getResponseBodyAsString());
+        }
+        else {
+            LOG.error(message, throwable);
         }
     }
 }

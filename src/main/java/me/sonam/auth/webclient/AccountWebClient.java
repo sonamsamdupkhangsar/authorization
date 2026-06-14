@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -63,14 +64,26 @@ public class AccountWebClient {
         return responseSpec.bodyToMono(String.class);
     }
 
-    public Mono<String> emailMySecret(String email) {
+    public Mono<String> emailMySecret(String email, String activationHost) {
         LOG.info("emailMySecret endpoint: {} for email: {}", emailMySecret, email);
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("email", email);
+        if (activationHost != null && !activationHost.isBlank()) {
+            body.put("activationHost", activationHost);
+        }
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailMySecret)
-                .bodyValue(Map.of("email", email))
+                .bodyValue(body)
                 .retrieve();
         return responseSpec.bodyToMono(String.class).onErrorResume(throwable -> {
-            LOG.error("failed to call email my secret endpoint", throwable);
+            if (throwable instanceof WebClientResponseException webClientResponseException
+                    && webClientResponseException.getStatusCode().value() == 400) {
+                LOG.warn("failed to call email my secret endpoint with bad request: {}",
+                        webClientResponseException.getResponseBodyAsString());
+            }
+            else {
+                LOG.error("failed to call email my secret endpoint", throwable);
+            }
             return Mono.error(throwable);
         });
     }
@@ -97,12 +110,17 @@ public class AccountWebClient {
      * @param email
      * @return
      */
-    public Mono<Map<String, String>> emailSecretForAccountUnlock(String email) {
+    public Mono<Map<String, String>> emailSecretForAccountUnlock(String email, String activationHost) {
         LOG.info("email secret to unlock account using account-rest-service endpoint: {}",
                 emailSecretUnlockAccount);
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("email", email);
+        if (activationHost != null && !activationHost.isBlank()) {
+            body.put("activationHost", activationHost);
+        }
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailSecretUnlockAccount)
-                .bodyValue(Map.of("email", email))
+                .bodyValue(body)
                 .retrieve();
         return responseSpec.bodyToMono(new ParameterizedTypeReference<>() {});
     }
@@ -165,7 +183,15 @@ public class AccountWebClient {
                     Boolean value = map.get("message");
                     return Mono.just(value);
                 }).onErrorResume(throwable -> {
-                    LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("error occured calling isAccountLocked endpoint {}: status={}, body={}",
+                                isAccountLockedEndpoint,
+                                webClientResponseException.getStatusCode(),
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    else {
+                        LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
+                    }
                     return Mono.error(throwable);
                 });
     }

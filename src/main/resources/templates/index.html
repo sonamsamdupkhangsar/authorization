@@ -10,24 +10,33 @@
 </head>
 <title>Login</title>
 <script th:inline="javascript">
+    let usernameCheckRequestId = 0;
+
     window.addEventListener('load', function() {
       console.log("remove after loading body");
       const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
       userIdCheckDivElement.style.display = "none";
     });
 
+  function setSubmitDisabled(disabled) {
+    document.getElementById("submit").disabled = disabled;
+  }
+
   function checkUsername(url) {
-    document.getElementById("submit").disabled = true;
+    const requestId = ++usernameCheckRequestId;
+    setSubmitDisabled(true);
 
     const usernameTextField = document.getElementById('username');
     if (usernameTextField.value.length <= 0) {
      // console.error('no username in text-field');
+      setSubmitDisabled(false);
       return;
     }
     const usernameValue = usernameTextField.value;
 
     var xhr = new XMLHttpRequest();
     xhr.open("PUT", url, true);
+    xhr.timeout = 10000;
 
     const userIdCheckDivElement = document.getElementById('userIdCheckDiv');
     userIdCheckDivElement.style.display = "none";
@@ -62,7 +71,15 @@
       else {
           console.error('PUT request failed: ', xhr.status, xhr.responseText);
       }
-      document.getElementById("submit").disabled = false;
+      if (requestId === usernameCheckRequestId) {
+        setSubmitDisabled(false);
+      }
+    };
+    xhr.onerror = xhr.onabort = xhr.ontimeout = function () {
+      console.error('PUT username check did not complete');
+      if (requestId === usernameCheckRequestId) {
+        setSubmitDisabled(false);
+      }
     };
     xhr.send(usernameValue);
    }
@@ -106,14 +123,14 @@
             <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
         <div class="mt-5">
-            <div class="mt-2"><a href="/password" style="color: dimgrey !important;">Forgot password?</a></div>
-            <div class="mt-2"><a href="/username" style="color: dimgrey !important;">Forgot username?</a></div>
-            <div class="mt-2"><a href="/accounts/active" style="color: dimgrey !important;">Email activation link</a></div>
-            <div class="mt-2"><a href="/accounts/lock" style="color: dimgrey !important;">Unlock account</a></div>
+            <div class="mt-2"><a th:href="@{/password(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot password?</a></div>
+            <div class="mt-2"><a th:href="@{/username(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot username?</a></div>
+            <div class="mt-2"><a th:href="@{/accounts/active(returnTo=${returnTo})}" style="color: dimgrey !important;">Email activation link</a></div>
+            <div class="mt-2"><a th:href="@{/accounts/lock(returnTo=${returnTo})}" style="color: dimgrey !important;">Unlock account</a></div>
         </div>
         <div class="row justify-content-around mt-3">
             <div class="col"></div>
-            <div class="col "><a th:href="@{/signup}">Signup here</a></div>
+            <div class="col "><a th:href="@{/signup(returnTo=${returnTo})}">Signup here</a></div>
         </div>
     </form>
 
