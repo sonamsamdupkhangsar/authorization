@@ -3,6 +3,7 @@ package me.sonam.auth.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -59,7 +60,7 @@ public class TokenFilter {
     @Value("${tokenExpireSeconds}")
     private int tokenExpireSeconds;
 
-    public TokenFilter(WebClient.Builder webClientBuilder, RequestCache requestCache) {
+    public TokenFilter(@Qualifier("tokenWebClientBuilder") WebClient.Builder webClientBuilder, RequestCache requestCache) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
     }

@@ -13,9 +13,81 @@ This app will communicate with the following two external services:
 
 ## Run
 For running locally using local profile:
-`./gradlew bootRun --args="--spring.profiles.active=local"`
+```bash
+./gradlew bootRun --args="--spring.profiles.active=local"
+```
 
 In IntelliJ open Run and add environment variable :'`spring.profiles.active=local` 
+
+## Local Development
+
+Add local tenant hostnames to `/etc/hosts`:
+
+```text
+127.0.0.1 platform.openissuer.test
+127.0.0.1 business1.openissuer.test business2.openissuer.test free.openissuer.test
+```
+
+Local issuer URLs:
+- `http://platform.openissuer.test:9001`
+- `http://business1.openissuer.test:9001`
+- `http://business2.openissuer.test:9001`
+- `http://free.openissuer.test:9001`
+
+Run authorization with the local profile:
+
+```bash
+./gradlew bootRun --args="--spring.profiles.active=local"
+```
+
+### Local HTTPS for Passkeys/WebAuthn
+
+Passkeys require a trusted secure browser context. For local passkey testing, use the `local-https` profile with `mkcert`.
+
+Install and trust the local mkcert CA once:
+
+```bash
+brew install mkcert nss
+mkcert -install
+```
+
+Create the local certificate used by `src/main/resources/application-local-https.yaml`:
+
+```bash
+mkdir -p ~/openissuer-local-certs
+mkcert \
+  -cert-file ~/openissuer-local-certs/openissuer.test.pem \
+  -key-file ~/openissuer-local-certs/openissuer.test-key.pem \
+  free.openissuer.test \
+  platform.openissuer.test \
+  business1.openissuer.test \
+  business2.openissuer.test \
+  localhost \
+  127.0.0.1
+```
+
+Run authorization with local HTTPS enabled:
+
+```bash
+unset ISSUER_ADDRESS
+unset ISSUER_URI
+SPRING_PROFILES_ACTIVE=local,local-https ./gradlew bootRun
+```
+
+Use the HTTPS tenant URL for passkey registration:
+
+```text
+https://free.openissuer.test:9001/mfa/passkeys
+```
+
+Expected startup/runtime clues:
+- `creating non-loadBalanced token webclient`
+- `set stable token request host headers host=platform.openissuer.test scheme=https port=9001`
+
+The `local-https` profile uses a non-load-balanced token WebClient only for this local HTTPS mode. Without that, Eureka may resolve `authorization-server` to an HTTP instance such as `http://10.0.0.244:9001`, which fails because the local server is listening with TLS on port `9001`.
+
+If Chrome shows "This Connection is Not Private", run `mkcert -install`, then fully quit and reopen Chrome. Safari may show an Apple passkey/iCloud dialog; Chrome has also been verified locally with Touch ID.
+
 ## Build Docker image
 Gradle build:
 ```

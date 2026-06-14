@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -15,8 +16,17 @@ public class WebClientConfig {
 
     @LoadBalanced
     @Bean
+    @Primary
     WebClient.Builder webClientBuilder() {
         LOG.info("creating loadBalanced webclient");
+        return WebClient.builder();
+    }
+
+    @LoadBalanced
+    @Bean
+    @Profile("!local-https")
+    WebClient.Builder tokenWebClientBuilder() {
+        LOG.info("creating loadBalanced token webclient");
         return WebClient.builder();
     }
 }

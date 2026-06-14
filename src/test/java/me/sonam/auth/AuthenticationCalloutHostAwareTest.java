@@ -79,6 +79,8 @@ public class AuthenticationCalloutHostAwareTest {
     private HClientUserRepository clientUserRepository;
     @Mock
     private RegisteredClientRepository registeredClientRepository;
+    @Mock
+    private SavedRequest savedRequest;
 
     private AuthenticationCallout authenticationCallout;
 
@@ -94,7 +96,6 @@ public class AuthenticationCalloutHostAwareTest {
         ReflectionTestUtils.setField(authenticationCallout, "hostOrganizationResolver", new HostOrganizationResolver());
         ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", authzManagerId);
 
-        SavedRequest savedRequest = mock(SavedRequest.class);
         when(requestCache.getRequest(any(), any(HttpServletResponse.class))).thenReturn(savedRequest);
         when(savedRequest.getParameterValues("client_id")).thenReturn(new String[]{CLIENT_ID});
 
@@ -104,7 +105,7 @@ public class AuthenticationCalloutHostAwareTest {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri("http://127.0.0.1/callback")
                 .build();
-        when(registeredClientRepository.findByClientId(CLIENT_ID)).thenReturn(registeredClient);
+        lenient().when(registeredClientRepository.findByClientId(CLIENT_ID)).thenReturn(registeredClient);
 
         when(accountWebClient.isAccountLocked("user1")).thenReturn(Mono.just(false));
         when(userWebClient.getUserId("user1")).thenReturn(Mono.just(userId));
@@ -174,6 +175,31 @@ public class AuthenticationCalloutHostAwareTest {
     }
 
     @Test
+    void passkeyManagementLoginDoesNotRequireClientId() {
+        bindRequestHost(FREE_HOST);
+        when(savedRequest.getParameterValues("client_id")).thenReturn(null);
+        when(savedRequest.getRedirectUrl()).thenReturn("http://" + FREE_HOST + ":9001/mfa/passkeys");
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
+
+        UsernamePasswordAuthenticationToken expected =
+                new UsernamePasswordAuthenticationToken("principal", "password");
+        when(authenticationWebClient.getAuth(any(), argThat(passkeyManagementAuthBody())))
+                .thenReturn(Mono.just(expected));
+
+        UsernamePasswordAuthenticationToken request =
+                new UsernamePasswordAuthenticationToken("user1", "password");
+
+        Object result = authenticationCallout.authenticate(request);
+
+        assertThat(result).isSameAs(expected);
+        verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId);
+        verify(registeredClientRepository, never()).findByClientId(any());
+        verify(clientOrganizationRepository, never()).findByClientId(any());
+        verify(authenticationWebClient).getAuth(any(), argThat(passkeyManagementAuthBody()));
+    }
+
+    @Test
     void authzManagerLoginRequiresSuperAdminForHostOrganization() {
         bindRequestHost(FREE_HOST);
         ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", clientUuid);
@@ -205,6 +231,14 @@ public class AuthenticationCalloutHostAwareTest {
         return body -> body != null
                 && clientUuid.equals(body.get("clientId"))
                 && expectedOrganizationId.equals(body.get("organizationId"))
+                && "user1".equals(body.get("authenticationId"))
+                && "password".equals(body.get("password"));
+    }
+
+    private ArgumentMatcher<Map<String, Object>> passkeyManagementAuthBody() {
+        return body -> body != null
+                && !body.containsKey("clientId")
+                && !body.containsKey("organizationId")
                 && "user1".equals(body.get("authenticationId"))
                 && "password".equals(body.get("password"));
     }

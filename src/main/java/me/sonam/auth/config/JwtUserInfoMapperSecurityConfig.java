@@ -36,12 +36,18 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.ui.DefaultResourcesFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.security.web.webauthn.management.UserCredentialRepository;
+import org.springframework.security.web.webauthn.management.WebAuthnRelyingPartyOperations;
+import org.springframework.security.web.webauthn.registration.PublicKeyCredentialCreationOptionsFilter;
+import org.springframework.security.web.webauthn.registration.WebAuthnRegistrationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -125,7 +131,15 @@ public class JwtUserInfoMapperSecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
+                                                          UserCredentialRepository userCredentialRepository,
+                                                          WebAuthnRelyingPartyOperations webAuthnRelyingPartyOperations)
+            throws Exception {
+        PublicKeyCredentialCreationOptionsFilter passkeyOptionsFilter =
+                new PublicKeyCredentialCreationOptionsFilter(webAuthnRelyingPartyOperations);
+        WebAuthnRegistrationFilter passkeyRegistrationFilter =
+                new WebAuthnRegistrationFilter(userCredentialRepository, webAuthnRelyingPartyOperations);
+
         http
                 .authorizeHttpRequests((authorize) ->
                         authorize.requestMatchers("/api/health/liveness").permitAll()
@@ -151,7 +165,10 @@ public class JwtUserInfoMapperSecurityConfig {
                         httpSecurityOAuth2ResourceServerConfigurer.jwt(Customizer.withDefaults()))
                 .formLogin(httpSecurityFormLoginConfigurer ->
                         httpSecurityFormLoginConfigurer.loginPage("/")
-                );
+                )
+                .addFilter(DefaultResourcesFilter.webauthn())
+                .addFilterBefore(passkeyOptionsFilter, AuthorizationFilter.class)
+                .addFilterAfter(passkeyRegistrationFilter, AuthorizationFilter.class);
 
       return http.cors(Customizer.withDefaults()).formLogin(formLogin ->
               formLogin.loginPage("/").permitAll()).build();

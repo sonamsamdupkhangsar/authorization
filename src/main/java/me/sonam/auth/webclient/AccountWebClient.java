@@ -190,7 +190,11 @@ public class AccountWebClient {
                                 webClientResponseException.getResponseBodyAsString());
                     }
                     else {
-                        LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
+                        LOG.error("error occured calling isAccountLocked endpoint {}: {}: {}",
+                                isAccountLockedEndpoint,
+                                throwable.getClass().getSimpleName(),
+                                throwable.getMessage());
+                        LOG.debug("isAccountLocked exception", throwable);
                     }
                     return Mono.error(throwable);
                 });

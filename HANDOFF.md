@@ -110,6 +110,12 @@ Local issuer URLs:
 - `http://business2.openissuer.test:9001`
 - `http://free.openissuer.test:9001`
 
+## Local HTTPS for Passkeys/WebAuthn
+
+The repeatable mkcert and `local-https` setup is documented in [README.md](/Users/sonamsamdupkhangsar/Documents/github/authorization/README.md).
+
+The important design note is that the `local-https` profile intentionally uses a non-load-balanced token WebClient only for local HTTPS. Without that, Eureka may resolve `authorization-server` to an HTTP instance such as `http://10.0.0.244:9001`, which fails because the local server is listening with TLS on port `9001`.
+
 Sibling local services updated to validate against the platform issuer/JWKS host:
 - `user-rest-service`
 - `organization-rest-service`
