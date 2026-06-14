@@ -183,7 +183,15 @@ public class AccountWebClient {
                     Boolean value = map.get("message");
                     return Mono.just(value);
                 }).onErrorResume(throwable -> {
-                    LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("error occured calling isAccountLocked endpoint {}: status={}, body={}",
+                                isAccountLockedEndpoint,
+                                webClientResponseException.getStatusCode(),
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    else {
+                        LOG.error("error occured calling isAccountLocked endpoint {}", isAccountLockedEndpoint, throwable);
+                    }
                     return Mono.error(throwable);
                 });
     }
