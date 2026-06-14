@@ -3,6 +3,7 @@ package me.sonam.auth;
 import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.rest.IndexController;
 import me.sonam.auth.service.ClientIdUtil;
+import me.sonam.auth.service.LoginReturnContextService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -24,7 +25,7 @@ public class IndexControllerTest {
         when(requestCache.getRequest(any(), any(HttpServletResponse.class))).thenReturn(savedRequest);
         when(savedRequest.getParameterValues("client_id")).thenReturn(new String[]{"authzmanager"});
 
-        IndexController indexController = new IndexController(requestCache);
+        IndexController indexController = indexController(requestCache);
         ExtendedModelMap model = new ExtendedModelMap();
         MockHttpServletRequest request = new MockHttpServletRequest();
 
@@ -40,7 +41,7 @@ public class IndexControllerTest {
         RequestCache requestCache = mock(RequestCache.class);
         when(requestCache.getRequest(any(), any(HttpServletResponse.class))).thenReturn(null);
 
-        IndexController indexController = new IndexController(requestCache);
+        IndexController indexController = indexController(requestCache);
         ExtendedModelMap model = new ExtendedModelMap();
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setParameter("error", "");
@@ -57,7 +58,7 @@ public class IndexControllerTest {
         RequestCache requestCache = mock(RequestCache.class);
         when(requestCache.getRequest(any(), any(HttpServletResponse.class))).thenReturn(null);
 
-        IndexController indexController = new IndexController(requestCache);
+        IndexController indexController = indexController(requestCache);
         ExtendedModelMap model = new ExtendedModelMap();
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.getSession().setAttribute(ClientIdUtil.CLIENT_ID_SESSION_ATTRIBUTE, "authzmanager");
@@ -66,5 +67,9 @@ public class IndexControllerTest {
 
         assertThat(view).isEqualTo("index");
         assertThat(model.get("clientId")).isNull();
+    }
+
+    private IndexController indexController(RequestCache requestCache) {
+        return new IndexController(requestCache, new LoginReturnContextService(requestCache));
     }
 }
