@@ -5,16 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Verify passkey</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
 </head>
 <body>
-<div class="container mt-5">
-    <h1 class="h3 mb-4">Verify passkey</h1>
+<div class="container">
+    <main class="form-signin w-100 m-auto">
+        <div id="passkeyError" class="alert alert-danger" role="alert" th:if="${error}" th:text="${error}"></div>
+        <div id="passkeyClientError" class="alert alert-danger" role="alert" style="display:none"></div>
 
-    <div id="passkeyError" class="alert alert-danger" role="alert" th:if="${error}" th:text="${error}"></div>
-    <div id="passkeyClientError" class="alert alert-danger" role="alert" style="display:none"></div>
-
-    <button id="verifyPasskey" type="button" class="btn btn-primary" th:disabled="${error != null}">Verify passkey</button>
+        <h1 class="h3 mb-3 fw-normal">Verify your passkey</h1>
+        <p class="mb-3 text-muted">Use your registered passkey to finish signing in.</p>
+        <button id="verifyPasskey" type="button" class="w-100 btn btn-lg btn-primary btn-block"
+                th:disabled="${error != null}">Verify passkey</button>
+    </main>
 </div>
 
 <script th:inline="javascript">
