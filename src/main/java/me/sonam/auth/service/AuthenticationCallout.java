@@ -107,7 +107,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
          String clientId = ClientIdUtil.getClientId(requestCache);
          LOG.info("clientId: {}", clientId);
-         if (clientId == null || clientId.equals("")) {
+         boolean passkeyManagementLogin = ClientIdUtil.isSavedRequestFor(requestCache, "/mfa/passkeys");
+         if ((clientId == null || clientId.equals("")) && !passkeyManagementLogin) {
              LOG.error("client id not found");
              throw new BadCredentialsException("Please go back to your main application that brought you here to this sign-in page");
          }
@@ -156,6 +157,10 @@ public class AuthenticationCallout implements AuthenticationProvider {
                 .flatMap(aBoolean -> {
                     LOG.info("authorities: {}, details: {}, credentials: {}", authentication.getAuthorities(),
                             authentication.getDetails(), authentication.getCredentials());
+                    if (passkeyManagementLogin) {
+                        LOG.info("clientless passkey management login for authenticationId {}", authenticationId);
+                        return checkUserForPasskeyManagement(authentication, currentHost);
+                    }
                     LOG.info("get registeredClient from clientId: {}", clientId);
                     RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
                     UUID clientUuidId = UUID.fromString(registeredClient.getId());
@@ -226,6 +231,42 @@ public class AuthenticationCallout implements AuthenticationProvider {
                         return Mono.error(throwable);
                     })
         );
+    }
+
+    private Mono<UsernamePasswordAuthenticationToken> checkUserForPasskeyManagement(Authentication authentication,
+                                                                                   String currentHost) {
+        final String authenticationId = authentication.getName();
+        return userWebClient.getUserId(authenticationId)
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to make get user by authId call for passkey management: {}", throwable.getMessage());
+                    return Mono.error(new BadCredentialsException("Bad credentials"));
+                })
+                .flatMap(userId -> {
+                    if (currentHost == null) {
+                        return Mono.error(new BadCredentialsException("passkey management requires a tenant issuer host"));
+                    }
+                    return resolveDefaultHostOrganization(currentHost, userId)
+                            .switchIfEmpty(Mono.error(new BadCredentialsException("user is not allowed for this issuer")))
+                            .then(authenticationWebClient.getAuth(authentication, Map.of(
+                                    "authenticationId", authentication.getPrincipal().toString(),
+                                    "password", authentication.getCredentials().toString())));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.debug("exception occurred during passkey management login", throwable);
+                    LOG.error("exception occurred during passkey management login: {}", throwable.getMessage());
+                    if (throwable instanceof BadCredentialsException) {
+                        return loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication))
+                                .flatMap(s -> Mono.error(new BadCredentialsException(throwable.getMessage() + " " + s)));
+                    }
+                    return Mono.error(throwable);
+                });
+    }
+
+    private String remoteAddress(Authentication authentication) {
+        if (authentication.getDetails() instanceof WebAuthenticationDetails webDetails) {
+            return webDetails.getRemoteAddress();
+        }
+        return "";
     }
 
     /**

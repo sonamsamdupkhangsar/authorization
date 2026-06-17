@@ -43,6 +43,20 @@ public class ClientIdUtil {
         return "";
     }
 
+    public static boolean isSavedRequestFor(RequestCache requestCache, String path) {
+        var requestAttributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (requestAttributes == null) {
+            return false;
+        }
+        var request = requestAttributes.getRequest();
+        var response = requestAttributes.getResponse();
+        var savedRequest = requestCache.getRequest(request, response);
+        if (savedRequest == null || savedRequest.getRedirectUrl() == null) {
+            return false;
+        }
+        return savedRequest.getRedirectUrl().contains(path);
+    }
+
     private static String getParameter(SavedRequest savedRequest, String parameterName) {
         if (savedRequest == null) {
             LOG.error("savedRequest is null");

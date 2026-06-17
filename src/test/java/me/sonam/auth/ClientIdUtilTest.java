@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -32,5 +33,20 @@ public class ClientIdUtilTest {
                 new ServletRequestAttributes(request, new MockHttpServletResponse()));
 
         assertThat(ClientIdUtil.getClientId(requestCache)).isEqualTo("authzmanager");
+    }
+
+    @Test
+    void isSavedRequestForMatchesRedirectPath() {
+        RequestCache requestCache = mock(RequestCache.class);
+        SavedRequest savedRequest = mock(SavedRequest.class);
+        when(requestCache.getRequest(any(), any())).thenReturn(savedRequest);
+        when(savedRequest.getRedirectUrl()).thenReturn("http://free.openissuer.test:9001/mfa/passkeys");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        RequestContextHolder.setRequestAttributes(
+                new ServletRequestAttributes(request, new MockHttpServletResponse()));
+
+        assertThat(ClientIdUtil.isSavedRequestFor(requestCache, "/mfa/passkeys")).isTrue();
+        assertThat(ClientIdUtil.isSavedRequestFor(requestCache, "/admin")).isFalse();
     }
 }

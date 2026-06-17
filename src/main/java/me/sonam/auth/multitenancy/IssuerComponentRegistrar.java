@@ -100,6 +100,7 @@ public class IssuerComponentRegistrar {
         populator.addScript(new ClassPathResource("org/springframework/security/oauth2/server/authorization/client/oauth2-registered-client-schema.sql"));
         populator.addScript(new ClassPathResource(resolveAuthorizationSchemaPath(dataSource)));
         populator.addScript(new ClassPathResource("org/springframework/security/oauth2/server/authorization/oauth2-authorization-consent-schema.sql"));
+        populator.addScript(new ClassPathResource(resolveWebAuthnSchemaPath(dataSource)));
         populator.execute(dataSource);
     }
 
@@ -107,6 +108,12 @@ public class IssuerComponentRegistrar {
         return isPostgreSql(dataSource)
                 ? "db/schema/postgresql/oauth2-authorization-schema.sql"
                 : "org/springframework/security/oauth2/server/authorization/oauth2-authorization-schema.sql";
+    }
+
+    private String resolveWebAuthnSchemaPath(DataSource dataSource) {
+        return isPostgreSql(dataSource)
+                ? "db/schema/postgresql/webauthn-schema.sql"
+                : "db/schema/h2/webauthn-schema.sql";
     }
 
     private boolean isPostgreSql(DataSource dataSource) {

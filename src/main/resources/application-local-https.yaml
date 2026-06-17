@@ -1,0 +1,13 @@
+server:
+  ssl:
+    enabled: true
+    certificate: ${OPENISSUER_LOCAL_CERT:/Users/sonamsamdupkhangsar/openissuer-local-certs/openissuer.test.pem}
+    certificate-private-key: ${OPENISSUER_LOCAL_CERT_KEY:/Users/sonamsamdupkhangsar/openissuer-local-certs/openissuer.test-key.pem}
+
+ISSUER_ADDRESS: https://platform.openissuer.test:${AUTH_SERVER_PORT}
+ISSUER_URI: ${ISSUER_ADDRESS}
+
+authzmanager: https://platform.admin.openissuer.test:9093
+
+auth-server:
+  root: https://platform.openissuer.test:${AUTH_SERVER_PORT}

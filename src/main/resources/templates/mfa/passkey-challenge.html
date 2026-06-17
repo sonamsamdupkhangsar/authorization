@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verify passkey</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
+</head>
+<body>
+<div class="container">
+    <main class="form-signin w-100 m-auto">
+        <div id="passkeyError" class="alert alert-danger" role="alert" th:if="${error}" th:text="${error}"></div>
+        <div id="passkeyClientError" class="alert alert-danger" role="alert" style="display:none"></div>
+
+        <h1 class="h3 mb-3 fw-normal">Verify your passkey</h1>
+        <p class="mb-3 text-muted">Use your registered passkey to finish signing in.</p>
+        <button id="verifyPasskey" type="button" class="w-100 btn btn-lg btn-primary btn-block"
+                th:disabled="${error != null}">Verify passkey</button>
+    </main>
+</div>
+
+<script th:inline="javascript">
+    const contextPath = /*[[@{/}]]*/ '/';
+    const basePath = contextPath.endsWith('/') ? contextPath.substring(0, contextPath.length - 1) : contextPath;
+
+    function showError(message) {
+        const error = document.getElementById('passkeyClientError');
+        error.textContent = message;
+        error.style.display = 'block';
+    }
+
+    function base64UrlEncode(buffer) {
+        const base64 = window.btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        return base64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    }
+
+    function base64UrlDecode(value) {
+        const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+        const binary = window.atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
+
+    async function postJson(url, body) {
+        const options = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        };
+        if (body) {
+            options.body = JSON.stringify(body);
+        }
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            throw new Error(`Server responded with HTTP ${response.status}`);
+        }
+        const contentType = response.headers.get('content-type') || '';
+        return contentType.includes('application/json') ? response.json() : {};
+    }
+
+    async function verifyPasskey() {
+        if (!window.PublicKeyCredential) {
+            throw new Error('Passkeys require a browser secure context. Use HTTPS for this sign-in.');
+        }
+
+        const options = await postJson(`${basePath}/mfa/passkeys/authenticate/options`);
+        const publicKey = {
+            ...options,
+            challenge: base64UrlDecode(options.challenge),
+            allowCredentials: (options.allowCredentials || []).map((credential) => ({
+                ...credential,
+                id: base64UrlDecode(credential.id)
+            }))
+        };
+
+        const credential = await navigator.credentials.get({ publicKey });
+        const response = credential.response;
+        const body = {
+            id: credential.id,
+            rawId: base64UrlEncode(credential.rawId),
+            response: {
+                authenticatorData: base64UrlEncode(response.authenticatorData),
+                clientDataJSON: base64UrlEncode(response.clientDataJSON),
+                signature: base64UrlEncode(response.signature),
+                userHandle: response.userHandle ? base64UrlEncode(response.userHandle) : null
+            },
+            type: credential.type,
+            authenticatorAttachment: credential.authenticatorAttachment
+        };
+
+        const result = await postJson(`${basePath}/mfa/passkeys/authenticate`, body);
+        window.location.href = result.redirectUrl || (basePath + '/');
+    }
+
+    window.addEventListener('load', function () {
+        const button = document.getElementById('verifyPasskey');
+        if (!button || button.disabled) {
+            return;
+        }
+        button.addEventListener('click', async function () {
+            button.disabled = true;
+            try {
+                await verifyPasskey();
+            } catch (error) {
+                button.disabled = false;
+                showError(error.message);
+                console.error(error);
+            }
+        });
+    });
+</script>
+</body>
+</html>

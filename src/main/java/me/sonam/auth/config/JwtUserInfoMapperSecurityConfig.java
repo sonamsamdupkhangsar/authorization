@@ -7,6 +7,7 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.JWTParser;
 import jakarta.annotation.Nullable;
+import me.sonam.auth.mfa.passkey.PasskeyMfaAuthenticationSuccessHandler;
 import me.sonam.auth.multitenancy.TenantPerHostComponentRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,12 +37,18 @@ import org.springframework.security.oauth2.server.authorization.oidc.authenticat
 import org.springframework.security.oauth2.server.authorization.token.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.ui.DefaultResourcesFilter;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.security.web.webauthn.management.UserCredentialRepository;
+import org.springframework.security.web.webauthn.management.WebAuthnRelyingPartyOperations;
+import org.springframework.security.web.webauthn.registration.PublicKeyCredentialCreationOptionsFilter;
+import org.springframework.security.web.webauthn.registration.WebAuthnRegistrationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -125,7 +132,16 @@ public class JwtUserInfoMapperSecurityConfig {
 
     @Bean
     @Order(2)
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http,
+                                                          UserCredentialRepository userCredentialRepository,
+                                                          WebAuthnRelyingPartyOperations webAuthnRelyingPartyOperations,
+                                                          PasskeyMfaAuthenticationSuccessHandler passkeyMfaAuthenticationSuccessHandler)
+            throws Exception {
+        PublicKeyCredentialCreationOptionsFilter passkeyOptionsFilter =
+                new PublicKeyCredentialCreationOptionsFilter(webAuthnRelyingPartyOperations);
+        WebAuthnRegistrationFilter passkeyRegistrationFilter =
+                new WebAuthnRegistrationFilter(userCredentialRepository, webAuthnRelyingPartyOperations);
+
         http
                 .authorizeHttpRequests((authorize) ->
                         authorize.requestMatchers("/api/health/liveness").permitAll()
@@ -142,6 +158,9 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/accounts/lock/email/secret").permitAll()
                                 .requestMatchers("/users/username").permitAll()
                                 .requestMatchers("/signup").permitAll()
+                                .requestMatchers("/mfa/passkeys/challenge").permitAll()
+                                .requestMatchers("/mfa/passkeys/authenticate/options").permitAll()
+                                .requestMatchers("/mfa/passkeys/authenticate").permitAll()
 
 
                 .anyRequest().authenticated()
@@ -150,11 +169,18 @@ public class JwtUserInfoMapperSecurityConfig {
                 .oauth2ResourceServer(httpSecurityOAuth2ResourceServerConfigurer ->
                         httpSecurityOAuth2ResourceServerConfigurer.jwt(Customizer.withDefaults()))
                 .formLogin(httpSecurityFormLoginConfigurer ->
-                        httpSecurityFormLoginConfigurer.loginPage("/")
-                );
+                        httpSecurityFormLoginConfigurer
+                                .loginPage("/")
+                                .successHandler(passkeyMfaAuthenticationSuccessHandler)
+                )
+                .addFilter(DefaultResourcesFilter.webauthn())
+                .addFilterBefore(passkeyOptionsFilter, AuthorizationFilter.class)
+                .addFilterAfter(passkeyRegistrationFilter, AuthorizationFilter.class);
 
       return http.cors(Customizer.withDefaults()).formLogin(formLogin ->
-              formLogin.loginPage("/").permitAll()).build();
+              formLogin.loginPage("/")
+                      .successHandler(passkeyMfaAuthenticationSuccessHandler)
+                      .permitAll()).build();
     }
 
     @Bean
@@ -208,7 +234,7 @@ public class JwtUserInfoMapperSecurityConfig {
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request -> {
             String uri = request.getRequestURI();
-            return !"/favicon.ico".equals(uri) && !"/favicon.svg".equals(uri);
+            return !"/favicon.ico".equals(uri) && !"/favicon.svg".equals(uri) && !"/error".equals(uri);
         });
         return requestCache;
     }
