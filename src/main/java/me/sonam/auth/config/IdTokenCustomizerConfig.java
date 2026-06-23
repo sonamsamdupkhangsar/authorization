@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 @Configuration
 public class IdTokenCustomizerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenCustomizerConfig.class);
+    static final String AUTH_FACTOR_PREFIX = "FACTOR_";
 
     private final SettingWebClient settingWebClient;
 
@@ -79,15 +80,33 @@ public class IdTokenCustomizerConfig {
                 authorities.forEach(role -> {
                     LOG.info("authority: {}",role );
                 });
-                if (!authorities.isEmpty()) {
-                    LOG.info("add roles in claim map");
-                    context.getClaims().claim("userRole", authorities);
+                Set<String> userRoles = userRoles(authorities);
+                if (!userRoles.isEmpty()) {
+                    LOG.info("add user roles in claim map");
+                    context.getClaims().claim("userRole", userRoles);
+                }
+                Set<String> authFactors = authFactors(authorities);
+                if (!authFactors.isEmpty()) {
+                    LOG.info("add authentication factors in claim map");
+                    context.getClaims().claim("authFactors", authFactors);
                 }
                 context.getClaims().claim("tenant_id", currentHost());
 
 
             }
         };
+    }
+
+    public static Set<String> userRoles(Set<String> authorities) {
+        return authorities.stream()
+                .filter(authority -> !authority.startsWith(AUTH_FACTOR_PREFIX))
+                .collect(Collectors.toSet());
+    }
+
+    public static Set<String> authFactors(Set<String> authorities) {
+        return authorities.stream()
+                .filter(authority -> authority.startsWith(AUTH_FACTOR_PREFIX))
+                .collect(Collectors.toSet());
     }
 
     private String currentHost() {
