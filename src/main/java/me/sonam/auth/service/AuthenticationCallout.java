@@ -3,6 +3,7 @@ package me.sonam.auth.service;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
+import me.sonam.auth.multitenancy.IssuerContextExecutor;
 import me.sonam.auth.service.exception.BadCredentialsException;
 import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
@@ -61,6 +62,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
     private AccountWebClient accountWebClient;
     @Autowired
     private RoleWebClient roleWebClient;
+    @Autowired
+    private IssuerContextExecutor issuerContextExecutor;
 
     @Value("${authzmanager-id}")
     private UUID authzManagerId;
@@ -125,6 +128,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
          */
         final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
         LOG.info("captured current host '{}' for authenticationId {}", currentHost, authenticationId);
+        final String currentIssuer = issuerContextExecutor.currentIssuer();
+        LOG.info("captured current issuer '{}' for authenticationId {}", currentIssuer, authenticationId);
 
          return accountWebClient.isAccountLocked(authenticationId)
                  .flatMap(aBoolean -> {
@@ -162,7 +167,12 @@ public class AuthenticationCallout implements AuthenticationProvider {
                         return checkUserForPasskeyManagement(authentication, currentHost);
                     }
                     LOG.info("get registeredClient from clientId: {}", clientId);
-                    RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
+                    RegisteredClient registeredClient = issuerContextExecutor.withIssuer(currentIssuer,
+                            () -> registeredClientRepository.findByClientId(clientId));
+                    if (registeredClient == null) {
+                        LOG.error("registeredClient not found for clientId: {}", clientId);
+                        return Mono.error(new BadCredentialsException("client is not registered for this issuer"));
+                    }
                     UUID clientUuidId = UUID.fromString(registeredClient.getId());
                     LOG.info("got clientUuid: {}", clientUuidId);
                     return checkUserAndClient(authentication, clientUuidId, currentHost);

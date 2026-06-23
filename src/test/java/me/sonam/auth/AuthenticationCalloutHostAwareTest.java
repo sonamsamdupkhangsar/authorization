@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
+import me.sonam.auth.multitenancy.IssuerContextExecutor;
 import me.sonam.auth.service.AuthenticationCallout;
 import me.sonam.auth.service.HostOrganizationResolver;
 import me.sonam.auth.webclient.AccountWebClient;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +38,7 @@ import reactor.core.publisher.Mono;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -80,6 +83,8 @@ public class AuthenticationCalloutHostAwareTest {
     @Mock
     private RegisteredClientRepository registeredClientRepository;
     @Mock
+    private IssuerContextExecutor issuerContextExecutor;
+    @Mock
     private SavedRequest savedRequest;
 
     private AuthenticationCallout authenticationCallout;
@@ -93,6 +98,7 @@ public class AuthenticationCalloutHostAwareTest {
         ReflectionTestUtils.setField(authenticationCallout, "clientOrganizationRepository", clientOrganizationRepository);
         ReflectionTestUtils.setField(authenticationCallout, "clientUserRepository", clientUserRepository);
         ReflectionTestUtils.setField(authenticationCallout, "registeredClientRepository", registeredClientRepository);
+        ReflectionTestUtils.setField(authenticationCallout, "issuerContextExecutor", issuerContextExecutor);
         ReflectionTestUtils.setField(authenticationCallout, "hostOrganizationResolver", new HostOrganizationResolver());
         ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", authzManagerId);
 
@@ -106,6 +112,9 @@ public class AuthenticationCalloutHostAwareTest {
                 .redirectUri("http://127.0.0.1/callback")
                 .build();
         lenient().when(registeredClientRepository.findByClientId(CLIENT_ID)).thenReturn(registeredClient);
+        lenient().when(issuerContextExecutor.currentIssuer()).thenReturn("http://" + FREE_HOST + ":9001");
+        lenient().when(issuerContextExecutor.withIssuer(any(), ArgumentMatchers.<Supplier<?>>any()))
+                .thenAnswer(invocation -> invocation.<Supplier<?>>getArgument(1).get());
 
         when(accountWebClient.isAccountLocked("user1")).thenReturn(Mono.just(false));
         when(userWebClient.getUserId("user1")).thenReturn(Mono.just(userId));
