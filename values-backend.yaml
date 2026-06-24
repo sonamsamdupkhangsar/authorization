@@ -134,31 +134,33 @@ envs:
   - name: SPRING_PROFILES_ACTIVE
     value: kubernetes
   - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_NAMESPACES_0
-    value: main
+    value: "{{ .Release.Namespace }}"
   - name: SPRING_AUTH_SERVER_PORT
     value: 8080
   - name: APPLICATION_REST_SERVICE
-    value: http://application-rest-service
+    value: "http://application-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: AUTHENTICATION_REST_SERVICE
-    value: http://authentication-rest-service
+    value: "http://authentication-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ORGANIZATION_REST_SERVICE
-    value: http://organization-rest-service
+    value: "http://organization-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: USER_REST_SERVICE
-    value: http://user-rest-service
+    value: "http://user-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ACCOUNT_REST_SERVICE
-    value: http://account-rest-service
+    value: "http://account-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ATTEMPT_REST_SERVICE
-    value: http://attempt-rest-service
+    value: "http://attempt-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ROLE_REST_SERVICE
-    value: http://role-rest-service
+    value: "http://role-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: SETTING_REST_SERVICE
-    value: http://setting-rest-service
+    value: "http://setting-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: private-client-url
     value: http://127.0.0.1:8090
   - name: AUTH_SERVER_PORT
     value: 8080
+  - name: AUTH_SERVER_ROOT
+    value: "http://authorization-server.{{ .Release.Namespace }}.svc.cluster.local"
   - name: TOKEN_MEDIATOR
-    value: http://oauth2-token-mediator
+    value: "http://oauth2-token-mediator.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ISSUER_URI
     value: https://platform.openissuer.com
   - name: ISSUER_ADDRESS
