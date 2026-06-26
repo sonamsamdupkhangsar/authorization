@@ -7,7 +7,7 @@ The Kubernetes deployment uses the shared `sonam-helm-chart` chart and service-s
 Kubernetes runs with:
 
 ```yaml
-SPRING_PROFILES_ACTIVE: kubernetes
+SPRING_PROFILES_ACTIVE: kubernetes,non-eureka
 ```
 
 In this profile:
@@ -97,4 +97,3 @@ Insufficient memory
 ```
 
 Cluster autoscaler may need time to add capacity.
-

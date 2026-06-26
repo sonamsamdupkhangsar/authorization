@@ -1,4 +1,4 @@
-# This yaml file is for loading local database, server port, disable eureka and set jwt-rest-service endpoint
+# Local Eureka profile: loads local database, server port, Eureka registry, and service-id endpoints.
 AUTH_SERVER_PORT: 9001
 
 POSTGRES_USERNAME: test

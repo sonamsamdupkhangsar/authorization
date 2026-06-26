@@ -132,7 +132,7 @@ envs:
   - name: JAVA_TOOL_OPTIONS
     value: "-XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=25"
   - name: SPRING_PROFILES_ACTIVE
-    value: kubernetes
+    value: kubernetes,non-eureka
   - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_NAMESPACES_0
     value: "{{ .Release.Namespace }}"
   - name: SPRING_AUTH_SERVER_PORT

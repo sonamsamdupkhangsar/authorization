@@ -12,10 +12,10 @@ Add local tenant hostnames to `/etc/hosts`:
 
 ## Local HTTP
 
-Run authorization with the local profile:
+Run authorization with the Eureka profile:
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=local"
+./gradlew bootRun --args="--spring.profiles.active=eureka"
 ```
 
 Common issuer URLs:
@@ -56,7 +56,7 @@ mkcert \
 Run authorization with HTTPS:
 
 ```bash
-SPRING_PROFILES_ACTIVE=local,local-https ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=eureka,local-https ./gradlew bootRun
 ```
 
 Use:
@@ -83,7 +83,7 @@ This combination of host and port requires TLS.
 
 ## Local Seed Data
 
-The local profile includes organization seed data for business tenants. Seeding is delayed by `organization-seed.delay-seconds` so discovery and downstream services have time to become available.
+The Eureka profile includes organization seed data for business tenants. Seeding is delayed by `organization-seed.delay-seconds` so discovery and downstream services have time to become available.
 
 If seeding fails with service discovery errors, verify:
 
@@ -101,4 +101,3 @@ If Chrome shows a certificate warning:
 3. Reopen Chrome from a clean session.
 
 Do not test passkeys on local HTTP tenant hosts. Use HTTPS.
-

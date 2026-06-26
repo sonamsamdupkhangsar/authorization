@@ -2,31 +2,31 @@ package me.sonam.auth.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.reactive.function.client.WebClient;
 
-@Profile("!localDevTest")
+/**
+ * Direct WebClient builders for environments that should not use Spring Cloud
+ * LoadBalancer, such as Kubernetes DNS names and integration-test endpoints.
+ */
 @Configuration
-public class WebClientConfig {
-    private static final Logger LOG = LoggerFactory.getLogger(WebClientConfig.class);
+@Profile("non-eureka")
+public class DirectWebClientConfig {
+    private static final Logger LOG = LoggerFactory.getLogger(DirectWebClientConfig.class);
 
-    @LoadBalanced
     @Bean
     @Primary
     WebClient.Builder webClientBuilder() {
-        LOG.info("creating loadBalanced webclient");
+        LOG.info("creating direct service WebClient for non-Eureka service discovery");
         return WebClient.builder();
     }
 
-    @LoadBalanced
     @Bean
-    @Profile("!local-https")
     WebClient.Builder tokenWebClientBuilder() {
-        LOG.info("creating loadBalanced token webclient");
+        LOG.info("creating direct token WebClient for non-Eureka service discovery");
         return WebClient.builder();
     }
 }
