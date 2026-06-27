@@ -10,20 +10,26 @@ Add local tenant hostnames to `/etc/hosts`:
 127.0.0.1 platform.admin.openissuer.test free.admin.openissuer.test business1.admin.openissuer.test business2.admin.openissuer.test
 ```
 
-## Local HTTP
+## Local HTTPS
 
-Run authorization with the Eureka profile:
+Run authorization with Eureka and local HTTPS for browser, tenant-host, and passkey/WebAuthn testing:
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=eureka"
+SPRING_PROFILES_ACTIVE=eureka,local-https ./gradlew bootRun
 ```
 
 Common issuer URLs:
 
-- `http://platform.openissuer.test:9001`
-- `http://free.openissuer.test:9001`
-- `http://business1.openissuer.test:9001`
-- `http://business2.openissuer.test:9001`
+- `https://platform.openissuer.test:9001`
+- `https://free.openissuer.test:9001`
+- `https://business1.openissuer.test:9001`
+- `https://business2.openissuer.test:9001`
+
+For local HTTP only:
+
+```bash
+SPRING_PROFILES_ACTIVE=eureka ./gradlew bootRun
+```
 
 ## Local HTTPS For Passkeys
 
@@ -51,12 +57,6 @@ mkcert \
   business2.admin.openissuer.test \
   localhost \
   127.0.0.1
-```
-
-Run authorization with HTTPS:
-
-```bash
-SPRING_PROFILES_ACTIVE=eureka,local-https ./gradlew bootRun
 ```
 
 Use:
