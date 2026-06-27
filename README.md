@@ -30,7 +30,7 @@ OpenIssuer Authorization Server is the OAuth 2.1 and OpenID Connect provider for
 Run locally with the Eureka profile:
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=eureka"
+SPRING_PROFILES_ACTIVE=eureka ./gradlew bootRun
 ```
 
 For passkey testing, use local HTTPS:

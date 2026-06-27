@@ -22,15 +22,15 @@ public class EurekaWebClientConfig {
     private static final Logger LOG = LoggerFactory.getLogger(EurekaWebClientConfig.class);
 
     @LoadBalanced
-    @Bean
+    @Bean("serviceWebClientBuilder")
     @Primary
-    WebClient.Builder webClientBuilder() {
+    WebClient.Builder serviceWebClientBuilder() {
         LOG.info("creating load-balanced service WebClient for Eureka service discovery");
         return WebClient.builder();
     }
 
     @LoadBalanced
-    @Bean
+    @Bean("tokenWebClientBuilder")
     @Profile("!local-https")
     WebClient.Builder tokenWebClientBuilder() {
         LOG.info("creating load-balanced token WebClient for Eureka service discovery");

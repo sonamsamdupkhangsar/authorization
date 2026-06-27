@@ -64,14 +64,14 @@ Current endpoint shape:
 
 Files changed for that move:
 - [application.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application.yaml)
-- [application-local.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application-local.yaml)
+- [application-eureka.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application-eureka.yaml)
 - [application.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/test/resources/application.yaml)
 - [TokenFilter.java](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/java/me/sonam/auth/util/TokenFilter.java)
 - several Thymeleaf templates under [templates](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/templates)
 
 ## Local Dev Setup
 
-Local tenant hosts configured in [application-local.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application-local.yaml):
+Local tenant hosts configured in [application-eureka.yaml](/Users/sonamsamdupkhangsar/Documents/github/authorization/src/main/resources/application-eureka.yaml):
 - `platform.openissuer.test`
 - `business1.openissuer.test`
 - `business2.openissuer.test`
@@ -101,7 +101,7 @@ Recommended `/etc/hosts` entry:
 Then run with:
 
 ```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
+./gradlew bootRun --args='--spring.profiles.active=eureka'
 ```
 
 Local issuer URLs:

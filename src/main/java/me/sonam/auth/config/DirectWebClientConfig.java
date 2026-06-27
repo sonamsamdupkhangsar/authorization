@@ -17,14 +17,14 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class DirectWebClientConfig {
     private static final Logger LOG = LoggerFactory.getLogger(DirectWebClientConfig.class);
 
-    @Bean
+    @Bean("serviceWebClientBuilder")
     @Primary
-    WebClient.Builder webClientBuilder() {
+    WebClient.Builder serviceWebClientBuilder() {
         LOG.info("creating direct service WebClient for non-Eureka service discovery");
         return WebClient.builder();
     }
 
-    @Bean
+    @Bean("tokenWebClientBuilder")
     WebClient.Builder tokenWebClientBuilder() {
         LOG.info("creating direct token WebClient for non-Eureka service discovery");
         return WebClient.builder();
