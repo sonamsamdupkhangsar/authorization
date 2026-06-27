@@ -27,16 +27,16 @@ OpenIssuer Authorization Server is the OAuth 2.1 and OpenID Connect provider for
 
 ## Quick Start
 
-Run locally with the local profile:
+Run locally with Eureka and local HTTPS. Use this for browser, tenant-host, and passkey/WebAuthn testing:
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=local"
+SPRING_PROFILES_ACTIVE=eureka,local-https ./gradlew bootRun
 ```
 
-For passkey testing, use local HTTPS:
+For local HTTP only:
 
 ```bash
-SPRING_PROFILES_ACTIVE=local,local-https ./gradlew bootRun
+SPRING_PROFILES_ACTIVE=eureka ./gradlew bootRun
 ```
 
 See [Local Development](docs/07-local-development.md) for `/etc/hosts`, `mkcert`, and service startup details.

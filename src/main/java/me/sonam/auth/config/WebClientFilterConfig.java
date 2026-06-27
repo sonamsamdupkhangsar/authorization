@@ -5,6 +5,7 @@ import me.sonam.auth.util.TokenFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -13,6 +14,7 @@ public class WebClientFilterConfig {
     private static final Logger LOG = LoggerFactory.getLogger(WebClientFilterConfig.class);
 
     @Autowired
+    @Qualifier("serviceWebClientBuilder")
     private WebClient.Builder webClientBuilder;
 
     @Autowired

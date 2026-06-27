@@ -18,7 +18,7 @@ eureka:
 
 spring:
   profiles:
-    active: localDevTest
+    active: non-eureka
   application:
     name: authorization-service
   datasource:

@@ -10,20 +10,26 @@ Add local tenant hostnames to `/etc/hosts`:
 127.0.0.1 platform.admin.openissuer.test free.admin.openissuer.test business1.admin.openissuer.test business2.admin.openissuer.test
 ```
 
-## Local HTTP
+## Local HTTPS
 
-Run authorization with the local profile:
+Run authorization with Eureka and local HTTPS for browser, tenant-host, and passkey/WebAuthn testing:
 
 ```bash
-./gradlew bootRun --args="--spring.profiles.active=local"
+SPRING_PROFILES_ACTIVE=eureka,local-https ./gradlew bootRun
 ```
 
 Common issuer URLs:
 
-- `http://platform.openissuer.test:9001`
-- `http://free.openissuer.test:9001`
-- `http://business1.openissuer.test:9001`
-- `http://business2.openissuer.test:9001`
+- `https://platform.openissuer.test:9001`
+- `https://free.openissuer.test:9001`
+- `https://business1.openissuer.test:9001`
+- `https://business2.openissuer.test:9001`
+
+For local HTTP only:
+
+```bash
+SPRING_PROFILES_ACTIVE=eureka ./gradlew bootRun
+```
 
 ## Local HTTPS For Passkeys
 
@@ -53,12 +59,6 @@ mkcert \
   127.0.0.1
 ```
 
-Run authorization with HTTPS:
-
-```bash
-SPRING_PROFILES_ACTIVE=local,local-https ./gradlew bootRun
-```
-
 Use:
 
 ```text
@@ -83,7 +83,7 @@ This combination of host and port requires TLS.
 
 ## Local Seed Data
 
-The local profile includes organization seed data for business tenants. Seeding is delayed by `organization-seed.delay-seconds` so discovery and downstream services have time to become available.
+The Eureka profile includes organization seed data for business tenants. Seeding is delayed by `organization-seed.delay-seconds` so discovery and downstream services have time to become available.
 
 If seeding fails with service discovery errors, verify:
 
@@ -101,4 +101,3 @@ If Chrome shows a certificate warning:
 3. Reopen Chrome from a clean session.
 
 Do not test passkeys on local HTTP tenant hosts. Use HTTPS.
-
