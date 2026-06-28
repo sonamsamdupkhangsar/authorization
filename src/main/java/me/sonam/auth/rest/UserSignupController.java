@@ -131,7 +131,7 @@ public class UserSignupController {
                             .flatMap(createdOrganization -> organizationWebClient.addOrganizationToSubdomain(currentHost, createdOrganization.getId())
                                     .then(organizationWebClient.setDefaultOrganization(createdOrganization.getId(), user.getId()))
                                     .then(roleWebClient.setUserAsRoleNameForOrganization(null,
-                                            "SuperAdmin", user.getId(), createdOrganization.getId()))
+                                            "OrgAdmin", user.getId(), createdOrganization.getId()))
                                     .thenReturn(PATH));
                 })
                 .onErrorResume(throwable -> {

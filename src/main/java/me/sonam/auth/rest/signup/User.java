@@ -19,14 +19,14 @@ public class User {
     private OrganizationChoice organizationChoice = new OrganizationChoice();
     private Boolean searchable;
     private String profilePhoto;
-    private UUID authzManagerRoleOrganizationId;
+    private UUID authzManagerRoleAssignmentId;
 
-    public UUID getAuthzManagerRoleOrganizationId() {
-        return authzManagerRoleOrganizationId;
+    public UUID getAuthzManagerRoleAssignmentId() {
+        return authzManagerRoleAssignmentId;
     }
 
-    public void setAuthzManagerRoleOrganizationId(UUID authzManagerRoleOrganizationId) {
-        this.authzManagerRoleOrganizationId = authzManagerRoleOrganizationId;
+    public void setAuthzManagerRoleAssignmentId(UUID authzManagerRoleAssignmentId) {
+        this.authzManagerRoleAssignmentId = authzManagerRoleAssignmentId;
     }
 
     public Boolean getSearchable() {

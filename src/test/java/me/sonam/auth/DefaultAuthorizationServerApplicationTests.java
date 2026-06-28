@@ -172,7 +172,7 @@ public class DefaultAuthorizationServerApplicationTests {
 				.setResponseCode(200).setBody("{\"message\":true}"));
 
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"message\": \"Authentication successful\"}"));
+				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"message\": \"Authentication successful\"}"));
 
 		//HtmlPage page = this.webClient.getPage("/");
 		HtmlPage page = this.webClient.getPage(AUTHORIZATION_REQUEST);//.getWebResponse();
@@ -238,7 +238,7 @@ public class DefaultAuthorizationServerApplicationTests {
 				.setResponseCode(200).setBody("{id=cf792fa5-f2e9-4cfa-b099-7f62f2d15b38, firstName='Dommy', lastName='thecat', email='dommy@cat.email', birthDate=null, profilePhoto='null', genderId=null, newAccount=false}"));
 
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"message\": \"Authentication successful\"}"));
+				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"message\": \"Authentication successful\"}"));
 
 		//WebResponse response = this.webClient.getPage(AUTHORIZATION_REQUEST).getWebResponse();
 		/*assertThat(response.getStatusCode()).isEqualTo(HttpStatus.MOVED_PERMANENTLY.value());

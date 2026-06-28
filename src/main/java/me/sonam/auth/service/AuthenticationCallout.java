@@ -303,20 +303,20 @@ public class AuthenticationCallout implements AuthenticationProvider {
              *   currentHost        = business2.openissuer.test
              *   targetOrganization = organization-rest-service row with subdomain business2.openissuer.test
              *
-             * Authzmanager login is allowed only when the user is SuperAdmin for this
+             * Authzmanager login is allowed only when the user is OrgAdmin for this
              * host-bound organization.
              */
             Mono<UUID> targetOrganization = resolveDefaultHostOrganization(currentHost, userId)
                     .switchIfEmpty(Mono.error(new BadCredentialsException(
                             "This admin site is not associated with your organization")))
-                    .flatMap(organizationId -> roleWebClient.isSuperAdminInOrgId(null, userId, organizationId)
-                            .flatMap(isSuperAdmin -> {
-                                if (isSuperAdmin) {
+                    .flatMap(organizationId -> roleWebClient.isOrgAdminInOrgId(null, userId, organizationId)
+                            .flatMap(isOrgAdmin -> {
+                                if (isOrgAdmin) {
                                     return Mono.just(organizationId);
                                 }
-                                LOG.info("user logging is not a super admin");
+                                LOG.info("user logging in is not an OrgAdmin");
                                 return Mono.error(new BadCredentialsException(
-                                        "You must be a super admin for this organization to sign in to the admin site"));
+                                        "You must be an OrgAdmin for this organization to sign in to the admin site"));
                             }));
 
             return targetOrganization

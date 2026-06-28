@@ -323,7 +323,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//5 this is returned for authentications authenticate call mock response with roles with userId
 		// and message
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
+				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
 
 		//6 login success is recorded before returning user roles in authentication
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
@@ -332,7 +332,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//7
 		//it seems like we need to mock one more response for the redirection to redirecUris: /login/oauth2/code/messaging-client-oidc?code=...
 	mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"roleNames\": \"[user, SuperAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
+				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
 
 		Page page = signIn(/*this.webClient.getPage(response
 				.getResponseHeaderValue("location"))*/

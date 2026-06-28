@@ -23,12 +23,12 @@ public class RoleWebClient {
         this.roleEndpoint = roleEndpoint;
     }
 
-    public Mono<List<UUID>> getSuperAdminOrgIds(String accessToken, int page, int size) {
-        LOG.info("get superAdmin organizations for this user in accessToken");
+    public Mono<List<UUID>> getOrgAdminOrgIds(String accessToken, int page, int size) {
+        LOG.info("get orgAdmin organizations for this user in accessToken");
 
         final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
         stringBuilder.append("/authzmanagerroles/users/organizations?page="+ page + "&size="+size);
-        LOG.info("get super admin organizations endpoint: {}", stringBuilder);
+        LOG.info("get org admin organizations endpoint: {}", stringBuilder);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(stringBuilder.toString())
                 .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken))
@@ -36,12 +36,12 @@ public class RoleWebClient {
         return responseSpec.bodyToMono(new ParameterizedTypeReference<List<UUID>>() {});
     }
 
-    public Mono<Integer> getSuperAdminOrgIdsCount(String accessToken) {
-        LOG.info("get superAdmin organizations count for this user in accessToken");
+    public Mono<Integer> getOrgAdminOrgIdsCount(String accessToken) {
+        LOG.info("get orgAdmin organizations count for this user in accessToken");
 
         final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
         stringBuilder.append("/authzmanagerroles/users/organizations/count");
-        LOG.info("get super admin organizations endpoint: {}", stringBuilder);
+        LOG.info("get org admin organizations endpoint: {}", stringBuilder);
 
         return webClientBuilder.build().get().uri(stringBuilder.toString())
                 .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken))
@@ -61,7 +61,7 @@ public class RoleWebClient {
 
         final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
         stringBuilder.append("/authzmanagerroles/names/users/organizations");
-        LOG.info("set user as superadmin role for orgId using endpoint: {}", stringBuilder);
+        LOG.info("set user as OrgAdmin role for orgId using endpoint: {}", stringBuilder);
 
         WebClient.RequestBodySpec requestBodySpec = webClientBuilder.build().post().uri(stringBuilder.toString());
         if (accessToken != null) {
@@ -87,12 +87,13 @@ public class RoleWebClient {
                 });
     }
 
-    public Mono<Boolean> isSuperAdminInOrgId(String accessToken, UUID userId, UUID organizationId) {
-        LOG.info("get superAdmin organizations count for this user in accessToken");
+    public Mono<Boolean> isOrgAdminInOrgId(String accessToken, UUID userId, UUID organizationId) {
+        LOG.info("get orgAdmin organizations count for this user in accessToken");
 
         final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
-        stringBuilder.append("/authzmanagerroles/users/").append(userId).append("/organizations/").append(organizationId);
-        LOG.info("is user superAdmin in orgId using endpoint: {}", stringBuilder);
+        stringBuilder.append("/authzmanagerroles/users/").append(userId)
+                .append("/organizations/").append(organizationId).append("/org-admin");
+        LOG.info("is user orgAdmin in orgId using endpoint: {}", stringBuilder);
 
         WebClient.RequestHeadersUriSpec<?> requestHeadersUriSpec = webClientBuilder.build().get();
 
@@ -103,7 +104,7 @@ public class RoleWebClient {
         return requestHeadersUriSpec.uri(stringBuilder.toString())
                 .retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Boolean>>() {})
                 .flatMap(map -> {
-                    LOG.info("response for is user a super admin in orgId: {}", map);
+                    LOG.info("response for is user an OrgAdmin in orgId: {}", map);
                     if (map.get("message") != null) {
                         return Mono.just(map.get("message"));
                     }
@@ -111,7 +112,7 @@ public class RoleWebClient {
                         return Mono.error(new BadRequestException("There is no message in the response"));
                     }
                 }).onErrorResume(throwable -> {
-                    LOG.error("error occurred when checking if user is super admin for orgId", throwable);
+                    LOG.error("error occurred when checking if user is OrgAdmin for orgId", throwable);
                     return Mono.error(throwable);
                 });
     }

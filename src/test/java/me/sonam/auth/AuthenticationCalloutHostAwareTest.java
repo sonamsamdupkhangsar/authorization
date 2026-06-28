@@ -152,7 +152,7 @@ public class AuthenticationCalloutHostAwareTest {
         verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository, times(1)).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
-        verify(roleWebClient, never()).isSuperAdminInOrgId(any(), any(), any());
+        verify(roleWebClient, never()).isOrgAdminInOrgId(any(), any(), any());
     }
 
     @Test
@@ -180,7 +180,7 @@ public class AuthenticationCalloutHostAwareTest {
         verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository).findByClientId(clientUuid);
         verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
-        verify(roleWebClient, never()).isSuperAdminInOrgId(any(), any(), any());
+        verify(roleWebClient, never()).isOrgAdminInOrgId(any(), any(), any());
     }
 
     @Test
@@ -209,12 +209,12 @@ public class AuthenticationCalloutHostAwareTest {
     }
 
     @Test
-    void authzManagerLoginRequiresSuperAdminForHostOrganization() {
+    void authzManagerLoginRequiresOrgAdminForHostOrganization() {
         bindRequestHost(FREE_HOST);
         ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", clientUuid);
         when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
                 .thenReturn(Mono.just(organizationId));
-        when(roleWebClient.isSuperAdminInOrgId(null, userId, organizationId)).thenReturn(Mono.just(false));
+        when(roleWebClient.isOrgAdminInOrgId(null, userId, organizationId)).thenReturn(Mono.just(false));
         when(loginAttemptWebClient.loginFailed("user1", "")).thenReturn(Mono.just("Please try again"));
 
         UsernamePasswordAuthenticationToken request =
@@ -222,9 +222,9 @@ public class AuthenticationCalloutHostAwareTest {
 
         assertThatThrownBy(() -> authenticationCallout.authenticate(request))
                 .isInstanceOf(me.sonam.auth.service.exception.BadCredentialsException.class)
-                .hasMessageContaining("You must be a super admin for this organization to sign in to the admin site");
+                .hasMessageContaining("You must be an OrgAdmin for this organization to sign in to the admin site");
 
-        verify(roleWebClient).isSuperAdminInOrgId(null, userId, organizationId);
+        verify(roleWebClient).isOrgAdminInOrgId(null, userId, organizationId);
         verify(authenticationWebClient, never()).getAuth(any(), any());
     }
 
