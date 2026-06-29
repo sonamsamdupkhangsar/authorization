@@ -87,6 +87,34 @@ public class RoleWebClient {
                 });
     }
 
+    public Mono<UUID> setUserAsRoleNameForSubdomain(String accessToken, final String authzManagerRoleName, UUID userId,
+                                                    UUID subdomainId) {
+        LOG.info("set authzManagerRoleName for subdomain and userId");
+
+        final StringBuilder stringBuilder = new StringBuilder(roleEndpoint);
+        stringBuilder.append("/authzmanagerroles/names/users/subdomains");
+        LOG.info("set user as SubdomainAdmin role for subdomainId using endpoint: {}", stringBuilder);
+
+        WebClient.RequestBodySpec requestBodySpec = webClientBuilder.build().post().uri(stringBuilder.toString());
+        if (accessToken != null) {
+            requestBodySpec.headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken));
+        }
+
+        return requestBodySpec.bodyValue(Map.of("userId", userId, "subdomainId", subdomainId,
+                        "authzManagerRoleName", authzManagerRoleName))
+                .retrieve().bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .flatMap(map -> {
+                    LOG.info("user set as authzManagerRoleName for subdomain: {}", map);
+                    if (map.get("id") != null) {
+                        return Mono.just(UUID.fromString(map.get("id").toString()));
+                    }
+                    return Mono.error(new AuthenticationException("No id found"));
+                }).onErrorResume(throwable -> {
+                    LOG.error("error occurred when setting user as authzManagerRoleName for subdomainId", throwable);
+                    return Mono.error(throwable);
+                });
+    }
+
     public Mono<Boolean> isOrgAdminInOrgId(String accessToken, UUID userId, UUID organizationId) {
         LOG.info("get orgAdmin organizations count for this user in accessToken");
 

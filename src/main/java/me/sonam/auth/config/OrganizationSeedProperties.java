@@ -36,6 +36,7 @@ public class OrganizationSeedProperties {
         private String password;
         private boolean active = true;
         private String organizationSubdomain;
+        private boolean subdomainAdmin;
 
         public String getFirstName() {
             return firstName;
@@ -91,6 +92,14 @@ public class OrganizationSeedProperties {
 
         public void setOrganizationSubdomain(String organizationSubdomain) {
             this.organizationSubdomain = organizationSubdomain;
+        }
+
+        public boolean isSubdomainAdmin() {
+            return subdomainAdmin;
+        }
+
+        public void setSubdomainAdmin(boolean subdomainAdmin) {
+            this.subdomainAdmin = subdomainAdmin;
         }
     }
 
