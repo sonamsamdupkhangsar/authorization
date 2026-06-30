@@ -1,6 +1,7 @@
 package me.sonam.auth.webclient;
 
 import me.sonam.auth.rest.signup.Organization;
+import me.sonam.auth.util.CustomRestPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -126,12 +127,13 @@ public class OrganizationWebClient {
     }
 
     public Mono<List<UUID>> getOrganizationIdsBySubdomain(String subdomain) {
-        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain) + "/organizations";
+        String endpoint = this.organizationBySubdomainEndpoint.replace("{subdomain}", subdomain)
+                + "/organizations?page=0&size=100";
         LOG.info("get organizations by subdomain endpoint: {}", endpoint);
 
         return webClientBuilder.build().get().uri(endpoint).retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-                .map(organizations -> organizations.stream()
+                .bodyToMono(new ParameterizedTypeReference<CustomRestPage<Map<String, Object>>>() {})
+                .map(organizationPage -> organizationPage.content().stream()
                         .map(organization -> organization.get("id"))
                         .filter(id -> id != null)
                         .map(id -> UUID.fromString(id.toString()))
@@ -143,6 +145,29 @@ public class OrganizationWebClient {
                                 webClientResponseException.getResponseBodyAsString());
                     }
                     return Mono.just(List.of());
+                });
+    }
+
+    public Mono<UUID> getSubdomainIdByHost(String subdomain) {
+        String endpoint = this.organizationEndpoint + "/subdomains/" + subdomain;
+        LOG.info("get subdomain by host endpoint: {}", endpoint);
+
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(map -> {
+                    Object id = map.get("id");
+                    if (id == null) {
+                        return Mono.empty();
+                    }
+                    return Mono.just(UUID.fromString(id.toString()));
+                })
+                .onErrorResume(throwable -> {
+                    LOG.error("failed to get subdomain by host {}: {}", subdomain, throwable.getMessage());
+                    if (throwable instanceof WebClientResponseException webClientResponseException) {
+                        LOG.error("subdomain by host error body contains: {}",
+                                webClientResponseException.getResponseBodyAsString());
+                    }
+                    return Mono.empty();
                 });
     }
 

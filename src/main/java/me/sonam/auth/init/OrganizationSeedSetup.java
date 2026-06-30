@@ -97,7 +97,7 @@ public class OrganizationSeedSetup {
                     .block();
         });
 
-        attachSeedUsersToOrganizationsAsSuperAdmins(seededUsers);
+        attachSeedUsersToOrganizationsAsOrgAdmins(seededUsers);
     }
 
     // Ensures each configured bootstrap user exists and returns a lookup map that later seed
@@ -128,18 +128,18 @@ public class OrganizationSeedSetup {
      * Grants bootstrap access for configured host-bound organizations.
      *
      * Any seed user with organizationSubdomain is attached to that organization and then made
-     * authzmanager SuperAdmin for the same organization. The SuperAdmin role is the important
-     * part for admin login: authzmanager allows login only when the user is SuperAdmin for the
-     * organization resolved from the current tenant host.
+     * authzmanager OrgAdmin for the same organization. The OrgAdmin role is still the login
+     * gate for authzmanager. If subdomainAdmin is true, the user also gets SubdomainAdmin for
+     * that same subdomain so they can use subdomain-level admin views after login.
      *
      * Example:
      *   business2user@openissuer.test + business2.openissuer.test
      *   -> add user to Business 2
-     *   -> assign SuperAdmin for Business 2
+     *   -> assign OrgAdmin for Business 2
      *   -> make Business 2 the user's default organization
      *   -> allow login at business2.admin.openissuer.test
      */
-    private void attachSeedUsersToOrganizationsAsSuperAdmins(Map<String, UUID> seededUsers) {
+    private void attachSeedUsersToOrganizationsAsOrgAdmins(Map<String, UUID> seededUsers) {
         organizationSeedProperties.getUsers().forEach(seedUser -> {
             if (!StringUtils.hasText(seedUser.getOrganizationSubdomain())) {
                 return;
@@ -159,15 +159,30 @@ public class OrganizationSeedSetup {
                                     seedUser.getOrganizationSubdomain(), true)
                             .doOnNext( response -> LOG.info("seeded user {} into organization subdomain {}",
                                     seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain()))
-                            // SuperAdmin is required for this seed user to sign in to authzmanager for this tenant.
-                            .then(roleWebClient.setUserAsRoleNameForOrganization(null, "SuperAdmin", userId, organizationId))
-                            .doOnNext(roleId -> LOG.info("seeded user {} as SuperAdmin for organization subdomain {}",
+                            // OrgAdmin is required for this seed user to sign in to authzmanager for this tenant.
+                            .then(roleWebClient.setUserAsRoleNameForOrganization(null, "OrgAdmin", userId, organizationId))
+                            .doOnNext(roleId -> LOG.info("seeded user {} as OrgAdmin for organization subdomain {}",
                                     seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain()))
+                            .then(assignSubdomainAdminIfConfigured(seedUser, userId))
                             .then(organizationWebClient.setDefaultOrganization(organizationId, userId))
                             .doOnNext(response -> LOG.info("set seeded user {} default organization to subdomain {}",
                                     seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain())))
                     .block();
         });
+    }
+
+    private Mono<?> assignSubdomainAdminIfConfigured(OrganizationSeedProperties.SeedUser seedUser, UUID userId) {
+        if (!seedUser.isSubdomainAdmin()) {
+            return Mono.empty();
+        }
+
+        return organizationWebClient.getSubdomainIdByHost(seedUser.getOrganizationSubdomain())
+                .switchIfEmpty(Mono.error(new IllegalStateException("No subdomain found for "
+                        + seedUser.getOrganizationSubdomain())))
+                .flatMap(subdomainId -> roleWebClient.setUserAsRoleNameForSubdomain(null, "SubdomainAdmin",
+                        userId, subdomainId))
+                .doOnNext(roleId -> LOG.info("seeded user {} as SubdomainAdmin for subdomain {}",
+                        seedUser.getAuthenticationId(), seedUser.getOrganizationSubdomain()));
     }
 
     // Converts the local YAML seed entry into the signup payload expected by user-rest-service.

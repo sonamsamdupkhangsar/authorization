@@ -153,6 +153,14 @@ organization-seed:
       password: business2user-secret
       active: true
       organizationSubdomain: business2.openissuer.test
+    - firstName: Free
+      lastName: User
+      email: freeuser@openissuer.test
+      authenticationId: freeuser@openissuer.test
+      password: freeuser-secret
+      active: true
+      organizationSubdomain: free.openissuer.test
+      subdomainAdmin: true
   organizations:
     - name: Business 1
       creatorAuthenticationId: owner1@openissuer.test
@@ -160,3 +168,6 @@ organization-seed:
     - name: Business 2
       creatorAuthenticationId: owner2@openissuer.test
       subdomain: business2.openissuer.test
+    - name: Free
+      creatorAuthenticationId: freeuser@openissuer.test
+      subdomain: free.openissuer.test

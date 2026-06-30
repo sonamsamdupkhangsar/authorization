@@ -260,7 +260,7 @@ public class ClientRestServiceIntegTest {
 
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")
     @Test
-    public void createFailWhenNotSuperAdmin() throws Exception {
+    public void createFailWhenNotOrgAdmin() throws Exception {
         LOG.info("create registration client");
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107");
@@ -287,7 +287,7 @@ public class ClientRestServiceIntegTest {
             }).verifyComplete();
         }
         catch (Exception e) {
-            LOG.info("This exception is thrown because the user is not a superadmin for orgId, error: {}", e.getMessage());
+            LOG.info("This exception is thrown because the user is not an OrgAdmin for orgId, error: {}", e.getMessage());
         }
 
         // take request for mocked response of access token
@@ -459,7 +459,7 @@ public class ClientRestServiceIntegTest {
         return tokenMap.get("access_token");
     }
 
-    private void saveClient(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isSuperAdmin) throws  Exception {
+    private void saveClient(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isOrgAdmin) throws  Exception {
         LOG.info("now make a request to create a client");
         Map<String, Object> regClientMap = getRegClientMap(clientId, clientSecret, userId);
 
@@ -475,7 +475,7 @@ public class ClientRestServiceIntegTest {
         enqueueDefaultOrganizationResponse(defaultOrgId);
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
+                .setResponseCode(200).setBody(getJson(Map.of("message", isOrgAdmin))));
 
 
         Mono<Map> mapMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
@@ -500,7 +500,7 @@ public class ClientRestServiceIntegTest {
         assertThat(recordedRequest.getPath()).startsWith("/roles/authzmanagerroles/users/"+userId+"/organizations/"+defaultOrgId);
     }
 
-    private void saveClientNotSuccess(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isSuperAdmin) throws  Exception {
+    private void saveClientNotSuccess(String clientId, String clientSecret, UUID userId, UUID defaultOrgId, boolean isOrgAdmin) throws  Exception {
 
         try {
             LOG.info("now make a request to create a client");
@@ -515,7 +515,7 @@ public class ClientRestServiceIntegTest {
             enqueueDefaultOrganizationResponse(defaultOrgId);
 
             mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-                    .setResponseCode(200).setBody(getJson(Map.of("message", isSuperAdmin))));
+                    .setResponseCode(200).setBody(getJson(Map.of("message", isOrgAdmin))));
 
             Mono<String> stringMono = webTestClient.post().uri("/clients").bodyValue(regClientMap)
                     .exchange().expectStatus().is4xxClientError().returnResult(String.class).getResponseBody().single();
@@ -707,7 +707,7 @@ public class ClientRestServiceIntegTest {
         //get defaultOrganization response
         enqueueDefaultOrganizationResponse(defaultOrgId);
 
-        //isSuperAdminInOrgId response
+        //isOrgAdminInOrgId response
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
                 .setResponseCode(200).setBody(getJson(Map.of("message", true))));
 

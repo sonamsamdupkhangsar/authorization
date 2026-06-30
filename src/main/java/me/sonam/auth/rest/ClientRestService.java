@@ -110,10 +110,10 @@ public class ClientRestService {
 
        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
-               .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+               .flatMap(orgId -> roleWebClient.isOrgAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                .flatMap(objects -> {
                    if (objects.getT1() == false) {
-                       return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : "+ objects.getT2()));
+                       return Mono.error(new AuthenticationException("user is not an OrgAdmin in organizationId : "+ objects.getT2()));
                    }
                    else {
                     return Mono.just(objects.getT2());
@@ -247,7 +247,7 @@ public class ClientRestService {
     }
     /**
      * Get user's default organization (whether a subdomain like org1.authzger.com or a free tier one) or a id from settings
-     * then show organization level clients.  Users can't login, only superadmins can.
+     * then show organization level clients.  Users can't login, only OrgAdmins can.
      * use the tokenized userId
      * @param pageable
      * @return
@@ -268,10 +268,10 @@ public class ClientRestService {
 
         return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
-                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(orgId -> roleWebClient.isOrgAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                 .flatMap(objects -> {
                     if (!objects.getT1()) {
-                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                        return Mono.error(new AuthenticationException("user is not an OrgAdmin in organizationId : " + objects.getT2()));
                     } else {
                         return Mono.just(objects.getT2());
                     }
@@ -398,10 +398,10 @@ public class ClientRestService {
 
         return organizationWebClient.getDefaultOrganizationIdForUser(userId)
                 .switchIfEmpty(Mono.error(new AuthenticationException("User does not have default organization-id")))
-                .flatMap(orgId -> roleWebClient.isSuperAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
+                .flatMap(orgId -> roleWebClient.isOrgAdminInOrgId(accessToken, userId, orgId).zipWith(Mono.just(orgId)))
                 .flatMap(objects -> {
                     if (!objects.getT1()) {
-                        return Mono.error(new AuthenticationException("user is not a superadmin in organizationId : " + objects.getT2()));
+                        return Mono.error(new AuthenticationException("user is not an OrgAdmin in organizationId : " + objects.getT2()));
                     }
                     UUID orgId = objects.getT2();
                     //check if there are rows where there are roles set by this orgId -- indicating there are users with roles for some client
