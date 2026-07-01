@@ -88,6 +88,7 @@ httproute:
     - "/password"
     - "/username"
     - "/loginHelp"
+    - "/mfa"
     - "/userinfo"
     - "/.well-known"
     - "/issuer"

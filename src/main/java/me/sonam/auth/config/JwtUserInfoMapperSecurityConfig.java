@@ -43,6 +43,7 @@ import org.springframework.security.web.authentication.ui.DefaultResourcesFilter
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.security.web.webauthn.management.UserCredentialRepository;
@@ -167,6 +168,9 @@ public class JwtUserInfoMapperSecurityConfig {
                 .anyRequest().authenticated()
                 )
                 .csrf(httpSecurityCsrfConfigurer -> httpSecurityCsrfConfigurer.disable())
+                .exceptionHandling(exceptionHandlingConfigurer -> exceptionHandlingConfigurer
+                        .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/"),
+                                PathPatternRequestMatcher.pathPattern("/mfa/passkeys")))
                 .oauth2ResourceServer(httpSecurityOAuth2ResourceServerConfigurer ->
                         httpSecurityOAuth2ResourceServerConfigurer.jwt(Customizer.withDefaults()))
                 .formLogin(httpSecurityFormLoginConfigurer ->
