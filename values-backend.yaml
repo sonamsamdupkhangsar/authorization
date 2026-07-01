@@ -81,6 +81,7 @@ httproute:
     - "/accounts/lock/email"
     - "/accounts/lock/email/secret"
   pathPrefixes:
+    - "/css"
     - "/oauth2"
     - "/login"
     - "/logout"
