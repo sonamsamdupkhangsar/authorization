@@ -1,0 +1,168 @@
+body.auth-page {
+  min-height: 100vh;
+  margin: 0;
+  background: #f7f9f6;
+  color: #111817;
+}
+
+.auth-page .container {
+  width: min(100% - 32px, 1120px);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px 0;
+}
+
+.auth-page .form-signin,
+.auth-page .container > div,
+.auth-page .container > main {
+  width: min(100%, 360px);
+  margin: 0 auto;
+  padding: 26px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: 0 22px 70px rgba(35, 48, 44, .13);
+}
+
+.auth-page .container > div:has(.form-signin) {
+  width: min(100%, 360px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-page .container > div:has(.form-signin) .form-signin {
+  width: 100%;
+}
+
+.auth-page .login-form {
+  width: min(100%, 320px);
+}
+
+.auth-page .compact-form {
+  width: min(100%, 320px);
+}
+
+.auth-page .container > div:has(.form-signin) .compact-form {
+  width: min(100%, 320px);
+}
+
+.auth-page h1 {
+  margin: 0 0 10px;
+  color: #111817;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.auth-page h1::before {
+  content: "OpenIssuer";
+  display: block;
+  margin-bottom: 12px;
+  color: #2d6a4f;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.auth-page p {
+  color: #43514c;
+  line-height: 1.6;
+}
+
+.auth-page .form-floating,
+.auth-page .form-group {
+  margin-top: 14px;
+}
+
+.auth-page .form-control {
+  min-height: 46px;
+  border-color: #cfd8d2;
+  border-radius: 6px;
+  color: #111817;
+}
+
+.auth-page .form-control:focus {
+  border-color: #2d6a4f;
+  box-shadow: 0 0 0 .2rem rgba(45, 106, 79, .16);
+}
+
+.auth-page label {
+  color: #26312d;
+  font-weight: 650;
+}
+
+.auth-page .btn,
+.auth-page button {
+  min-height: 46px;
+  border-radius: 6px;
+  font-weight: 750;
+}
+
+.auth-page .btn-primary,
+.auth-page .btn-primary:disabled,
+.auth-page button.btn-primary {
+  border-color: #13211d;
+  background: #13211d;
+}
+
+.auth-page .btn-primary:hover,
+.auth-page button.btn-primary:hover {
+  border-color: #263a33;
+  background: #263a33;
+}
+
+.auth-page a {
+  color: #143a2a !important;
+  font-weight: 700;
+}
+
+.auth-page .alert {
+  border-radius: 6px;
+}
+
+.auth-page .error {
+  margin: 0 0 6px;
+  color: #9d2b2b;
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.auth-page .auth-links {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.auth-page .passkey-page {
+  width: min(100%, 760px);
+  padding: 28px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: 0 22px 70px rgba(35, 48, 44, .13);
+}
+
+.auth-page .passkey-list-item {
+  background: #f9fcf8;
+}
+
+@media (max-width: 560px) {
+  .auth-page .container {
+    width: min(100% - 24px, 1120px);
+    padding: 24px 0;
+  }
+
+  .auth-page .form-signin,
+  .auth-page .container > div,
+  .auth-page .container > main {
+    padding: 22px;
+  }
+}

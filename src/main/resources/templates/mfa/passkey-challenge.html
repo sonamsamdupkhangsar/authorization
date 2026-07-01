@@ -6,11 +6,11 @@
     <title>Verify passkey</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
-    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
-</head>
-<body>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    </head>
+<body class="auth-page">
 <div class="container">
-    <main class="form-signin w-100 m-auto">
+    <main class="form-signin m-auto">
         <div id="passkeyError" class="alert alert-danger" role="alert" th:if="${error}" th:text="${error}"></div>
         <div id="passkeyClientError" class="alert alert-danger" role="alert" style="display:none"></div>
 

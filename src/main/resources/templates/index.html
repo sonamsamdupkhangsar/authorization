@@ -3,13 +3,11 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spring Authorization sign in</title>
+    <title>OpenIssuer Sign In</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
-    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
-</head>
-<title>Login</title>
-<script th:inline="javascript">
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <script th:inline="javascript">
     let usernameCheckRequestId = 0;
 
     window.addEventListener('load', function() {
@@ -95,10 +93,11 @@
         }
     }
 </script>
-<body>
+</head>
+<body class="auth-page">
 <div class="container">
 
-    <form class="form-signin w-100 m-auto" method="post" th:action="@{/}">
+    <form class="form-signin login-form m-auto" method="post" th:action="@{/}">
         <input type="hidden" name="client_id" th:if="${clientId}" th:value="${clientId}">
         <div id="userIdCheckDiv" class="alert alert-danger" role="alert">
             <span id="userIdCheckSpan"></span>
@@ -109,7 +108,7 @@
         <div th:if="${param.logout}" class="alert alert-success" role="alert">
             You have been logged out.
         </div>
-        <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
+        <h1 class="h3 mb-3 fw-normal">Sign in to OpenIssuer</h1>
         <div class="form-floating">
             <input type="text" id="username" name="username" autocomplete="username" class="form-control"
                    th:with="url = @{/users/username}"  th:onblur="checkUsername([[${url}]])" required autofocus>

@@ -6,9 +6,11 @@
     <title>Passkeys</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
 </head>
-<body>
-<div class="container mt-5">
+<body class="auth-page">
+<div class="container">
+    <main class="passkey-page">
     <h1 class="h3 mb-4">Passkeys</h1>
 
     <div id="passkeySuccess" class="alert alert-success" role="alert" style="display:none">
@@ -29,7 +31,7 @@
 
     <h2 class="h5">Registered passkeys</h2>
     <p th:if="${#lists.isEmpty(credentials)}" class="text-muted">No passkeys registered.</p>
-    <div th:each="credential : ${credentials}" class="d-flex align-items-center justify-content-between border rounded p-3 mb-2">
+    <div th:each="credential : ${credentials}" class="d-flex align-items-center justify-content-between border rounded p-3 mb-2 passkey-list-item">
         <div>
             <div th:text="${credential.label}">Passkey</div>
             <small class="text-muted">
@@ -44,6 +46,7 @@
             <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
         </form>
     </div>
+    </main>
 </div>
 
     <script th:inline="javascript">

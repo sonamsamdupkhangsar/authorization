@@ -3,10 +3,10 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spring Authorization User Signup form</title>
+    <title>OpenIssuer Signup</title>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
-    <link href="https://getbootstrap.com/docs/4.0/examples/signin/signin.css" rel="stylesheet" crossorigin="anonymous"/>
-<style>
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+    <style>
     .error {
       color: red;
   }
@@ -19,7 +19,7 @@
         }
     </script>
 </head>
-<body>
+<body class="auth-page">
 <div class="container">
     <div class="mb-3">
 
@@ -32,7 +32,7 @@
     </div>
 
 
-    <form th:if="${userSignup}" class="form-signin w-100 m-auto" method="post" th:object="${userSignup}" th:action="@{/signup}"  onsubmit='disableButton()'>
+    <form th:if="${userSignup}" class="form-signin m-auto" method="post" th:object="${userSignup}" th:action="@{/signup}"  onsubmit='disableButton()'>
         <input type="hidden" name="returnTo" th:if="${returnTo}" th:value="${returnTo}">
         <div th:if="${param.error}" th:with="errorMsg=${session['SPRING_SECURITY_LAST_EXCEPTION'].message}" class="alert alert-danger" role="alert">
             Login failed. <span th:text="${errorMsg}"></span>.
@@ -40,7 +40,7 @@
         <div th:if="${param.logout}" class="alert alert-success" role="alert">
             You have been logged out.
         </div>
-        <h1 class="h3 mb-3 fw-normal">Enter User information</h1>
+        <h1 class="h3 mb-3 fw-normal">Create your account</h1>
 
 
         <div class="form-floating mb-3 mt-5">
