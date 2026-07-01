@@ -91,9 +91,9 @@ public class ForgotUsernamePasswordIntegTest {
     public void forgotUsername() throws Exception {
         LOG.info("call forgotUsername endpoint");
 
-        LOG.info("assert that the page returned is Email username help");
+        LOG.info("assert that the username recovery page is returned");
         this.mockMvc.perform(get("/username")).andDo(print()).andExpect(status().isOk())
-                .andExpect(content().string(containsString("Email username help")));
+                .andExpect(content().string(containsString("Recover your username")));
     }
 
     @Test
