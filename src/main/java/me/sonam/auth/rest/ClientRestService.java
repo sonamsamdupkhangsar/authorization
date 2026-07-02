@@ -368,7 +368,7 @@ public class ClientRestService {
         final String issuer = issuerFromJwt(jwt);
 
         String accessToken = jwt.getTokenValue();
-        LOG.info("delete client requested by userId {}", String.valueOf(jwt.getClaim("userId")));
+        LOG.info("delete client requested by userId {}", (Object) jwt.getClaim("userId"));
 
         RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findById(issuer, id);
 
