@@ -93,7 +93,14 @@ public class ClientRestService {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Mono<Map<String, Object>> createNew(@RequestBody Map<String, Object> map) {
-        LOG.info("create new client with map: {}", map);
+        if (map == null) {
+            return Mono.error(new BadRequestException("client request body is required"));
+        }
+        if (map.get("clientId") == null) {
+            return Mono.error(new BadRequestException("clientId is required"));
+        }
+
+        LOG.info("create new client with clientId: {}", map.get("clientId"));
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         final String issuer = issuerFromJwt(jwt);
@@ -105,7 +112,7 @@ public class ClientRestService {
 
         UUID userId = UUID.fromString(userIdString);
 
-        LOG.info("userId {}, accessToken: {}", userId, accessToken);
+        LOG.info("create client requested by userId {}", userId);
 
 
        return organizationWebClient.getDefaultOrganizationIdForUser(userId)
@@ -144,16 +151,16 @@ public class ClientRestService {
 
         String encodedPassword = passwordEncoder.encode((String)map.get("clientSecret"));
 
-        LOG.info("saving bcrypt encodedPassword {} as the clientSecret", encodedPassword);
+        LOG.info("encoding client secret before storage");
         map.put("clientSecret", encodedPassword);
 
         RegisteredClient registeredClient = registeredClientMapConverter.build(map);
 
-        LOG.debug("built registeredClient from map: {}", registeredClient);
+        LOG.debug("built registered client with id {}", registeredClient.getId());
 
         issuerAwareAuthorizationServerOperations.save(issuer, registeredClient);
         RegisteredClient savedRedisteredClient = issuerAwareAuthorizationServerOperations.findById(issuer, registeredClient.getId());
-        LOG.info("saved registeredClient: {}", savedRedisteredClient);
+        LOG.info("saved registered client with id {}", savedRedisteredClient.getId());
 
         LOG.info("saved registeredClient.id: {}", registeredClient.getId());
         UUID clientId = UUID.fromString(registeredClient.getId());
@@ -295,19 +302,23 @@ public class ClientRestService {
     @PutMapping
     @ResponseStatus(HttpStatus.OK)
     public Mono<Map<String, Object>> update(@RequestBody Map<String, Object> map) {
-        LOG.info("update client using map: {}", map);
+        if (map == null) {
+            return Mono.error(new BadRequestException("client request body is required"));
+        }
+        if (map.get("id") == null) {
+            LOG.error("map does not contain client id");
+            return Mono.error(new BadRequestException("No client id"));
+        }
+
+        LOG.info("update client with id: {}", map.get("id"));
         LOG.info("clientIdIssuedAt: {}", map.get("clientIdIssuedAt"));
 
         Jwt jwt = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         final String issuer = issuerFromJwt(jwt);
 
         String accessToken = jwt.getTokenValue();
-        LOG.info("accessToken: {}", accessToken);
+        LOG.info("authenticated client update request received");
 
-        if (map.get("id") == null) {
-            LOG.error("map does not contain client id");
-            return Mono.error(new BadRequestException("No client id"));
-        }
         RegisteredClient fromDb = issuerAwareAuthorizationServerOperations.findById(issuer, map.get("id").toString());
         if (fromDb == null) {
             LOG.error("There is no RegisteredClient found with id: {}", map.get("id"));
@@ -316,24 +327,24 @@ public class ClientRestService {
 
         map.put("id", fromDb.getId());
         final String newClientSecret = (String) map.get("newClientSecret");
-        LOG.info("using newClientSecret as clientSecret: {}", newClientSecret);
+        LOG.info("new client secret supplied: {}", newClientSecret != null && !newClientSecret.isEmpty());
 
         if (newClientSecret != null && !newClientSecret.isEmpty()) {
 
-            LOG.info("using new client secret to overwrite clientSecret: {}", map.get("newClientSecret"));
+            LOG.info("replacing stored client secret");
             final String encodedPassword = passwordEncoder.encode(newClientSecret);
             map.put("clientSecret", encodedPassword);
-            LOG.info("adding encodePassword as clientSecret: {}", encodedPassword);
+            LOG.info("encoded replacement client secret before storage");
         }
 
-        LOG.info("fromDb: {}, fromDb.ts.authCodeTimeToLive seconds: {}",
-                fromDb, fromDb.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds());
+        LOG.info("loaded registered client id {}, authorizationCodeTimeToLive seconds: {}",
+                fromDb.getId(), fromDb.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds());
 
         try {
             RegisteredClient registeredClient = registeredClientMapConverter.build(map);
 
-            LOG.info("built registeredClient from map, authorizationCodeTimeToLive in seconds: {}, registeredClient {}",
-                    registeredClient.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds(), registeredClient);
+            LOG.info("built registered client id {}, authorizationCodeTimeToLive in seconds: {}",
+                    registeredClient.getId(), registeredClient.getTokenSettings().getAuthorizationCodeTimeToLive().getSeconds());
 
             issuerAwareAuthorizationServerOperations.save(issuer, registeredClient);
 
@@ -357,7 +368,7 @@ public class ClientRestService {
         final String issuer = issuerFromJwt(jwt);
 
         String accessToken = jwt.getTokenValue();
-        LOG.info("userId: {}, accessToken: {}", jwt.getClaim("userId"), accessToken);
+        LOG.info("delete client requested by userId {}", String.valueOf(jwt.getClaim("userId")));
 
         RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findById(issuer, id);
 

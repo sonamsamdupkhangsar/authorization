@@ -77,9 +77,9 @@ public class OrganizationWebClient {
 
         //throws exception if user does not exist in organization
         return responseSpec.bodyToMono(Map.class).map(map -> {
-            LOG.info("userExistsInOrganization response: {}, map.get'message': {}", map, map.get("message"));
-            LOG.info("map.get(message): {}", map.get("message").equals(true));
-            if (map.get("message").equals(true)) {
+            Object message = map.get("message");
+            LOG.info("userExistsInOrganization response received, exists: {}", Boolean.TRUE.equals(message));
+            if (Boolean.TRUE.equals(message)) {
                 LOG.info("return true");
                 return true;
             }

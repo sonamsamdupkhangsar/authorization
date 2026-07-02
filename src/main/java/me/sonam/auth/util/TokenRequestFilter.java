@@ -133,7 +133,7 @@ public class TokenRequestFilter {
                 return "AccessToken{" +
                         "option=" + option +
                         ", scopes='" + scopes + '\'' +
-                        ", base64EncodedClientIdSecret='" + base64EncodedClientIdSecret + '\'' +
+                        ", credentialsConfigured=" + (base64EncodedClientIdSecret != null && !base64EncodedClientIdSecret.isBlank()) +
                         '}';
             }
 

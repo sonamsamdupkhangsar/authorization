@@ -152,15 +152,11 @@ public class User {
     public String toString() {
         return "User{" +
                 "id=" + id +
-                ", firstName='" + firstName + '\'' +
-                ", lastName='" + lastName + '\'' +
-                ", email='" + email + '\'' +
-                ", authenticationId='" + authenticationId + '\'' +
                 ", active=" + active +
                 ", userAuthAccountCreated=" + userAuthAccountCreated +
                 ", organizationChoice=" + organizationChoice +
                 ", searchable=" + searchable +
-                ", profilePhoto='" + profilePhoto + '\'' +
+                ", profilePhotoSupplied=" + (profilePhoto != null && !profilePhoto.isBlank()) +
                 '}';
     }
 }

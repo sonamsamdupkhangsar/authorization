@@ -58,7 +58,7 @@ public class ForgotUsernameController {
     @PostMapping("/username")
     public Mono<String> emailUsername(String emailAddress, Model model,
                                       HttpServletRequest request, HttpServletResponse response) {
-        LOG.info("email username for email: {}", emailAddress);
+        LOG.info("forgot-username email requested");
         loginReturnContextService.addReturnContext(model, request, response);
 
       return  accountWebClient.emailUsername(emailAddress).flatMap(s -> {

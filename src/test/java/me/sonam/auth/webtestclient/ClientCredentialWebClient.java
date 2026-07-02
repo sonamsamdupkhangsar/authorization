@@ -25,7 +25,7 @@ public class ClientCredentialWebClient {
     }
 
     public String getAccessToken(String clientId, String secret) {
-        LOG.info("clientId: {}, secret: {}", clientId, secret);
+        LOG.info("requesting client-credentials token for clientId: {}", clientId);
 
         String base64ClientSecret = Base64.getEncoder().encodeToString((clientId +
                 ":" + secret).getBytes());
@@ -43,7 +43,7 @@ public class ClientCredentialWebClient {
                 })
                 .returnResult();
 
-        LOG.info("tokenEntityExchangeResult: {}", tokenEntityExchangeResult.getResponseBody());
+        LOG.info("client-credentials token response received");
 
         final Map<String, String> map = tokenEntityExchangeResult.getResponseBody();
         return map.get("access_token");

@@ -21,7 +21,7 @@ public class PasswordEncodeTest {
         LOG.error("encrypt empty string and see the result");
         final String password = "";
         String encodedPassword = passwordEncoder.encode(password);
-        LOG.error("encoded password is {}", encodedPassword);
+        LOG.info("password encoded for comparison test");
 
         boolean equals = passwordEncoder.matches("", encodedPassword);
         LOG.error("is the empty string equals to encodedPassword: {}", equals);
@@ -34,7 +34,7 @@ public class PasswordEncodeTest {
         LOG.error("encrypt string with single value");
         final String password = "1";
         String encodedPassword = passwordEncoder.encode(password);
-        LOG.error("encoded 1 password is {}", encodedPassword);
+        LOG.info("password encoded for comparison test");
 
         boolean equals = passwordEncoder.matches("1", encodedPassword);
         LOG.error("is the 1 string equals to encodedPassword: {}", equals);

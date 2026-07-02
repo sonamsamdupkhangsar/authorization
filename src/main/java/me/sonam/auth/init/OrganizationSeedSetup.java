@@ -114,7 +114,7 @@ public class OrganizationSeedSetup {
             UUID userId = userWebClient.getUserId(seedUser.getAuthenticationId())
                     .onErrorResume(throwable -> userWebClient.signupUser(toUserSignup(seedUser))
                             .then(userWebClient.getUserId(seedUser.getAuthenticationId())))
-                    .doOnNext(id -> LOG.info("resolved seeded user {} with id {}", seedUser.getAuthenticationId(), id))
+                    .doOnNext(id -> LOG.info("resolved seeded user id {}", id))
                     .block();
 
             if (userId != null) {

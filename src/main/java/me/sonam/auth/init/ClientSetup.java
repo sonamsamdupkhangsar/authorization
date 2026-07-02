@@ -79,7 +79,7 @@ public class ClientSetup {
         final String clientId = clientIdSecretArray[0];
         final String secret = clientIdSecretArray[1];
 
-        LOG.info("clientId: {}, secret: {}", clientId, secret);
+        LOG.info("create service account for clientId {}", clientId);
 
         seedDefaultIssuerServiceAccount(clientId, secret);
         configuredIssuers().forEach(this::seedIssuerClients);
