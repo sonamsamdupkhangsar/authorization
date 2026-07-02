@@ -64,7 +64,7 @@ public class AuthenticationWebClient {
 
         //throws exception on authentication not found return with 401 http status
         return responseSpec.bodyToMono(Map.class).flatMap(map -> {
-            LOG.info("authentication response contains: {}", map);
+            LOG.info("authentication response received");
 
             final List<GrantedAuthority> grantedAuths = new ArrayList<>();
 
@@ -93,7 +93,7 @@ public class AuthenticationWebClient {
                 // Access webDetails properties
                 LOG.info("details is webAuthenitcationDetails type");
                 ipAddress = webDetails.getRemoteAddress();
-                LOG.info("ip address is {}", ipAddress);
+                LOG.debug("authentication details include remote-address metadata");
             }
 
             LOG.info("returning using custom authenticator with grantedAuths added: {}", grantedAuths);
@@ -151,23 +151,21 @@ public class AuthenticationWebClient {
             if (webClientResponseException.getResponseBodyAsString().contains("\"error\":")) {
                 String error = webClientResponseException.getResponseBodyAs(Map.class).get("error").toString();
 
-                LOG.info("ipAddress {}", ipAddress);
-
                 if (error.contains(authIdNotExist)) {
-                    LOG.info("audit authId tried {}", authenticationId);
+                    LOG.info("authentication identifier was not found");
                     return Mono.just("Invalid username");
 
                 }
                 else if (error.contains(authNotActive)) {
-                    LOG.info("audit auth not active for {}", authenticationId);
+                    LOG.info("authentication account is not active");
                     return Mono.just(error);
                 }
                 else if(error.contains(authPasswordNotSet)) {
-                    LOG.info("audit password not set for {}", authenticationId);
+                    LOG.info("authentication account has no password set");
                     return Mono.just(error);
                 }
                 else {
-                    LOG.error("different response {} for authId {}", error, authenticationId);
+                    LOG.error("authentication service returned an unexpected response category");
                     return Mono.just("Bad credentials");
                 }
             }

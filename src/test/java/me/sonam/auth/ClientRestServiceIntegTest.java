@@ -440,7 +440,7 @@ public class ClientRestServiceIntegTest {
     }
 
     private String getOauth2Token(String clientId, String secret) {
-        LOG.info("clientId: {}, secret: {}", clientId, secret);
+        LOG.info("requesting token for test clientId: {}", clientId);
         final String encodedSecret  = Base64.getEncoder().encodeToString((clientId +":"+secret).getBytes());
 
         MultiValueMap<String, Object> mvm = new LinkedMultiValueMap<>();
@@ -550,7 +550,7 @@ public class ClientRestServiceIntegTest {
         //final String accessToken  = getOauth2Token(messageClient, "secret");
         final String accessToken = "eyJraWQiOiJiYThjMDY1Mi1mNDY1LTRjMjgtYTBhNC00ZjkwZjZiMDgwYWUiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzb25hbSIsImF1ZCI6ImI0ZGZlM2ZiLTE2OTItNDRiOC05MmFiLTM2NmNjYzg0YjUzOS1hdXRoem1hbmFnZXIiLCJuYmYiOjE3MTg4MjMyOTgsInNjb3BlIjpbIm9wZW5pZCIsInByb2ZpbGUiXSwiaXNzIjoiaHR0cDovL2FwaS1nYXRld2F5OjkwMDEvaXNzdWVyIiwiZXhwIjoxNzE4ODIzNTk4LCJ1c2VyUm9sZSI6WyJVU0VSX1JPTEUiXSwiaWF0IjoxNzE4ODIzMjk4LCJ1c2VySWQiOiIxZjQ0MmRhYi05NmEzLTQ1OWUtODYwNS03ZjVjZDVmODJlMjUiLCJqdGkiOiJkOTA2MmE2MC01ODQ2LTRiM2YtYmYwOC03ZGZmNDY5ZmIxOTMifQ.fwKo-SWQnFRpyAVuLxTjjkAqMqNMXBy7NNr-SIbuaXYzOrpzdhY0PFKrG2sRbbvSWxoIIjPFaVeFskh-I_sON8uvTw3MPld5W3gf7RcT_ZG49UlGt4E1R_BzhxiYpkm2QCZqZl1CtgQ_lqgN0roTWuXGMCPFuwATIyIhfkAHnyvWBcUlGRavDfGEBx61MEWJZ3ZnK0Mr08_LH4dXqms2QoDEIQzDbpNLUFCpV99mTEKyOMfKh5wrSgex7fdwdDcdhq1wx98nlbrk9gmLRMruYaPx8Vun0xFjudZzIDwvqA9iQRPjQmJdO-8V9xFY5mvS04zrRbRCIDR_g09hwkkRTw";
 
-        LOG.info("oauth2Token: {}", accessToken);
+        LOG.info("OAuth2 token received for integration test");
 
         UUID userId = UUID.fromString("5d8de63a-0b45-4c33-b9eb-d7fb8d662107"); //this should match the value from WithMockCustomerUser.userId value
         UUID defaultOrgId = UUID.randomUUID();

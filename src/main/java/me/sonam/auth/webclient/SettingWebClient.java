@@ -104,16 +104,17 @@ public class SettingWebClient {
     }
 
     private Mono<UUID> getDefaultOrganizationId(Map<String, Object> map) {
-        LOG.info("setting map {}", map);
+        LOG.info("default organization response received");
 
         if (map != null) {
-            LOG.info("map.get() {}", map.get("message"));
-            Map<String, Object> objectMap = (Map) map.get("message");
+            Object message = map.get("message");
+            if (!(message instanceof Map<?, ?> objectMap)) {
+                return Mono.error(new IllegalStateException("default organization response is missing message data"));
+            }
 
-            LOG.info("objectMap: {}", objectMap);
-
-            if (objectMap.get("defaultOrganizationId") != null) {
-                return Mono.just(UUID.fromString(objectMap.get("defaultOrganizationId").toString()));
+            Object defaultOrganizationId = objectMap.get("defaultOrganizationId");
+            if (defaultOrganizationId != null) {
+                return Mono.just(UUID.fromString(defaultOrganizationId.toString()));
             } else {
                 LOG.error("no defaultOrganizationId value found");
                 return Mono.empty();

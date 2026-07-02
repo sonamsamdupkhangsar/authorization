@@ -49,7 +49,7 @@ public class OidcUserInfoService {
             Map<String, Object> oidcUserInfoMap = buildOidcUserInfo(authenticationId, stringStringMap);
             return Mono.just(oidcUserInfoMap);
         }).onErrorResume(throwable -> {
-            LOG.error("failed to get user by authenticationid '{}'", authenticationId);
+            LOG.error("failed to get user by authentication identifier");
             LOG.debug("exception occurred in get user by authenticationId", throwable);
 
             return Mono.error(throwable);

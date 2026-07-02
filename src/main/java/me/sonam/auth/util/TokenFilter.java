@@ -157,7 +157,7 @@ public class TokenFilter {
                 LOG.info("inbound request contains a authorization header, sending that instead");
                 String token = request.headers().getFirst("Authorization");
                 if (token != null) {
-                    LOG.debug("inbound token: {}", token);
+                    LOG.debug("using inbound bearer token");
                     token = token.replace("Bearer ", "");
                     return getClientRequestWithToken(token, request, next);
                 }
@@ -203,7 +203,7 @@ public class TokenFilter {
                     headers.set(HttpHeaders.ORIGIN, request.headers().getFirst(HttpHeaders.ORIGIN));
                     if (accessToken != null) {
                         headers.setBearerAuth(accessToken);
-                        LOG.info("set authorization header with {}", accessToken);
+                        LOG.debug("set bearer authorization header on outbound request");
                     }
                 }).build();
     }
@@ -258,7 +258,7 @@ public class TokenFilter {
                 .retrieve();
 
         return responseSpec.bodyToMono(Map.class).map(map -> {
-            LOG.debug("response for '{}' is in map: {}", oauthEndpoint, map);
+            LOG.debug("received successful token response from '{}'", oauthEndpoint);
             if (map.get("access_token") != null) {
                 return map.get("access_token").toString();
             }

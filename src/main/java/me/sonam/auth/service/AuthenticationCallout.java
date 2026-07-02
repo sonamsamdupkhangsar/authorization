@@ -102,13 +102,13 @@ public class AuthenticationCallout implements AuthenticationProvider {
             // Access webDetails properties
             LOG.info("details is webAuthenitcationDetails type");
             ipAddress = webDetails.getRemoteAddress();
-            LOG.info("ip address is {}", ipAddress);
+            LOG.debug("authentication request contains remote address metadata");
         }
 
         final String authenticationId = authentication.getName();
         final String password = authentication.getCredentials().toString();
 
-        LOG.info("authenticationId {}, password: {}", authenticationId, password);
+        LOG.info("username/password authentication submitted");
 
          String clientId = ClientIdUtil.getClientId(requestCache);
          LOG.info("clientId: {}", clientId);
@@ -129,14 +129,14 @@ public class AuthenticationCallout implements AuthenticationProvider {
          * authzmanager login checks.
          */
         final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
-        LOG.info("captured current host '{}' for authenticationId {}", currentHost, authenticationId);
+        LOG.info("captured current host '{}' for authentication request", currentHost);
         final String currentIssuer = issuerContextExecutor.currentIssuer();
-        LOG.info("captured current issuer '{}' for authenticationId {}", currentIssuer, authenticationId);
+        LOG.info("captured current issuer '{}' for authentication request", currentIssuer);
 
          return accountWebClient.isAccountLocked(authenticationId)
                  .flatMap(aBoolean -> {
                      if (aBoolean) {
-                         LOG.info("account is locked for authenticationId {}", authenticationId);
+                         LOG.info("account is locked");
 
                          return loginAttemptWebClient.checkLoginAttempt(authenticationId)
                                          .flatMap(s -> {
@@ -162,10 +162,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
                      }
                  })
                 .flatMap(aBoolean -> {
-                    LOG.info("authorities: {}, details: {}, credentials: {}", authentication.getAuthorities(),
-                            authentication.getDetails(), authentication.getCredentials());
+                    LOG.debug("authentication request has {} authorities", authentication.getAuthorities().size());
                     if (passkeyManagementLogin) {
-                        LOG.info("clientless passkey management login for authenticationId {}", authenticationId);
+                        LOG.info("clientless passkey management login");
                         return checkUserForPasskeyManagement(authentication, currentHost);
                     }
                     LOG.info("get registeredClient from clientId: {}", clientId);
@@ -203,11 +202,11 @@ public class AuthenticationCallout implements AuthenticationProvider {
                 // Access webDetails properties
                 LOG.info("details is webAuthenitcationDetails type");
                 ipAddress = webDetails.getRemoteAddress();
-                LOG.info("ip address is {}", ipAddress);
+                LOG.debug("failed login includes remote-address metadata");
             }
 
             return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
-                    .doOnNext(s -> LOG.error("user not found with authenticationId: {}", authenticationId, throwable))
+                    .doOnNext(s -> LOG.error("user was not found during authentication", throwable))
                     .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
         }
@@ -230,11 +229,11 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                 // Access webDetails properties
                                 LOG.info("details is webAuthenitcationDetails type");
                                 ipAddress = webDetails.getRemoteAddress();
-                                LOG.info("ip address is {}", ipAddress);
+                                LOG.debug("failed login includes remote-address metadata");
                             }
 
                             return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
-                                    .doOnNext(s -> LOG.trace("authentication failed: {}", authenticationId, throwable))
+                                    .doOnNext(s -> LOG.trace("authentication failed", throwable))
                                     .flatMap(s -> {
                                         final String message = throwable.getMessage() + " " + s;
                                         return Mono.error(new BadCredentialsException(message));

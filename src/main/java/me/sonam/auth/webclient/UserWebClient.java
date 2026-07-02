@@ -49,7 +49,7 @@ public class UserWebClient {
      * @return
      */
     public Mono<User> findByAuthenticationId(String authenticationId) {
-        LOG.info("find user by authenticationId: {}", authenticationId);
+        LOG.info("find user by authentication identifier");
 
         StringBuilder stringBuilder = new StringBuilder(userRestServiceEndpoint).append("/authentication-id/")
                 .append(authenticationId);
@@ -60,7 +60,7 @@ public class UserWebClient {
                 .retrieve();
 
         return responseSpec.bodyToMono(User.class).onErrorResume(throwable -> {
-            LOG.error("user not found with authenticationId: {}", authenticationId, throwable.getMessage());
+            LOG.error("user not found by authentication identifier: {}", throwable.getMessage());
             String errorMessage = throwable.getMessage();
             if (throwable instanceof WebClientResponseException) {
                 WebClientResponseException webClientResponseException = (WebClientResponseException) throwable;

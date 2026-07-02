@@ -23,13 +23,13 @@ public class UsernameCheck {
 
     @PutMapping("/username")
     public Mono<String> checkUsername(HttpServletRequest request, @RequestBody  String username) {
-        LOG.info("username check {}", username);
+        LOG.info("username availability check requested");
         if (username == null) {
             LOG.error("no username set");
         }
 
         String ipAddress = request.getRemoteAddr();
-        LOG.info("Ip address {}", ipAddress);
+        LOG.debug("username check includes remote-address metadata");
 
         return authenticationWebClient.checkUsername(ipAddress, username).flatMap(s -> {
             LOG.info("add message attribute for response {}",s);

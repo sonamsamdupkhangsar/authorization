@@ -32,7 +32,7 @@ public class PasskeyMfaAuthenticationSuccessHandler implements AuthenticationSuc
             return;
         }
 
-        LOG.info("password authentication succeeded for {}; redirecting to passkey MFA", authentication.getName());
+        LOG.info("password authentication succeeded; redirecting to passkey MFA");
         request.getSession().setAttribute(PasskeyMfaSession.PENDING_AUTHENTICATION, authentication);
         passkeyMfaService.clearAuthentication(request, response);
         response.sendRedirect(request.getContextPath() + "/mfa/passkeys/challenge");

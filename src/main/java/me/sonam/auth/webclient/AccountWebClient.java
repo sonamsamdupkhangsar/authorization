@@ -51,7 +51,7 @@ public class AccountWebClient {
     }
 
     public Mono<String> emailAccountActivationLink(String email, String activationHost) {
-        LOG.info("email activation link endpoint: {} for email: {}", emailActiveLink, email);
+        LOG.info("email activation link using endpoint: {}", emailActiveLink);
         Map<String, String> body = new LinkedHashMap<>();
         body.put("email", email);
         if (activationHost != null && !activationHost.isBlank()) {
@@ -65,7 +65,7 @@ public class AccountWebClient {
     }
 
     public Mono<String> emailMySecret(String email, String activationHost) {
-        LOG.info("emailMySecret endpoint: {} for email: {}", emailMySecret, email);
+        LOG.info("request password-change secret from account service endpoint: {}", emailMySecret);
         Map<String, String> body = new LinkedHashMap<>();
         body.put("email", email);
         if (activationHost != null && !activationHost.isBlank()) {
@@ -89,7 +89,7 @@ public class AccountWebClient {
     }
 
     public Mono<Map<String, String>> updateAuthenticationPassword(String email, String secret, String password) {
-        LOG.info("update password using email {} and endpoint account-rest-service {}", email, updatePassword);
+        LOG.info("update password using account service endpoint {}", updatePassword);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(updatePassword)
                 .bodyValue(Map.of("email", email, "secret", secret, "password", password))
@@ -98,7 +98,7 @@ public class AccountWebClient {
     }
 
     public Mono<Map<String, String>> emailUsername(String email) {
-        LOG.info("email {}, username endpoint: {}", email, emailUserName);
+        LOG.info("email username using endpoint: {}", emailUserName);
 
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(emailUserName).bodyValue(Map.of("email", email))
                 .retrieve();
@@ -137,7 +137,7 @@ public class AccountWebClient {
     }
 
     public Mono<Map<String, String>> unLockAccount(String email, String secret) {
-        LOG.info("unlock account using email '{}' and secret: '{}'", email, secret);
+        LOG.info("unlock account using account service");
 
         LOG.debug("unlock account endpoint {}", unLockAccount);
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(unLockAccount)
@@ -148,7 +148,7 @@ public class AccountWebClient {
     }
 
     public Mono<Map<String, String>> unLockAccountAfterTimedIntervalExpire(String authenticationId) {
-        LOG.info("unlock account after timed interval expires using authenticationId  '{}''", authenticationId);
+        LOG.info("unlock account after timed interval expires");
 
         LOG.debug("unlock account timed expire endpoint {}", unLockAccountTimeExpire);
         WebClient.ResponseSpec responseSpec = webClientBuilder.build().put().uri(unLockAccountTimeExpire)
@@ -159,7 +159,7 @@ public class AccountWebClient {
     }
 
     public Mono<Boolean> isAccountLocked(String authenticationId) {
-        LOG.info("check if account is locked for authenticationId: {}", authenticationId);
+        LOG.info("check if account is locked");
         LOG.info("isAccountLockedEndpoint {}", isAccountLockedEndpoint);
 
 

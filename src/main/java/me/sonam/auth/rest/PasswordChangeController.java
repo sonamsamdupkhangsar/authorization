@@ -63,7 +63,7 @@ public class PasswordChangeController {
      */
     @PostMapping("/password")
     public Mono<String> emailSecret(String email, Model model, HttpServletRequest request, HttpServletResponse response) {
-        LOG.info("password change for email: {}", email);
+        LOG.info("password change secret requested");
         loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.emailMySecret(email, hostOrganizationResolver.currentHost().orElse(null)).flatMap(s -> {
@@ -80,12 +80,12 @@ public class PasswordChangeController {
     @PostMapping("/password/secret")
     public Mono<String> passwordChange(@NotEmpty String password ,@NotEmpty String email, @NotEmpty String secret,
                                        Model model, HttpServletRequest request, HttpServletResponse response) {
-        LOG.info("change password {} for email {} and secret: {}", password, email, secret);
+        LOG.info("password change submitted");
         loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.updateAuthenticationPassword(email, secret, password)
                 .flatMap(stringStringMap -> {
-                    LOG.info("password has been changed: {}", stringStringMap);
+                    LOG.info("password changed successfully");
                     model.addAttribute("message", "password has been updated successfully");
                     return Mono.just(PASSWORD_SECRET_PAGE);
                 })

@@ -82,7 +82,7 @@ public class AccountLockController {
     @PostMapping("/accounts/lock/email")
     public Mono<String> emailUserToUnLockAccount(String email, Model model,
                                                  HttpServletRequest request, HttpServletResponse response) {
-        LOG.info("email secret to unlock account for email: {}", email);
+        LOG.info("account-unlock email requested");
         loginReturnContextService.addReturnContext(model, request, response);
 
         return accountWebClient.emailSecretForAccountUnlock(email,
