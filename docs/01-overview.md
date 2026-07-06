@@ -10,7 +10,7 @@ The service is a customization of Spring Authorization Server. It keeps the stan
 - Authenticates usernames and passwords through `authentication-rest-service`.
 - Looks up users through `user-rest-service`.
 - Checks organization membership through `organization-rest-service`.
-- Checks AuthzManager authorization through `role-rest-service`.
+- Checks organization-scoped AuthzManager authorization through `role-rest-service`.
 - Calls `account-rest-service` for activation, reset, lock, unlock, and email flows.
 - Calls `attempt-rest-service` to track login attempts.
 - Stores OAuth clients, authorizations, authorization consent, JWKs, tenant registration records, and passkey credentials.
@@ -24,6 +24,7 @@ The current implementation includes several major platform changes:
 - Spring Authorization Server dependency is `org.springframework.security:spring-security-oauth2-authorization-server:7.0.0`.
 - WebAuthn/passkey support is provided through `org.springframework.security:spring-security-webauthn`.
 - Host-based multi-tenancy allows one authorization server deployment to serve multiple issuer hosts.
+- AuthzManager administration uses scoped `OrgAdmin` and `SubdomainAdmin` role assignments.
 - Passkey MFA is enforced after password login for users who have enrolled passkeys.
 - Local HTTPS profile supports passkey development with trusted `mkcert` certificates.
 
@@ -55,4 +56,3 @@ Local equivalents use `.test`, for example:
 - `me.sonam.auth.mfa.passkey`: passkey registration, MFA challenge, and tenant-aware WebAuthn repositories.
 - `me.sonam.auth.rest`: login, signup, client management, password/account flows, and health endpoints.
 - `me.sonam.auth.webclient`: calls to user, account, role, organization, authentication, and attempt services.
-

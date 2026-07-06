@@ -1,0 +1,16 @@
+{
+  "name": "authorization-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:signup": "playwright test tests/signup.spec.ts",
+    "test:signup:headed": "playwright test tests/signup.spec.ts --headed",
+    "test:links": "playwright test tests/signin-links.spec.ts",
+    "test:account": "playwright test tests/account-actions.spec.ts",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "typescript": "^5.9.0"
+  }
+}
