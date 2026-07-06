@@ -32,6 +32,8 @@ AuthzManager runs on admin hosts:
 
 `HostOrganizationResolver` removes the `.admin.` segment so admin flows can still operate on the correct tenant organization host.
 
+For AuthzManager login, the authorization server resolves that normalized host to its organization, then verifies that the user has `OrgAdmin` for the resolved organization. A `SubdomainAdmin` assignment alone does not currently pass this login gate.
+
 ## How Components Are Selected
 
 `PerIssuerAuthorizationServerComponentsConfig` enables multiple issuers:
@@ -94,4 +96,3 @@ Tenant registration requires infrastructure to already exist:
 In Kubernetes, browser traffic often reaches the service through a gateway. Forwarded headers must preserve the original public host. The authorization server uses a `ForwardedHeaderFilter`, and service-to-service token calls set stable forwarded host/proto/port headers when needed.
 
 If forwarded host information is wrong, the server may resolve the wrong issuer, create tokens with the wrong `iss`, or fail with a missing `RegisteredClientRepository`.
-

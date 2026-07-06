@@ -49,7 +49,7 @@ Example:
 6. Authorization server creates an organization through `organization-rest-service`.
 7. The new organization is mapped to the current host.
 8. The user is set as default organization member.
-9. `role-rest-service` assigns `SuperAdmin` for that organization.
+9. `role-rest-service` assigns `OrgAdmin` for that organization.
 
 ```mermaid
 sequenceDiagram
@@ -67,7 +67,7 @@ sequenceDiagram
     Authz->>OrgSvc: Create organization
     Authz->>OrgSvc: Bind organization to host
     Authz->>OrgSvc: Set default organization
-    Authz->>RoleSvc: Assign SuperAdmin
+    Authz->>RoleSvc: Assign OrgAdmin for organization
     Authz-->>User: Show activation email message
 ```
 
@@ -139,4 +139,3 @@ https://free.openissuer.com/accounts/active/password-secret/{id}/{secret}
 ## Return Context
 
 Signup and related pages preserve a safe return context with `LoginReturnContextService`. This lets a user navigate away from login to signup, forgot password, or activation flows and still return to the OAuth client flow afterward when possible.
-
