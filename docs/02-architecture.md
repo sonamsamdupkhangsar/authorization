@@ -82,7 +82,7 @@ AuthzManager administration uses two scoped roles:
 | Role | Scope | Current authorization-server use |
 | --- | --- | --- |
 | `OrgAdmin` | Organization ID | Required to sign in to the AuthzManager admin host associated with that organization and to manage its OAuth clients. |
-| `SubdomainAdmin` | Subdomain ID | Assigned to configured bootstrap users for future subdomain-level administration. It does not currently satisfy the AuthzManager login check by itself. |
+| `SubdomainAdmin` | Subdomain ID | Manages organizations, organization users, organization roles, and SubdomainAdmin assignments within one subdomain. It does not satisfy the AuthzManager login check by itself. |
 
 `role-rest-service` stores both through `Authz_Manager_Role_Assignment`. The `scope_type` identifies an `ORGANIZATION` or `SUBDOMAIN` assignment, and `scope_id` contains the corresponding organization or subdomain UUID.
 
@@ -92,6 +92,8 @@ The authorization server resolves the organization associated with the current a
 GET /roles/authzmanagerroles/users/{userId}/organizations/{organizationId}/org-admin
 ```
 
-Configured seed users marked as subdomain administrators currently receive an `OrgAdmin` assignment for the host organization as well as a `SubdomainAdmin` assignment for the subdomain. Making `SubdomainAdmin` imply organization administration without that additional row remains future work and requires a reliable subdomain-to-organization lookup during authorization.
+Configured seed users marked as subdomain administrators receive an `OrgAdmin` assignment for the host organization as well as a `SubdomainAdmin` assignment for the subdomain. The `OrgAdmin` assignment permits entry through the current AuthzManager login gate. After login, AuthzManager permits a `SubdomainAdmin` to view and rename organizations in that subdomain and to search, add, remove, and change default-organization assignments for their users. Every operation verifies the target organization belongs to the current subdomain; cross-subdomain access is rejected. Subdomain access does not make the administrator a member of each organization.
 
 Existing subdomain administrators can manage assignments from AuthzManager's subdomain user view. The target user must have a default organization in the same subdomain and must already be `OrgAdmin` for that organization. Management calls are scoped to the acting administrator's subdomain, duplicate assignments are rejected, and the final `SubdomainAdmin` assignment cannot be removed.
+
+Organization role creation, update, and deletion are available to an `OrgAdmin` for that organization and to a `SubdomainAdmin` when the organization belongs to the assigned subdomain. A role is bound to its organization when it is created; there is no separate role-to-organization assignment step. Organization-scoped routes bind mutations to the organization ID in the URL and verify an existing role belongs to that organization before update or deletion. The obsolete standalone role-to-organization management route was removed from AuthzManager.

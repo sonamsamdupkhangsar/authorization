@@ -32,7 +32,7 @@ AuthzManager runs on admin hosts:
 
 `HostOrganizationResolver` removes the `.admin.` segment so admin flows can still operate on the correct tenant organization host.
 
-For AuthzManager login, the authorization server resolves that normalized host to its organization, then verifies that the user has `OrgAdmin` for the resolved organization. A `SubdomainAdmin` assignment alone does not currently pass this login gate.
+For AuthzManager login, the authorization server resolves that normalized host to its organization, then verifies that the user has `OrgAdmin` for the resolved organization. A `SubdomainAdmin` assignment alone does not pass this login gate. Once authenticated, a SubdomainAdmin can administer organizations and their users only when AuthzManager verifies that the target organization belongs to the current subdomain.
 
 ## How Components Are Selected
 
