@@ -82,7 +82,7 @@ AuthzManager administration uses two scoped roles:
 | Role | Scope | Current authorization-server use |
 | --- | --- | --- |
 | `OrgAdmin` | Organization ID | Required to sign in to the AuthzManager admin host associated with that organization and to manage its OAuth clients. |
-| `SubdomainAdmin` | Subdomain ID | Manages organizations, organization users, and SubdomainAdmin assignments within one subdomain. It does not satisfy the AuthzManager login check by itself. |
+| `SubdomainAdmin` | Subdomain ID | Manages organizations, organization users, organization roles, and SubdomainAdmin assignments within one subdomain. It does not satisfy the AuthzManager login check by itself. |
 
 `role-rest-service` stores both through `Authz_Manager_Role_Assignment`. The `scope_type` identifies an `ORGANIZATION` or `SUBDOMAIN` assignment, and `scope_id` contains the corresponding organization or subdomain UUID.
 
@@ -96,4 +96,4 @@ Configured seed users marked as subdomain administrators receive an `OrgAdmin` a
 
 Existing subdomain administrators can manage assignments from AuthzManager's subdomain user view. The target user must have a default organization in the same subdomain and must already be `OrgAdmin` for that organization. Management calls are scoped to the acting administrator's subdomain, duplicate assignments are rejected, and the final `SubdomainAdmin` assignment cannot be removed.
 
-Organization role creation, update, deletion, and role-to-organization assignment remain organization-admin capabilities; subdomain-wide role management is not currently enabled.
+Organization role creation, update, and deletion are available to an `OrgAdmin` for that organization and to a `SubdomainAdmin` when the organization belongs to the assigned subdomain. A role is bound to its organization when it is created; there is no separate role-to-organization assignment step. Organization-scoped routes bind mutations to the organization ID in the URL and verify an existing role belongs to that organization before update or deletion. The obsolete standalone role-to-organization management route was removed from AuthzManager.
