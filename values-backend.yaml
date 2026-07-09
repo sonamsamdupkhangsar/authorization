@@ -110,6 +110,10 @@ httproute:
       hostname: "free.openissuer.com"
       httpsListenerName: "https-free"
       httpListenerName: "http-free"
+    - name: demo
+      hostname: "demo.openissuer.com"
+      httpsListenerName: "https-demo"
+      httpListenerName: "http-demo"
 
 resources:
   requests:
@@ -197,6 +201,12 @@ envs:
     value: freeauth
   - name: FREE_AUTH_DB_PASSWORD_SECRET_REF
     value: free-db-password
+  - name: DEMO_AUTH_DB_URL
+    value: jdbc:postgresql://demo-auth-db-rw/demoauth
+  - name: DEMO_AUTH_DB_USERNAME
+    value: demoauth
+  - name: DEMO_AUTH_DB_PASSWORD_SECRET_REF
+    value: demo-db-password
 
 health:
   startup:
@@ -242,6 +252,10 @@ secretFiles:
     keys:
       - key: password
         name: TENANT_SECRET_FREE_DB_PASSWORD
+  - file: demo-auth-db-app
+    keys:
+      - key: password
+        name: TENANT_SECRET_DEMO_DB_PASSWORD
   - file: authorization-seed
     optional: true
     keys:

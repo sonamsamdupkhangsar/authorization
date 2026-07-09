@@ -24,6 +24,11 @@ FREE_AUTH_DB_USERNAME: test
 FREE_AUTH_DB_PASSWORD_SECRET_REF: free-db-password
 FREE_AUTH_DB_DRIVER: org.postgresql.Driver
 
+DEMO_AUTH_DB_URL: jdbc:postgresql://localhost:5432/demoauth
+DEMO_AUTH_DB_USERNAME: test
+DEMO_AUTH_DB_PASSWORD_SECRET_REF: demo-db-password
+DEMO_AUTH_DB_DRIVER: org.postgresql.Driver
+
 EUREKA_HOST: localhost:8761
 EUREKA_USER: test
 EUREKA_PASSWORD: test
@@ -102,6 +107,14 @@ authorization-server:
         password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER}
         maximum-pool-size: ${TENANT_AUTH_DB_MAX_POOL_SIZE}
+      demo:
+        hosts:
+          - demo.openissuer.test
+        url: ${DEMO_AUTH_DB_URL}
+        username: ${DEMO_AUTH_DB_USERNAME}
+        password-secret-ref: ${DEMO_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${DEMO_AUTH_DB_DRIVER}
+        maximum-pool-size: ${TENANT_AUTH_DB_MAX_POOL_SIZE}
   signup-policy:
     hosts:
       free.openissuer.test:
@@ -119,10 +132,15 @@ authorization-server:
         create-organization-on-signup: false
         allowed-email-domains:
           - business2.com
+      demo.openissuer.test:
+        allow-signup: false
+        create-organization-on-signup: false
+        allowed-email-domains: []
 tenant-secrets:
   business1-db-password: test
   business2-db-password: test
   free-db-password: test
+  demo-db-password: test
 
 organization-seed:
   delay-seconds: 120
@@ -161,6 +179,14 @@ organization-seed:
       active: true
       organizationSubdomain: free.openissuer.test
       subdomainAdmin: true
+    - firstName: Demo
+      lastName: Administrator
+      email: demo@openissuer.test
+      authenticationId: demo@openissuer.test
+      password: ${DEMO_USER_PASSWORD}
+      active: true
+      organizationSubdomain: demo.openissuer.test
+      subdomainAdmin: false
   organizations:
     - name: Business 1
       creatorAuthenticationId: owner1@openissuer.test
@@ -171,3 +197,6 @@ organization-seed:
     - name: Free
       creatorAuthenticationId: freeuser@openissuer.test
       subdomain: free.openissuer.test
+    - name: OpenIssuer Demo
+      creatorAuthenticationId: demo@openissuer.test
+      subdomain: demo.openissuer.test

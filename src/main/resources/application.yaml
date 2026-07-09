@@ -69,6 +69,13 @@ authorization-server:
         username: ${BUSINESS2_AUTH_DB_USERNAME}
         password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER:org.postgresql.Driver}
+      demo:
+        hosts:
+          - demo.openissuer.com
+        url: ${DEMO_AUTH_DB_URL}
+        username: ${DEMO_AUTH_DB_USERNAME}
+        password-secret-ref: ${DEMO_AUTH_DB_PASSWORD_SECRET_REF}
+        driver-class-name: ${DEMO_AUTH_DB_DRIVER:org.postgresql.Driver}
   signup-policy:
     hosts:
       free.openissuer.com:
@@ -86,6 +93,10 @@ authorization-server:
         create-organization-on-signup: false
         allowed-email-domains:
           - business2.com
+      demo.openissuer.com:
+        allow-signup: false
+        create-organization-on-signup: false
+        allowed-email-domains: []
 application-rest-service:
   root: ${APPLICATION_REST_SERVICE}
   client-role: /applications/clients/{clientId}/users/{authenticationId}

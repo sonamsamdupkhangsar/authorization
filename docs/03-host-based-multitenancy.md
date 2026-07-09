@@ -29,6 +29,7 @@ AuthzManager runs on admin hosts:
 | `free.admin.openissuer.com` | `free.openissuer.com` |
 | `business1.admin.openissuer.com` | `business1.openissuer.com` |
 | `business2.admin.openissuer.com` | `business2.openissuer.com` |
+| `demo.admin.openissuer.com` | `demo.openissuer.com` |
 
 `HostOrganizationResolver` removes the `.admin.` segment so admin flows can still operate on the correct tenant organization host.
 
