@@ -21,7 +21,7 @@ Important behavior:
 - Create/update clients only for authorized organization admins.
 - Resolve the issuer from the access token.
 - Use `IssuerAwareAuthorizationServerOperations` to read/write the registered client in the correct issuer repository.
-- Enforce `maxClients`.
+- Enforce the configured client limit for the user's current organization.
 - Associate created clients to the user's default organization.
 
 ## Creating A Client In AuthzManager
@@ -34,6 +34,37 @@ Typical flow:
 4. Authorization server reads the JWT issuer, for example `https://free.openissuer.com`.
 5. Authorization server saves the registered client in the `free` issuer repository.
 6. Authorization server associates the client ID with the admin's default organization.
+
+Before creating a new client, AuthzManager asks the authorization server for the current default organization's client count. If the limit is already reached, AuthzManager shows the limit message before submitting the create request. The authorization server enforces the same limit for direct API calls.
+
+## Client Limits
+
+Client limits are configured by issuer host:
+
+```yaml
+client-limits:
+  default-max-clients: ${MAX_CLIENTS:5}
+  hosts:
+    free.openissuer.com: ${FREE_MAX_CLIENTS:2}
+    demo.openissuer.com: ${DEMO_MAX_CLIENTS:2}
+```
+
+Local `eureka` profile values use the matching `.test` hosts:
+
+```yaml
+client-limits:
+  hosts:
+    free.openissuer.test: ${FREE_MAX_CLIENTS:2}
+    demo.openissuer.test: ${DEMO_MAX_CLIENTS:2}
+```
+
+The current public policy is:
+
+| Issuer | Max clients per organization |
+| --- | ---: |
+| Default/unlisted hosts | 5 |
+| `free.openissuer.com` / `free.openissuer.test` | 2 |
+| `demo.openissuer.com` / `demo.openissuer.test` | 2 |
 
 ## Client Fields
 
@@ -87,4 +118,3 @@ The response token `iss` claim should match the issuer host used for the flow.
 | Login starts but token exchange fails | Client was registered under a different issuer host. |
 | Admin can list orgs but not clients | Client API call may not be using tenant forwarded headers or correct issuer. |
 | Redirect URI error | Redirect URI submitted by client does not exactly match registered URI. |
-

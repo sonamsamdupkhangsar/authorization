@@ -20,11 +20,16 @@ authorization-server:
         create-organization-on-signup: true
         allowed-email-domains:
           - "*"
-      business1.openissuer.com:
-        allow-signup: true
-        create-organization-on-signup: false
-        allowed-email-domains:
-          - business1.com
+	      business1.openissuer.com:
+	        allow-signup: true
+	        create-organization-on-signup: false
+	        allowed-email-domains:
+	          - business1.com
+	      demo.openissuer.com:
+	        allow-signup: false
+	        create-organization-on-signup: false
+	        allowed-email-domains:
+	          - "*"
 ```
 
 Policy fields:
@@ -34,6 +39,8 @@ Policy fields:
 | `allow-signup` | Enables or disables signup on that host. |
 | `create-organization-on-signup` | Creates a new organization for the user when true; attaches to the existing host organization when false. |
 | `allowed-email-domains` | Restricts signup email domains. `*` allows any domain unless the domain is reserved by another host. |
+
+When signup is disabled for a host, the signup page displays a disabled message and the controller rejects submitted signup requests. The demo issuer uses this mode.
 
 ## Free/Public Signup
 
@@ -88,6 +95,18 @@ Flow:
 5. The host organization becomes the user's default organization.
 
 This is appropriate when the business issuer already exists and new users should join that business organization.
+
+## Demo Issuer Restrictions
+
+The demo issuer is intended for a shared public walkthrough, not self-service account creation. For `demo.openissuer.com`:
+
+- Public signup is disabled.
+- Forgot username is disabled.
+- Forgot password is disabled.
+- Email activation-link requests are disabled.
+- Account unlock requests are disabled.
+
+The seeded demo user is created through the authorization seed process and receives `OrgAdmin` for the demo organization. The password is supplied from deployment secrets, not through public signup.
 
 ## Business Issuer/Tenant Creation
 
