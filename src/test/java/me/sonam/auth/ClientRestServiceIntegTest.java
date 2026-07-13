@@ -177,15 +177,15 @@ public class ClientRestServiceIntegTest {
 
     @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role= "USER")
     @Test
-    public void getClientCountForLoggedInUser() throws Exception {
+    public void getClientCountForDefaultOrganization() throws Exception {
         UUID defaultOrgId = UUID.randomUUID();
 
         enqueueDefaultOrganizationResponse(defaultOrgId);
 
-        LOG.info("call getClientCount without any clients for a org");
+        LOG.info("call getDefaultOrganizationClientCount without any clients for a org");
 
         Mono<Long> longMono = webTestClient
-                .get().uri("/clients/count/users")
+                .get().uri("/clients/count/organizations/default")
                 .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
 
         StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(0)).verifyComplete();
@@ -200,9 +200,9 @@ public class ClientRestServiceIntegTest {
 
         enqueueDefaultOrganizationResponse(defaultOrgId);
 
-        LOG.info("call getClientCount without any clients for a org");
+        LOG.info("call getDefaultOrganizationClientCount with clients for a org");
 
-        longMono = webTestClient.get().uri("/clients/count/users")
+        longMono = webTestClient.get().uri("/clients/count/organizations/default")
                 .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
 
         StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(3)).verifyComplete();
@@ -211,6 +211,21 @@ public class ClientRestServiceIntegTest {
         recordedRequest = takeDefaultOrganizationRequest();
 
 
+    }
+
+    @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role= "USER")
+    @Test
+    public void getClientCountForLoggedInUserKeepsCompatibilityAlias() throws Exception {
+        UUID defaultOrgId = UUID.randomUUID();
+        enqueueDefaultOrganizationResponse(defaultOrgId);
+
+        Mono<Long> longMono = webTestClient
+                .get().uri("/clients/count/users")
+                .exchange().expectStatus().isOk().returnResult(Long.class).getResponseBody().single();
+
+        StepVerifier.create(longMono).assertNext(aLong -> assertThat(aLong).isEqualTo(0)).verifyComplete();
+
+        takeDefaultOrganizationRequest();
     }
 
         @WithMockCustomUser( userId = "5d8de63a-0b45-4c33-b9eb-d7fb8d662107", username = "user@sonam.cloud", password = "password", role = "ROLE_USER")

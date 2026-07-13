@@ -21,13 +21,14 @@
 </head>
 <body class="auth-page">
 <div class="container">
-    <div class="mb-3">
+    <div th:if="${message} or ${error}" class="mb-3">
 
         <div th:if="${message}" class="alert alert-success">
             <strong>User Signup Success!</strong> <span th:text="${message}"></span>
         </div>
         <div th:if="${error}" class="alert alert-danger">
-            <strong>Failed to signup user!</strong> <span th:text="${error}"></span>
+            <strong th:if="${userSignup == null}">Signup disabled.</strong>
+            <strong th:unless="${userSignup == null}">Failed to signup user!</strong> <span th:text="${error}"></span>
         </div>
     </div>
 

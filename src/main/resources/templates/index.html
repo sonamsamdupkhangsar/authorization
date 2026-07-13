@@ -121,13 +121,13 @@
         <div>
             <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
-        <div class="mt-5">
+        <div class="mt-5" th:if="${accountSelfServiceAllowed}">
             <div class="mt-2"><a th:href="@{/password(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot password?</a></div>
             <div class="mt-2"><a th:href="@{/username(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot username?</a></div>
             <div class="mt-2"><a th:href="@{/accounts/active(returnTo=${returnTo})}" style="color: dimgrey !important;">Email activation link</a></div>
             <div class="mt-2"><a th:href="@{/accounts/lock(returnTo=${returnTo})}" style="color: dimgrey !important;">Unlock account</a></div>
         </div>
-        <div class="row justify-content-around mt-3">
+        <div class="row justify-content-around mt-3" th:if="${accountSelfServiceAllowed}">
             <div class="col"></div>
             <div class="col "><a th:href="@{/signup(returnTo=${returnTo})}">Signup here</a></div>
         </div>

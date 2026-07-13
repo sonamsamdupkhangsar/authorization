@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.service.HostOrganizationResolver;
 import me.sonam.auth.service.LoginReturnContextService;
+import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.AccountWebClient;
 import me.sonam.auth.webclient.LoginAttemptWebClient;
 import org.slf4j.Logger;
@@ -39,16 +40,19 @@ public class AccountLockController {
     private final AccountWebClient accountWebClient;
     private final LoginReturnContextService loginReturnContextService;
     private final HostOrganizationResolver hostOrganizationResolver;
+    private final SignupPolicyService signupPolicyService;
     private final String lockAccounnt = "account/lock";
     private final String lockSecret = "account/lock-secret";
 
     public AccountLockController(AccountWebClient accountWebClient, LoginAttemptWebClient loginAttemptWebClient,
                                  LoginReturnContextService loginReturnContextService,
-                                 HostOrganizationResolver hostOrganizationResolver) {
+                                 HostOrganizationResolver hostOrganizationResolver,
+                                 SignupPolicyService signupPolicyService) {
         this.accountWebClient = accountWebClient;
         this.loginAttemptWebClient = loginAttemptWebClient;
         this.loginReturnContextService = loginReturnContextService;
         this.hostOrganizationResolver = hostOrganizationResolver;
+        this.signupPolicyService = signupPolicyService;
     }
 
     /**
@@ -60,6 +64,7 @@ public class AccountLockController {
     public String getLockAccountPage(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", lockAccounnt);
         loginReturnContextService.addReturnContext(model, request, response);
+        addAccountSelfServicePolicy(model);
         return lockAccounnt;
     }
 
@@ -84,6 +89,9 @@ public class AccountLockController {
                                                  HttpServletRequest request, HttpServletResponse response) {
         LOG.info("account-unlock email requested");
         loginReturnContextService.addReturnContext(model, request, response);
+        if (blockAccountSelfService(model)) {
+            return Mono.just(lockAccounnt);
+        }
 
         return accountWebClient.emailSecretForAccountUnlock(email,
                 hostOrganizationResolver.currentHost().orElse(null)).flatMap(s -> {
@@ -139,6 +147,23 @@ public class AccountLockController {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
         }
+    }
+
+    private void addAccountSelfServicePolicy(Model model) {
+        signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost().ifPresent(error -> {
+            model.addAttribute("accountSelfServiceDisabled", true);
+            model.addAttribute("error", error);
+        });
+    }
+
+    private boolean blockAccountSelfService(Model model) {
+        var error = signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost();
+        if (error.isEmpty()) {
+            return false;
+        }
+        model.addAttribute("accountSelfServiceDisabled", true);
+        model.addAttribute("error", error.get());
+        return true;
     }
 
     private void logAccountRestError(String message, Throwable throwable) {

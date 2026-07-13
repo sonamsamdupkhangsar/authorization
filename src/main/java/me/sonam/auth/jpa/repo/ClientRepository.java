@@ -12,5 +12,6 @@ import org.springframework.stereotype.Repository;
 public interface ClientRepository extends JpaRepository<Client, String> {
     Optional<Client> findByClientId(String clientId);
     Optional<Client> findByTenantIdAndClientId(String tenantId, String clientId);
+    List<Client> findByTenantId(String tenantId);
     List<Client> findByIdIn(List<String> ids);
 }

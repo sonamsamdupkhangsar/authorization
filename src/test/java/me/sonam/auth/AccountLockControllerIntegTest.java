@@ -24,17 +24,20 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.ui.Model;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,6 +100,7 @@ public class AccountLockControllerIntegTest {
         r.add("account-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("auth-server.root", () -> "http://localhost:"+ mockWebServer.getPort());
         r.add("attempt-rest-service.root", () -> "http://localhost:"+ mockWebServer.getPort());
+        r.add("authorization-server.signup-policy.hosts.demo.openissuer.test.allow-account-self-service", () -> false);
     }
 
     @Test
@@ -106,6 +110,35 @@ public class AccountLockControllerIntegTest {
         LOG.info("assert that the page returned is unlocking user account page.");
         this.mockMvc.perform(get("/accounts/lock")).andDo(print()).andExpect(status().isOk())
                 .andExpect(content().string(containsString("To unlock your account enter your email address")));
+    }
+
+    @Test
+    public void unlockAccountDisabledForDemoHost() throws Exception {
+        this.mockMvc.perform(get("/accounts/lock")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Unlock my account"))));
+    }
+
+    @Test
+    public void unlockAccountEmailPostDoesNotCallAccountServiceForDemoHost() throws Exception {
+        MvcResult mvcResult = this.mockMvc.perform(post("/accounts/lock/email")
+                        .param("email", "demo@openissuer.test")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andReturn();
+        this.mockMvc.perform(asyncDispatch(mvcResult))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")));
+
+        RecordedRequest request = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        assertThat(request).isNull();
     }
 
     @Test

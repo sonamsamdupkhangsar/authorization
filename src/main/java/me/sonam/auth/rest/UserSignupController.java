@@ -62,10 +62,18 @@ public class UserSignupController {
     @GetMapping
     public Mono<String> getSignupForm(Model model, HttpServletRequest request, HttpServletResponse response) {
         final String PATH = "signupform";
+        final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
         LOG.info("returning {}", PATH);
 
-        model.addAttribute("userSignup", new UserSignup());
         loginReturnContextService.addReturnContext(model, request, response);
+        var signupAllowedError = signupPolicyService.validateSignupAllowedForHost(currentHost);
+        if (signupAllowedError.isPresent()) {
+            model.addAttribute("error", signupAllowedError.get());
+            model.asMap().remove("userSignup");
+            return Mono.just(PATH);
+        }
+
+        model.addAttribute("userSignup", new UserSignup());
         return Mono.just(PATH);
     }
 
@@ -79,6 +87,13 @@ public class UserSignupController {
         final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
         LOG.info("signing up user: {}", userSignup);
         loginReturnContextService.addReturnContext(model, request, response);
+
+        var signupAllowedError = signupPolicyService.validateSignupAllowedForHost(currentHost);
+        if (signupAllowedError.isPresent()) {
+            model.addAttribute("error", signupAllowedError.get());
+            model.asMap().remove("userSignup");
+            return Mono.just(PATH);
+        }
 
         if (bindingResult.hasErrors()) {
             LOG.info("user didn't enter required fields");

@@ -94,9 +94,17 @@ authorization-server:
         allowed-email-domains:
           - business2.com
       demo.openissuer.com:
+        allow-account-self-service: false
         allow-signup: false
         create-organization-on-signup: false
         allowed-email-domains: []
+
+demo-cleanup:
+  enabled: ${DEMO_CLEANUP_ENABLED:false}
+  tenant-host: ${DEMO_CLEANUP_TENANT_HOST:demo.openissuer.com}
+  preserved-client-ids: ${DEMO_CLEANUP_PRESERVED_CLIENT_IDS:nextauth-demo}
+  initial-delay-seconds: ${DEMO_CLEANUP_INITIAL_DELAY_SECONDS:300}
+  fixed-delay-seconds: ${DEMO_CLEANUP_FIXED_DELAY_SECONDS:21600}
 application-rest-service:
   root: ${APPLICATION_REST_SERVICE}
   client-role: /applications/clients/{clientId}/users/{authenticationId}
@@ -188,6 +196,12 @@ maxClients: 5
 maxOrganizations: 1
 maxUserPerOrganization: 5
 maxRoles: 5
+
+client-limits:
+  default-max-clients: ${MAX_CLIENTS:5}
+  hosts:
+    free.openissuer.com: ${FREE_MAX_CLIENTS:2}
+    demo.openissuer.com: ${DEMO_MAX_CLIENTS:2}
 
 organization-seed:
   delay-seconds: 120

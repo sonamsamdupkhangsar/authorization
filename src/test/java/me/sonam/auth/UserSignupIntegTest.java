@@ -125,6 +125,11 @@ public class UserSignupIntegTest {
         business1Policy.setCreateOrganizationOnSignup(false);
         business1Policy.getAllowedEmailDomains().add("business1.com");
         signupPolicyProperties.getHosts().put("business1.openissuer.test", business1Policy);
+
+        SignupPolicyProperties.HostPolicy demoPolicy = new SignupPolicyProperties.HostPolicy();
+        demoPolicy.setAllowSignup(false);
+        demoPolicy.setCreateOrganizationOnSignup(false);
+        signupPolicyProperties.getHosts().put("demo.openissuer.test", demoPolicy);
     }
 
     @Test
@@ -244,6 +249,30 @@ public class UserSignupIntegTest {
         Assertions.assertThat(recordedRequest).isNull();
     }
 
+    @Test
+    public void signupFormShowsDisabledMessageWhenSignupNotAllowedForHost() throws Exception {
+        String responseBody = getSignupFormWithHost("demo.openissuer.test");
+
+        assertThat(responseBody).contains("Signup disabled.");
+        assertThat(responseBody).contains("signup is not allowed on this subdomain");
+        assertThat(responseBody).doesNotContain("Create your account");
+        assertThat(responseBody).doesNotContain("id=\"submitButton\"");
+    }
+
+    @Test
+    public void signupPostRejectsBeforeCreatingUserWhenSignupNotAllowedForHost() throws Exception {
+        UserSignup userSignup = new UserSignup("Demo", "User", "demo-user@openissuer.test",
+                "demo-user", "hello".toCharArray(), false, "Ignored Org");
+
+        String responseBody = signupWithHost("demo.openissuer.test", userSignup);
+
+        assertThat(responseBody).contains("Signup disabled.");
+        assertThat(responseBody).contains("signup is not allowed on this subdomain");
+        assertThat(responseBody).doesNotContain("Create your account");
+        RecordedRequest recordedRequest = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        Assertions.assertThat(recordedRequest).isNull();
+    }
+
     private User enqueueTokenAndUserResponses(UserSignup userSignup) throws JsonProcessingException {
         mockWebServer.enqueue(jsonResponse(200, token));
         mockWebServer.enqueue(jsonResponse(200, "{\"message\": \"user created\"}"));
@@ -295,6 +324,21 @@ public class UserSignupIntegTest {
                         .param("password", "1234567890")
                         .param("active", "false")
                         .param("organization", userSignup.getOrganization() == null ? "" : userSignup.getOrganization()))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        MvcResult asyncResult = mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andReturn();
+        return asyncResult.getResponse().getContentAsString();
+    }
+
+    private String getSignupFormWithHost(String host) throws Exception {
+        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/signup")
+                        .with(request -> {
+                            request.setServerName(host);
+                            return request;
+                        }))
                 .andExpect(status().isOk())
                 .andReturn();
 

@@ -55,7 +55,7 @@
             <div id="errorDiv" th:if="${error}" class="alert alert-danger" role="alert">
                 <span th:text="${error}"></span>
             </div>
-            <div th:if="!${message}">
+            <div th:if="${message == null} and ${accountSelfServiceDisabled != true}">
                 <div class="form-floating">
                     <input type="email" id="emailAddress" name="emailAddress" class="form-control" required autofocus>
                     <label for="emailAddress">Email</label>

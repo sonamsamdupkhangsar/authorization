@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 public interface AuthorizationConsentRepository extends JpaRepository<AuthorizationConsent, AuthorizationConsent.AuthorizationConsentId> {
     Optional<AuthorizationConsent> findByRegisteredClientIdAndPrincipalName(String registeredClientId, String principalName);
     Optional<AuthorizationConsent> findByTenantIdAndRegisteredClientIdAndPrincipalName(String tenantId, String registeredClientId, String principalName);
+    long deleteByTenantIdAndRegisteredClientId(String tenantId, String registeredClientId);
     void deleteByRegisteredClientIdAndPrincipalName(String registeredClientId, String principalName);
     void deleteByTenantIdAndRegisteredClientIdAndPrincipalName(String tenantId, String registeredClientId, String principalName);
 }

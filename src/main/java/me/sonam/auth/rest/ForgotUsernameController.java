@@ -3,6 +3,7 @@ package me.sonam.auth.rest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.service.LoginReturnContextService;
+import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.AccountWebClient;
 import me.sonam.auth.service.HostOrganizationResolver;
 import org.slf4j.Logger;
@@ -30,20 +31,24 @@ public class ForgotUsernameController {
     private final AccountWebClient accountWebClient;
     private final HostOrganizationResolver hostOrganizationResolver;
     private final LoginReturnContextService loginReturnContextService;
+    private final SignupPolicyService signupPolicyService;
     private final String USERNAME_PAGE = "username";
     private final String EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE = "account/active";
 
     public ForgotUsernameController(AccountWebClient accountWebClient, HostOrganizationResolver hostOrganizationResolver,
-                                    LoginReturnContextService loginReturnContextService) {
+                                    LoginReturnContextService loginReturnContextService,
+                                    SignupPolicyService signupPolicyService) {
         this.accountWebClient = accountWebClient;
         this.hostOrganizationResolver = hostOrganizationResolver;
         this.loginReturnContextService = loginReturnContextService;
+        this.signupPolicyService = signupPolicyService;
     }
 
     @GetMapping("/loginHelp")
     public String getLoginHelp(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("return login help page");
         loginReturnContextService.addReturnContext(model, request, response);
+        addAccountSelfServicePolicy(model);
         return "loginHelp";
     }
 
@@ -52,6 +57,7 @@ public class ForgotUsernameController {
     public String forgotUsername(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning forgotUsername");
         loginReturnContextService.addReturnContext(model, request, response);
+        addAccountSelfServicePolicy(model);
         return USERNAME_PAGE;
     }
 
@@ -60,6 +66,9 @@ public class ForgotUsernameController {
                                       HttpServletRequest request, HttpServletResponse response) {
         LOG.info("forgot-username email requested");
         loginReturnContextService.addReturnContext(model, request, response);
+        if (blockAccountSelfService(model)) {
+            return Mono.just(USERNAME_PAGE);
+        }
 
       return  accountWebClient.emailUsername(emailAddress).flatMap(s -> {
                 LOG.info("add message attribute");
@@ -75,6 +84,7 @@ public class ForgotUsernameController {
     public String emailAccountActivateLink(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning emailAccountActivateLink page");
         loginReturnContextService.addReturnContext(model, request, response);
+        addAccountSelfServicePolicy(model);
 
         return EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE;
     }
@@ -84,6 +94,9 @@ public class ForgotUsernameController {
                                                 HttpServletRequest request, HttpServletResponse response) {
         LOG.info("send email account activate link if inactive");
         loginReturnContextService.addReturnContext(model, request, response);
+        if (blockAccountSelfService(model)) {
+            return EMAIL_ACCOUNT_ACTIVATE_LINK_PAGE;
+        }
 
         return accountWebClient.emailAccountActivationLink(emailAddress,
                 hostOrganizationResolver.currentHost().orElse(null)).doOnNext(s -> {
@@ -114,6 +127,23 @@ public class ForgotUsernameController {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
         }
+    }
+
+    private void addAccountSelfServicePolicy(Model model) {
+        signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost().ifPresent(error -> {
+            model.addAttribute("accountSelfServiceDisabled", true);
+            model.addAttribute("error", error);
+        });
+    }
+
+    private boolean blockAccountSelfService(Model model) {
+        var error = signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost();
+        if (error.isEmpty()) {
+            return false;
+        }
+        model.addAttribute("accountSelfServiceDisabled", true);
+        model.addAttribute("error", error.get());
+        return true;
     }
 
     private void logAccountRestError(String message, Throwable throwable) {

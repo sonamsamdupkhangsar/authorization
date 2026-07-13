@@ -181,6 +181,16 @@ envs:
     value: authorization-server
   - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_3
     value: platform.openissuer.com
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_4
+    value: authorization-server.{{ .Release.Namespace }}.svc.cluster.local
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_5
+    value: authorization-server.{{ .Release.Namespace }}
+  - name: AUTHORIZATION_SERVER_MULTITENANCY_DEFAULT_HOSTS_6
+    value: authorization-server.{{ .Release.Namespace }}.svc
+  - name: FREE_MAX_CLIENTS
+    value: "2"
+  - name: DEMO_MAX_CLIENTS
+    value: "2"
   - name: NEW_RELIC_ENABLED
     value: false
   - name: BUSINESS1_AUTH_DB_URL
@@ -207,6 +217,16 @@ envs:
     value: demoauth
   - name: DEMO_AUTH_DB_PASSWORD_SECRET_REF
     value: demo-db-password
+  - name: DEMO_CLEANUP_ENABLED
+    value: "true"
+  - name: DEMO_CLEANUP_TENANT_HOST
+    value: demo.openissuer.com
+  - name: DEMO_CLEANUP_PRESERVED_CLIENT_IDS
+    value: nextauth-demo
+  - name: DEMO_CLEANUP_INITIAL_DELAY_SECONDS
+    value: "900"
+  - name: DEMO_CLEANUP_FIXED_DELAY_SECONDS
+    value: "21600"
 
 health:
   startup:

@@ -19,15 +19,18 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -85,6 +88,7 @@ public class ForgotUsernamePasswordIntegTest {
         LOG.info("mock the port for account-rest-service");
         r.add("account-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("auth-server.root", () -> "http://localhost:"+ mockWebServer.getPort());
+        r.add("authorization-server.signup-policy.hosts.demo.openissuer.test.allow-account-self-service", () -> false);
     }
 
     @Test
@@ -102,6 +106,91 @@ public class ForgotUsernamePasswordIntegTest {
 
         LOG.info("assert that the page returned is Change password help");
         this.mockMvc.perform(get("/password")).andDo(print()).andExpect(status().isOk());
+    }
+
+    @Test
+    public void forgotUsernameDisabledForDemoHost() throws Exception {
+        this.mockMvc.perform(get("/username")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Email my username"))));
+    }
+
+    @Test
+    public void forgotUsernamePostDoesNotCallAccountServiceForDemoHost() throws Exception {
+        MvcResult mvcResult = this.mockMvc.perform(post("/username")
+                        .param("emailAddress", "demo@openissuer.test")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andReturn();
+        this.mockMvc.perform(asyncDispatch(mvcResult))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")));
+
+        RecordedRequest request = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        assertThat(request).isNull();
+    }
+
+    @Test
+    public void forgotPasswordDisabledForDemoHost() throws Exception {
+        this.mockMvc.perform(get("/password")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Forgot password"))));
+    }
+
+    @Test
+    public void forgotPasswordPostDoesNotCallAccountServiceForDemoHost() throws Exception {
+        MvcResult mvcResult = this.mockMvc.perform(post("/password")
+                        .param("email", "demo@openissuer.test")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andReturn();
+        this.mockMvc.perform(asyncDispatch(mvcResult))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")));
+
+        RecordedRequest request = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        assertThat(request).isNull();
+    }
+
+    @Test
+    public void activationLinkDisabledForDemoHost() throws Exception {
+        this.mockMvc.perform(get("/accounts/active")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Email account activation link"))));
+    }
+
+    @Test
+    public void activationLinkPostDoesNotCallAccountServiceForDemoHost() throws Exception {
+        this.mockMvc.perform(post("/accounts/active")
+                        .param("emailAddress", "demo@openissuer.test")
+                        .with(request -> {
+                            request.setServerName("demo.openissuer.test");
+                            return request;
+                        }))
+                .andDo(print()).andExpect(status().isOk())
+                .andExpect(content().string(containsString("account self-service is disabled on this subdomain")));
+
+        RecordedRequest request = mockWebServer.takeRequest(200, TimeUnit.MILLISECONDS);
+        assertThat(request).isNull();
     }
 
     @Test
