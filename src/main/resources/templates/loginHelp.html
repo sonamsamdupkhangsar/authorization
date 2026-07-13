@@ -46,10 +46,13 @@
 <div class="container">
     <div>
             <h1 class="h3 mb-3 fw-normal">Login help</h1>
-            <div th:if="!${message}">
-                <div class="mt-2"><a href="/forgotPassword" style="color: dimgrey !important;">Forgot password?</a></div>
-                <div class="mt-2"><a href="/forgotUsername" style="color: dimgrey !important;">Forgot username?</a></div>
-                <div class="mt-2"><a href="/forgotUsername" style="color: dimgrey !important;">Resend account activation link</a></div>
+            <div th:if="${accountSelfServiceDisabled}" class="alert alert-danger" role="alert">
+                <span th:text="${error}"></span>
+            </div>
+            <div th:if="${message == null} and ${accountSelfServiceDisabled != true}">
+                <div class="mt-2"><a th:href="@{/password(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot password?</a></div>
+                <div class="mt-2"><a th:href="@{/username(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot username?</a></div>
+                <div class="mt-2"><a th:href="@{/accounts/active(returnTo=${returnTo})}" style="color: dimgrey !important;">Resend account activation link</a></div>
             </div>
     </div>
 </div>

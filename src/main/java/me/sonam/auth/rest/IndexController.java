@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import me.sonam.auth.service.ClientIdUtil;
 import me.sonam.auth.service.LoginReturnContextService;
+import me.sonam.auth.service.SignupPolicyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,10 +30,13 @@ public class IndexController {
 
     private final RequestCache requestCache;
     private final LoginReturnContextService loginReturnContextService;
+    private final SignupPolicyService signupPolicyService;
 
-    public IndexController(RequestCache requestCache, LoginReturnContextService loginReturnContextService) {
+    public IndexController(RequestCache requestCache, LoginReturnContextService loginReturnContextService,
+                           SignupPolicyService signupPolicyService) {
         this.requestCache = requestCache;
         this.loginReturnContextService = loginReturnContextService;
+        this.signupPolicyService = signupPolicyService;
     }
 
 
@@ -41,6 +45,7 @@ public class IndexController {
         LOG.info("returning index");
 
         model.addAttribute("authzmanager", authzManagerUrl);
+        model.addAttribute("accountSelfServiceAllowed", signupPolicyService.isAccountSelfServiceAllowedForCurrentHost());
         addSavedClientId(model, request, response);
         loginReturnContextService.addReturnContext(model, request, response);
 

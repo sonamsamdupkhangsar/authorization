@@ -18,6 +18,7 @@ public interface AuthorizationRepository extends JpaRepository<Authorization, St
     Optional<Authorization> findByTenantIdAndAccessTokenValue(String tenantId, String accessToken);
     Optional<Authorization> findByRefreshTokenValue(String refreshToken);
     Optional<Authorization> findByTenantIdAndRefreshTokenValue(String tenantId, String refreshToken);
+    long deleteByTenantIdAndRegisteredClientId(String tenantId, String registeredClientId);
     @Query("select a from Authorization a where a.state = :token" +
             " or a.authorizationCodeValue = :token" +
             " or a.accessTokenValue = :token" +

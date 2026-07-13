@@ -2,6 +2,7 @@ package me.sonam.auth.rest;
 
 
 import jakarta.ws.rs.BadRequestException;
+import me.sonam.auth.config.ClientLimitProperties;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.multitenancy.IssuerAwareAuthorizationServerOperations;
@@ -17,7 +18,6 @@ import org.apache.tomcat.websocket.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -68,11 +68,7 @@ public class ClientRestService {
     @Autowired
     private final OrganizationWebClient organizationWebClient;
 
-    @Value("${maxClients}")
-    private int maxClients;
-
-    @Value("${authzmanager-id}")
-    private String authzManagerId;
+    private final ClientLimitProperties clientLimitProperties;
 
     private final TransactionTemplate transactionTemplate;
 
@@ -80,13 +76,15 @@ public class ClientRestService {
                              IssuerAwareAuthorizationServerOperations issuerAwareAuthorizationServerOperations,
                              PasswordEncoder passwordEncoder, RoleWebClient roleWebClient,
                              OrganizationWebClient organizationWebClient,
-                             TransactionTemplate transactionTemplate) {
+                             TransactionTemplate transactionTemplate,
+                             ClientLimitProperties clientLimitProperties) {
         this.registeredClientMapConverter = registeredClientMapConverter;
         this.issuerAwareAuthorizationServerOperations = issuerAwareAuthorizationServerOperations;
         this.passwordEncoder = passwordEncoder;
         this.roleWebClient = roleWebClient;
         this.organizationWebClient = organizationWebClient;
         this.transactionTemplate = transactionTemplate;
+        this.clientLimitProperties = clientLimitProperties;
         LOG.info("initialized clientRestService");
     }
 
@@ -127,7 +125,8 @@ public class ClientRestService {
                    }
                })
                .flatMap(orgId -> {
-                   LOG.info("max number of clients count: {}", maxClients);
+                   int maxClients = clientLimitProperties.maxClientsForIssuer(issuer);
+                   LOG.info("max number of clients count for issuer {}: {}", issuer, maxClients);
                     long clientCount = clientOrganizationRepository.countByOrganizationId(orgId);
                     LOG.info("clientCount: {}", clientCount);
                    if (clientCount >= maxClients) {
@@ -240,12 +239,17 @@ public class ClientRestService {
     }
 
 
-    // get count of clients owned by logged-in user based on access token
+    // get count of clients associated with the logged-in user's default organization
     @GetMapping("/count/users")
     public Mono<Long> getClientCount() {
-        LOG.info("get count of clients for logged-in user");
+        LOG.info("get count of clients for logged-in user's default organization");
+        return getDefaultOrganizationClientCount();
+    }
+
+    @GetMapping("/count/organizations/default")
+    public Mono<Long> getDefaultOrganizationClientCount() {
+        LOG.info("get count of clients for default organization");
         Pair<UUID, String> uuidTokenPair = UserIdUtil.getLoggedInUserId();
-        String accessToken = uuidTokenPair.getSecond();
         UUID userId = uuidTokenPair.getFirst();
 
         return organizationWebClient.getDefaultOrganizationIdForUser(userId)

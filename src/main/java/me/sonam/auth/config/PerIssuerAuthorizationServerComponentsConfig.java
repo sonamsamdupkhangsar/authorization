@@ -31,7 +31,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties({AuthorizationServerMultitenancyProperties.class, OrganizationSeedProperties.class, SignupPolicyProperties.class})
+@EnableConfigurationProperties({
+        AuthorizationServerMultitenancyProperties.class,
+        ClientLimitProperties.class,
+        DemoCleanupProperties.class,
+        OrganizationSeedProperties.class,
+        SignupPolicyProperties.class
+})
 public class PerIssuerAuthorizationServerComponentsConfig {
     @Bean
     public TenantPerHostComponentRegistry tenantPerHostComponentRegistry(

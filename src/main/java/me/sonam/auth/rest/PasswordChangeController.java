@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.service.HostOrganizationResolver;
 import me.sonam.auth.service.LoginReturnContextService;
+import me.sonam.auth.service.SignupPolicyService;
 import me.sonam.auth.webclient.AccountWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,20 +29,24 @@ public class PasswordChangeController {
     private final AccountWebClient accountWebClient;
     private final LoginReturnContextService loginReturnContextService;
     private final HostOrganizationResolver hostOrganizationResolver;
+    private final SignupPolicyService signupPolicyService;
     private final String PASSWORD_PAGE = "/password/password";
     private final String PASSWORD_SECRET_PAGE = "/password/password-secret";
 
     public PasswordChangeController(AccountWebClient accountWebClient, LoginReturnContextService loginReturnContextService,
-                                    HostOrganizationResolver hostOrganizationResolver) {
+                                    HostOrganizationResolver hostOrganizationResolver,
+                                    SignupPolicyService signupPolicyService) {
         this.accountWebClient = accountWebClient;
         this.loginReturnContextService = loginReturnContextService;
         this.hostOrganizationResolver = hostOrganizationResolver;
+        this.signupPolicyService = signupPolicyService;
     }
 
     @GetMapping("/password")
     public String forgotPassword(Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("returning {}", PASSWORD_PAGE);
         loginReturnContextService.addReturnContext(model, request, response);
+        addAccountSelfServicePolicy(model);
         return PASSWORD_PAGE;
     }
 
@@ -65,6 +70,9 @@ public class PasswordChangeController {
     public Mono<String> emailSecret(String email, Model model, HttpServletRequest request, HttpServletResponse response) {
         LOG.info("password change secret requested");
         loginReturnContextService.addReturnContext(model, request, response);
+        if (blockAccountSelfService(model)) {
+            return Mono.just(PASSWORD_PAGE);
+        }
 
         return accountWebClient.emailMySecret(email, hostOrganizationResolver.currentHost().orElse(null)).flatMap(s -> {
             LOG.info("secret sent to email for password change");
@@ -114,6 +122,23 @@ public class PasswordChangeController {
             //set model error attribute to present back to user
             model.addAttribute("error", defaultErrMessage  + throwable.getMessage());
         }
+    }
+
+    private void addAccountSelfServicePolicy(Model model) {
+        signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost().ifPresent(error -> {
+            model.addAttribute("accountSelfServiceDisabled", true);
+            model.addAttribute("error", error);
+        });
+    }
+
+    private boolean blockAccountSelfService(Model model) {
+        var error = signupPolicyService.validateAccountSelfServiceAllowedForCurrentHost();
+        if (error.isEmpty()) {
+            return false;
+        }
+        model.addAttribute("accountSelfServiceDisabled", true);
+        model.addAttribute("error", error.get());
+        return true;
     }
 
     private void logAccountRestError(String message, Throwable throwable) {

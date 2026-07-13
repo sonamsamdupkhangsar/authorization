@@ -15,8 +15,16 @@ public class SignupPolicyProperties {
         return hosts;
     }
 
+    public void setHosts(Map<String, HostPolicy> hosts) {
+        this.hosts.clear();
+        if (hosts != null) {
+            this.hosts.putAll(hosts);
+        }
+    }
+
     public static class HostPolicy {
-        private boolean allowSignup;
+        private boolean allowSignup = true;
+        private boolean allowAccountSelfService = true;
         private boolean createOrganizationOnSignup = true;
         private final List<String> allowedEmailDomains = new ArrayList<>();
 
@@ -26,6 +34,14 @@ public class SignupPolicyProperties {
 
         public void setAllowSignup(boolean allowSignup) {
             this.allowSignup = allowSignup;
+        }
+
+        public boolean isAllowAccountSelfService() {
+            return allowAccountSelfService;
+        }
+
+        public void setAllowAccountSelfService(boolean allowAccountSelfService) {
+            this.allowAccountSelfService = allowAccountSelfService;
         }
 
         public boolean isCreateOrganizationOnSignup() {
@@ -38,6 +54,13 @@ public class SignupPolicyProperties {
 
         public List<String> getAllowedEmailDomains() {
             return allowedEmailDomains;
+        }
+
+        public void setAllowedEmailDomains(List<String> allowedEmailDomains) {
+            this.allowedEmailDomains.clear();
+            if (allowedEmailDomains != null) {
+                this.allowedEmailDomains.addAll(allowedEmailDomains);
+            }
         }
     }
 }

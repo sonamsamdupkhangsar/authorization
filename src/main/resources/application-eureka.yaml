@@ -133,6 +133,7 @@ authorization-server:
         allowed-email-domains:
           - business2.com
       demo.openissuer.test:
+        allow-account-self-service: false
         allow-signup: false
         create-organization-on-signup: false
         allowed-email-domains: []
@@ -200,3 +201,8 @@ organization-seed:
     - name: OpenIssuer Demo
       creatorAuthenticationId: demo@openissuer.test
       subdomain: demo.openissuer.test
+
+client-limits:
+  hosts:
+    free.openissuer.test: ${FREE_MAX_CLIENTS:2}
+    demo.openissuer.test: ${DEMO_MAX_CLIENTS:2}

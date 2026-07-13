@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import me.sonam.auth.rest.IndexController;
 import me.sonam.auth.service.ClientIdUtil;
 import me.sonam.auth.service.LoginReturnContextService;
+import me.sonam.auth.service.SignupPolicyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -70,6 +71,8 @@ public class IndexControllerTest {
     }
 
     private IndexController indexController(RequestCache requestCache) {
-        return new IndexController(requestCache, new LoginReturnContextService(requestCache));
+        SignupPolicyService signupPolicyService = mock(SignupPolicyService.class);
+        when(signupPolicyService.isAccountSelfServiceAllowedForCurrentHost()).thenReturn(true);
+        return new IndexController(requestCache, new LoginReturnContextService(requestCache), signupPolicyService);
     }
 }
