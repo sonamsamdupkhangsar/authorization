@@ -97,3 +97,17 @@ Configured seed users marked as subdomain administrators receive an `OrgAdmin` a
 Existing subdomain administrators can manage assignments from AuthzManager's subdomain user view. The target user must have a default organization in the same subdomain and must already be `OrgAdmin` for that organization. Management calls are scoped to the acting administrator's subdomain, duplicate assignments are rejected, and the final `SubdomainAdmin` assignment cannot be removed.
 
 Organization role creation, update, and deletion are available to an `OrgAdmin` for that organization and to a `SubdomainAdmin` when the organization belongs to the assigned subdomain. A role is bound to its organization when it is created; there is no separate role-to-organization assignment step. Organization-scoped routes bind mutations to the organization ID in the URL and verify an existing role belongs to that organization before update or deletion. The obsolete standalone role-to-organization management route was removed from AuthzManager.
+
+## Free And Demo Usage Limits
+
+Free and demo tenants are intentionally capped so public/demo environments cannot grow unbounded. The current limits are organization-scoped:
+
+| Resource | Default | Free | Demo | Source of enforcement |
+| --- | ---: | ---: | ---: | --- |
+| OAuth clients | 5 | 2 | 2 | `authorization` |
+| Organization roles | 5 | 2 | 2 | `role-rest-service` |
+| Added users / organization associations | 5 | 2 | 2 | `organization-rest-service` |
+
+AuthzManager performs prechecks for these limits and hides or disables create/add controls where the page already has enough context. The backend service still enforces the limit for direct requests or stale pages.
+
+The organization user limit counts added users. The organization creator is allowed in addition to the configured added-user limit.
