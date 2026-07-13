@@ -94,7 +94,7 @@ authorization-server:
         allowed-email-domains:
           - business2.com
       demo.openissuer.com:
-        allow-account-self-service: false
+        allow-account-self-service: true
         allow-signup: false
         create-organization-on-signup: false
         allowed-email-domains: []
