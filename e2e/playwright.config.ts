@@ -11,7 +11,10 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     screenshot: "off",
     trace: "retain-on-failure",
-    video: "off",
+    video: process.env.E2E_RECORD_VIDEO === "true" ? "on" : "off",
+    launchOptions: {
+      slowMo: Number(process.env.E2E_SLOW_MO_MS ?? "0"),
+    },
     ...devices["Desktop Chrome"],
   },
 });

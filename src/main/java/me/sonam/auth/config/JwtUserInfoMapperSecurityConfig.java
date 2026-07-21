@@ -150,6 +150,7 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/favicon.ico").permitAll()
                                 .requestMatchers("/favicon.svg").permitAll()
                                 .requestMatchers("/css/**").permitAll()
+                                .requestMatchers("/js/**").permitAll()
                                 .requestMatchers("/username").permitAll()
                                 .requestMatchers("/password/secret").permitAll()
                                 .requestMatchers("/password").permitAll()
@@ -163,6 +164,8 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/mfa/passkeys/challenge").permitAll()
                                 .requestMatchers("/mfa/passkeys/authenticate/options").permitAll()
                                 .requestMatchers("/mfa/passkeys/authenticate").permitAll()
+                                .requestMatchers("/passkeys/login/options").permitAll()
+                                .requestMatchers("/passkeys/login").permitAll()
 
 
                 .anyRequest().authenticated()

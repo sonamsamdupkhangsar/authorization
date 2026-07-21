@@ -42,8 +42,8 @@ public class BeanConfig {
     @Value("${account-rest-service.unLockAccountTimeExpire}")
     private String unLockAccountTimeExpireEndpoint;
 
-    @Value("${authentication-rest-service.authenticate}")
-    private String authenticateEndpoint;
+    @Value("${authentication-rest-service.verifyPassword}")
+    private String verifyPasswordEndpoint;
 
     @Value("${authentication-rest-service.authenticationId}")
     private String authenticateIdCheckEndpoint;
@@ -120,8 +120,8 @@ public class BeanConfig {
 
     @Bean
     public AuthenticationWebClient authenticationWebClient() {
-        return new AuthenticationWebClient(webClientBuilder, authenticateEndpoint, authenticateIdCheckEndpoint,
-                loginAttemptWebClient(), authIdNotExist,
+        return new AuthenticationWebClient(webClientBuilder, verifyPasswordEndpoint, authenticateIdCheckEndpoint,
+                authIdNotExist,
                 authNotActive, authPasswordNotSet);
     }
 

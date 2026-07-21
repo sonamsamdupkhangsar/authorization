@@ -1,5 +1,6 @@
 package me.sonam.auth.service;
 
+import jakarta.servlet.http.HttpServletRequest;
 import me.sonam.auth.jpa.entity.ClientOrganization;
 import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
@@ -15,15 +16,22 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -92,6 +100,18 @@ public class AuthenticationCallout implements AuthenticationProvider {
     // through the new host-aware user/client authorization flow.
     @Override
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+        return authenticate(authentication, false);
+    }
+
+    public Authentication authenticatePasskey(String authenticationId, HttpServletRequest request) {
+        UsernamePasswordAuthenticationToken authentication =
+                UsernamePasswordAuthenticationToken.unauthenticated(authenticationId, "");
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        return authenticate(authentication, true);
+    }
+
+    private Authentication authenticate(Authentication authentication, boolean passkeyAuthenticated)
+            throws AuthenticationException {
         LOG.info("authenticate with username and password");
 
         // ip address
@@ -165,7 +185,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     LOG.debug("authentication request has {} authorities", authentication.getAuthorities().size());
                     if (passkeyManagementLogin) {
                         LOG.info("clientless passkey management login");
-                        return checkUserForPasskeyManagement(authentication, currentHost);
+                        return checkUserForPasskeyManagement(authentication, currentHost, passkeyAuthenticated);
                     }
                     LOG.info("get registeredClient from clientId: {}", clientId);
                     RegisteredClient registeredClient = issuerContextExecutor.withIssuer(currentIssuer,
@@ -176,14 +196,16 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     }
                     UUID clientUuidId = UUID.fromString(registeredClient.getId());
                     LOG.info("got clientUuid: {}", clientUuidId);
-                    return checkUserAndClient(authentication, clientUuidId, currentHost);
+                    return checkUserAndClient(authentication, clientUuidId, currentHost, passkeyAuthenticated);
                 })
                  .block();
     }
 
     // Resolves the user id first, enforces any host-bound organization boundary, and then
     // continues with either authzmanager-specific authorization or the existing client-org check.
-    private Mono<UsernamePasswordAuthenticationToken> checkUserAndClient(Authentication authentication, UUID clientId, String currentHost) {
+    private Mono<UsernamePasswordAuthenticationToken> checkUserAndClient(Authentication authentication, UUID clientId,
+                                                                          String currentHost,
+                                                                          boolean passkeyAuthenticated) {
         final String authenticationId = authentication.getName();
         LOG.info("check user and client relationship");
 
@@ -213,8 +235,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
         ).flatMap(userId ->
                 // Blocks cross-tenant login before issuing tokens for a host-bound issuer.
                 enforceHostOrganizationBoundary(userId, clientId, currentHost)
-                .then(isClientAuthzManager(userId, clientId, authentication, currentHost)
-                .switchIfEmpty(checkClientInOrganization(authentication, userId, clientId))
+                .then(isClientAuthzManager(userId, clientId, authentication, currentHost, passkeyAuthenticated)
+                .switchIfEmpty(checkClientInOrganization(authentication, userId, clientId, passkeyAuthenticated))
                 )
 
                     .onErrorResume(throwable -> {
@@ -245,7 +267,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
     }
 
     private Mono<UsernamePasswordAuthenticationToken> checkUserForPasskeyManagement(Authentication authentication,
-                                                                                   String currentHost) {
+                                                                                     String currentHost,
+                                                                                     boolean passkeyAuthenticated) {
         final String authenticationId = authentication.getName();
         return userWebClient.getUserId(authenticationId)
                 .onErrorResume(throwable -> {
@@ -258,9 +281,11 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     }
                     return resolveDefaultHostOrganization(currentHost, userId)
                             .switchIfEmpty(Mono.error(new BadCredentialsException("user is not allowed for this issuer")))
-                            .then(authenticationWebClient.getAuth(authentication, Map.of(
+                            .then(verifyPasswordIfRequired(userId, passkeyAuthenticated, Map.of(
                                     "authenticationId", authentication.getPrincipal().toString(),
-                                    "password", authentication.getCredentials().toString())));
+                                    "password", authentication.getCredentials().toString())))
+                            .then(completeAuthentication(authentication, userId, null, null,
+                                    passkeyAuthenticated));
                 })
                 .onErrorResume(throwable -> {
                     LOG.debug("exception occurred during passkey management login", throwable);
@@ -282,14 +307,16 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
     /**
      * If the clientId is authzManager create a client-user row if doesn't exist
-     * and return call to authenticationWebClient.getAuth()
+     * and complete authentication through the shared role/session path
      * @param userId UUID of user
      * @param clientId UUID of client id
      * @param authentication authentication object
      * @return if authentication is success or fail object
      */
-    private Mono<UsernamePasswordAuthenticationToken> isClientAuthzManager(final UUID userId, final UUID clientId, final Authentication authentication,
-                                                                          final String currentHost) {
+    private Mono<UsernamePasswordAuthenticationToken> isClientAuthzManager(final UUID userId, final UUID clientId,
+                                                                           final Authentication authentication,
+                                                                           final String currentHost,
+                                                                           boolean passkeyAuthenticated) {
         LOG.info("checking if the clientId: {} is for authzManagerId: {}", clientId, authzManagerId);
 
         if (authzManagerId.equals(clientId)) {
@@ -319,10 +346,12 @@ public class AuthenticationCallout implements AuthenticationProvider {
                             }));
 
             return targetOrganization
-                    .flatMap(orgId -> authenticationWebClient.getAuth(authentication,  Map.of(
+                    .flatMap(orgId -> verifyPasswordIfRequired(userId, passkeyAuthenticated, Map.of(
                                     "authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),
-                                    "clientId", clientId)));
+                                    "clientId", clientId))
+                            .then(completeAuthentication(authentication, userId, null, null,
+                                    passkeyAuthenticated)));
         }
         else {
             LOG.info("clientId is not AuthzManager");
@@ -403,7 +432,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
     // Preserves the original client-organization login rule for non-authzmanager clients after
     // the host-bound organization checks have already run.
-    private Mono<UsernamePasswordAuthenticationToken> checkClientInOrganization(Authentication authentication, UUID userId, UUID clientId) {
+    private Mono<UsernamePasswordAuthenticationToken> checkClientInOrganization(Authentication authentication,
+                                                                                 UUID userId, UUID clientId,
+                                                                                 boolean passkeyAuthenticated) {
         return Mono.defer(() -> {
             LOG.info("checkClientInOrganization() - checking client exists in clientOrganization");
             Optional<ClientOrganization> optionalClientOrganization = clientOrganizationRepository.findByClientId(clientId);
@@ -422,11 +453,48 @@ public class AuthenticationCallout implements AuthenticationProvider {
             return organizationWebClient.userExistInOrganization(userId, clientOrganization.getOrganizationId())
                     .filter(aBoolean -> aBoolean)
                     .switchIfEmpty(Mono.error(new BadCredentialsException("user does not exists in organization")))
-                    .flatMap(aBoolean -> authenticationWebClient.getAuth(authentication,
+                    .flatMap(aBoolean -> verifyPasswordIfRequired(userId, passkeyAuthenticated,
                             Map.of("authenticationId", authentication.getPrincipal().toString(),
                                     "password", authentication.getCredentials().toString(),
-                                    "clientId", clientId,
-                                    "organizationId", clientOrganization.getOrganizationId())));
+                                    "clientId", clientId))
+                            .then(completeAuthentication(authentication, userId, clientId,
+                                    clientOrganization.getOrganizationId(), passkeyAuthenticated)));
+        });
+    }
+
+    private Mono<Void> verifyPasswordIfRequired(UUID expectedUserId, boolean passkeyAuthenticated,
+                                                Map<String, Object> passwordBody) {
+        if (passkeyAuthenticated) {
+            return Mono.empty();
+        }
+        return authenticationWebClient.verifyPassword(passwordBody)
+                .filter(expectedUserId::equals)
+                .switchIfEmpty(Mono.error(new BadCredentialsException("authenticated user did not match requested user")))
+                .then();
+    }
+
+    private Mono<UsernamePasswordAuthenticationToken> completeAuthentication(
+            Authentication authentication, UUID userId, UUID clientId, UUID organizationId,
+            boolean passkeyAuthenticated) {
+        Mono<String> roleName = clientId == null || organizationId == null
+                ? Mono.just("")
+                : roleWebClient.getRoleNameForClientOrganizationUser(null, clientId, organizationId, userId)
+                        .defaultIfEmpty("");
+
+        return roleName.flatMap(role -> {
+            List<GrantedAuthority> authorities = new ArrayList<>();
+            if (!role.isBlank()) {
+                authorities.add(new SimpleGrantedAuthority(role));
+            }
+            String factor = passkeyAuthenticated
+                    ? FactorGrantedAuthority.WEBAUTHN_AUTHORITY
+                    : FactorGrantedAuthority.PASSWORD_AUTHORITY;
+            authorities.add(FactorGrantedAuthority.fromAuthority(factor));
+
+            User principal = new User(authentication.getName(), "", authorities);
+            return loginAttemptWebClient.loginSucccess(authentication.getName(), userId,
+                            remoteAddress(authentication))
+                    .thenReturn(new UsernamePasswordAuthenticationToken(principal, "", authorities));
         });
     }
 

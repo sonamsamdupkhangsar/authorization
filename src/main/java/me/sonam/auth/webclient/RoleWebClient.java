@@ -155,8 +155,12 @@ public class RoleWebClient {
 
 
         LOG.info("get clientOrganizationUserWithRoles with endpoint: {}", endpoint);
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
+        WebClient.RequestHeadersSpec<?> request = webClientBuilder.build().get().uri(endpoint)
+                .accept(MediaType.APPLICATION_JSON);
+        if (accessToken != null && !accessToken.isBlank()) {
+            request.headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken));
+        }
+        WebClient.ResponseSpec responseSpec = request.retrieve();
 
         return responseSpec.bodyToMono(UUID.class).map(s -> {
             LOG.info("got role for clientOrganizationUser roles: '{}'", s);
@@ -179,8 +183,12 @@ public class RoleWebClient {
 
 
         LOG.info("get clientOrganizationUserWithRoles with endpoint: {}", endpoint);
-        WebClient.ResponseSpec responseSpec = webClientBuilder.build().get().uri(endpoint)
-                .headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken)).accept(MediaType.APPLICATION_JSON).retrieve();
+        WebClient.RequestHeadersSpec<?> request = webClientBuilder.build().get().uri(endpoint)
+                .accept(MediaType.APPLICATION_JSON);
+        if (accessToken != null && !accessToken.isBlank()) {
+            request.headers(httpHeaders -> httpHeaders.setBearerAuth(accessToken));
+        }
+        WebClient.ResponseSpec responseSpec = request.retrieve();
 
         return responseSpec.bodyToMono(String.class).map(s -> {
             LOG.info("got role name for clientOrganizationUser roles: '{}'", s);

@@ -325,11 +325,15 @@ public class AuthorizationServerApplicationUserLoginTests {
 		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
 
-		//6 login success is recorded before returning user roles in authentication
-		mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
-				.setResponseCode(200).setBody("{\"message\": \"CONTINUE\"}"));
+        //6 shared authorization loads the role after password verification
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody("\"user\""));
 
-		//7
+        //7 login success is recorded after shared role loading
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setResponseCode(200).setBody("{\"message\": \"CONTINUE\"}"));
+
+        //8
 		//it seems like we need to mock one more response for the redirection to redirecUris: /login/oauth2/code/messaging-client-oidc?code=...
 	mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
 				.setResponseCode(200).setBody("{\"roleNames\": \"[user, OrgAdmin]\", \"userId\": \""+ userId +"\", \"message\": \"Authentication successful\"}"));
@@ -376,14 +380,20 @@ public class AuthorizationServerApplicationUserLoginTests {
 		//6 authentication call
 		recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+        assertThat(recordedRequest.getPath()).startsWith("/authentications/verify-password");
 
-		//7
-		recordedRequest = mockWebServer.takeRequest();
-		assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
-		assertThat(recordedRequest.getPath()).startsWith("/attempts/login/success");
+        //7 shared role lookup
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("GET");
+        assertThat(recordedRequest.getPath()).startsWith("/roles/clients/" + clientIdUuid
+                + "/organizations/" + organizationId + "/users/" + userId + "/roles/name");
 
-		//8 for redirection on successful login
+        //8
+        recordedRequest = mockWebServer.takeRequest();
+        assertThat(recordedRequest.getMethod()).isEqualTo("PUT");
+        assertThat(recordedRequest.getPath()).startsWith("/attempts/login/success");
+
+        //9 for redirection on successful login
 		recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("GET");
 		LOG.info("recordedRequest path: {}", recordedRequest.getPath());
@@ -839,7 +849,7 @@ public class AuthorizationServerApplicationUserLoginTests {
 			//5 authentication call
 			recordedRequest = mockWebServer.takeRequest();
 			assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-			assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+            assertThat(recordedRequest.getPath()).startsWith("/authentications/verify-password");
 
 			//6
 			recordedRequest = mockWebServer.takeRequest();

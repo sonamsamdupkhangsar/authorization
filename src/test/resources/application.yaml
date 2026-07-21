@@ -39,7 +39,7 @@ application-rest-service:
 authentication-rest-service:
   root: http://localhost:8080
   context: ${authentication-rest-service.root}/authentications
-  authenticate: ${authentication-rest-service.context}/authenticate
+  verifyPassword: ${authentication-rest-service.context}/verify-password
   authenticationId: ${authentication-rest-service.context}/authenticationId
 
 user-rest-service:
