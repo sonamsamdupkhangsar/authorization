@@ -90,6 +90,7 @@ httproute:
     - "/username"
     - "/loginHelp"
     - "/mfa"
+    - "/webauthn"
     - "/userinfo"
     - "/.well-known"
     - "/issuer"

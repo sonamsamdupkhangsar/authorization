@@ -5,12 +5,17 @@
     "test": "playwright test",
     "test:signup": "playwright test tests/signup.spec.ts",
     "test:signup:headed": "playwright test tests/signup.spec.ts --headed",
+    "test:signup:demo": "E2E_RECORD_VIDEO=true E2E_SHOW_WEBMAIL=true E2E_SLOW_MO_MS=500 playwright test tests/signup.spec.ts --headed",
+    "inspect:mailbox": "node --no-warnings --experimental-strip-types support/inspect-mailbox.ts",
     "test:links": "playwright test tests/signin-links.spec.ts",
     "test:account": "playwright test tests/account-actions.spec.ts",
     "report": "playwright show-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
+    "@types/mailparser": "^3.4.6",
+    "imapflow": "^1.4.7",
+    "mailparser": "^3.9.14",
     "typescript": "^5.9.0"
   }
 }

@@ -115,7 +115,7 @@ public class PasskeyMfaController {
                 ? (PublicKeyCredentialRequestOptions) options : null;
     }
 
-    private Map<String, Object> toBrowserOptions(PublicKeyCredentialRequestOptions options) {
+    static Map<String, Object> toBrowserOptions(PublicKeyCredentialRequestOptions options) {
         return Map.of(
                 "challenge", options.getChallenge().toBase64UrlString(),
                 "timeout", options.getTimeout().toMillis(),
@@ -125,7 +125,7 @@ public class PasskeyMfaController {
         );
     }
 
-    private List<Map<String, Object>> toBrowserCredentials(List<PublicKeyCredentialDescriptor> credentials) {
+    private static List<Map<String, Object>> toBrowserCredentials(List<PublicKeyCredentialDescriptor> credentials) {
         if (credentials == null) {
             return List.of();
         }
@@ -137,7 +137,7 @@ public class PasskeyMfaController {
                 .toList();
     }
 
-    private List<String> transports(PublicKeyCredentialDescriptor credential) {
+    private static List<String> transports(PublicKeyCredentialDescriptor credential) {
         if (credential.getTransports() == null) {
             return List.of();
         }

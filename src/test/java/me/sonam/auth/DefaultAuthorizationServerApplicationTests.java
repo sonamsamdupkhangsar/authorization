@@ -191,7 +191,7 @@ public class DefaultAuthorizationServerApplicationTests {
 		assertThat(recordedRequest.getPath()).startsWith("/organizations/");//userExistsInOrganization http call
 
 		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+		assertThat(recordedRequest.getPath()).startsWith("/authentications/verify-password");
 
 		assertThat(signInResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND.value());	// there is no "default" index page
 	}
@@ -208,7 +208,7 @@ public class DefaultAuthorizationServerApplicationTests {
 
 		RecordedRequest recordedRequest = mockWebServer.takeRequest();
 		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+		assertThat(recordedRequest.getPath()).startsWith("/authentications/verify-password");
 
 		HtmlElement alert = loginErrorPage.querySelector("div[role=\"alert\"]");
 		assertThat(alert).isNotNull();
@@ -270,7 +270,7 @@ public class DefaultAuthorizationServerApplicationTests {
 */
 
 		assertThat(recordedRequest.getMethod()).isEqualTo("POST");
-		assertThat(recordedRequest.getPath()).startsWith("/authentications/authenticate");
+		assertThat(recordedRequest.getPath()).startsWith("/authentications/verify-password");
 
 /*		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.MOVED_PERMANENTLY.value());
 		String location = response.getResponseHeaderValue("location");

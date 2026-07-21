@@ -92,6 +92,7 @@
             console.log('show login div');
         }
     }
+
 </script>
 </head>
 <body class="auth-page">
@@ -121,6 +122,13 @@
         <div>
             <button class="w-100 btn btn-lg btn-primary btn-block" type="submit" id="submit">Sign in</button>
         </div>
+        <div class="auth-separator" aria-hidden="true"><span>or</span></div>
+        <div id="passkeyLoginError" class="alert alert-danger" role="alert" style="display:none"></div>
+        <button class="w-100 btn btn-lg btn-outline-primary btn-block" type="button" id="passkeySignIn"
+                th:data-options-url="@{/passkeys/login/options}" th:data-login-url="@{/passkeys/login}"
+                th:data-default-url="@{/}">
+            Sign in with a passkey
+        </button>
         <div class="mt-5" th:if="${accountSelfServiceAllowed}">
             <div class="mt-2"><a th:href="@{/password(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot password?</a></div>
             <div class="mt-2"><a th:href="@{/username(returnTo=${returnTo})}" style="color: dimgrey !important;">Forgot username?</a></div>
@@ -135,5 +143,6 @@
 
 
 </div>
+<script type="module" th:src="@{/js/passkey-login.js}"></script>
 </body>
 </html>

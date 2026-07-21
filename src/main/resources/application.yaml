@@ -112,7 +112,7 @@ application-rest-service:
 authentication-rest-service:
   root: ${AUTHENTICATION_REST_SERVICE}
   context: ${authentication-rest-service.root}/authentications
-  authenticate: ${authentication-rest-service.context}/authenticate
+  verifyPassword: ${authentication-rest-service.context}/verify-password
   authenticationId: ${authentication-rest-service.context}/authenticationId
 
 

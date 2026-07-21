@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -136,22 +137,25 @@ public class AuthenticationCalloutHostAwareTest {
                 .thenReturn(Optional.of(true));
         when(organizationWebClient.userExistInOrganization(userId, organizationId)).thenReturn(Mono.just(true));
 
-        UsernamePasswordAuthenticationToken expected =
-                new UsernamePasswordAuthenticationToken("principal", "password");
-        when(authenticationWebClient.getAuth(any(), argThat(authBodyWithOrganization(organizationId))))
-                .thenReturn(Mono.just(expected));
+        when(authenticationWebClient.verifyPassword(argThat(passwordAuthBody())))
+                .thenReturn(Mono.just(userId));
+        when(roleWebClient.getRoleNameForClientOrganizationUser(null, clientUuid, organizationId, userId))
+                .thenReturn(Mono.just("MESSAGE_USER"));
+        when(loginAttemptWebClient.loginSucccess("user1", userId, ""))
+                .thenReturn(Mono.just("success"));
 
         UsernamePasswordAuthenticationToken request =
                 new UsernamePasswordAuthenticationToken("user1", "password");
 
         Object result = authenticationCallout.authenticate(request);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(((Authentication) result).getAuthorities()).extracting("authority")
+                .containsExactly("MESSAGE_USER", "FACTOR_PASSWORD");
         verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId);
         verify(organizationWebClient, times(1)).userExistInOrganization(userId, organizationId);
         verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository, times(1)).findByClientId(clientUuid);
-        verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
+        verify(authenticationWebClient).verifyPassword(argThat(passwordAuthBody()));
         verify(roleWebClient, never()).isOrgAdminInOrgId(any(), any(), any());
     }
 
@@ -164,23 +168,50 @@ public class AuthenticationCalloutHostAwareTest {
         when(clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUuid, organizationId))
                 .thenReturn(Optional.of(true));
 
-        UsernamePasswordAuthenticationToken expected =
-                new UsernamePasswordAuthenticationToken("principal", "password");
-        when(authenticationWebClient.getAuth(any(), argThat(authBodyWithOrganization(organizationId))))
-                .thenReturn(Mono.just(expected));
+        when(authenticationWebClient.verifyPassword(argThat(passwordAuthBody())))
+                .thenReturn(Mono.just(userId));
+        when(roleWebClient.getRoleNameForClientOrganizationUser(null, clientUuid, organizationId, userId))
+                .thenReturn(Mono.just("MESSAGE_USER"));
+        when(loginAttemptWebClient.loginSucccess("user1", userId, ""))
+                .thenReturn(Mono.just("success"));
 
         UsernamePasswordAuthenticationToken request =
                 new UsernamePasswordAuthenticationToken("user1", "password");
 
         Object result = authenticationCallout.authenticate(request);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(((Authentication) result).getAuthorities()).extracting("authority")
+                .containsExactly("MESSAGE_USER", "FACTOR_PASSWORD");
         verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(BUSINESS1_HOST, userId);
         verify(organizationWebClient, times(1)).userExistInOrganization(userId, organizationId);
         verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
         verify(clientOrganizationRepository).findByClientId(clientUuid);
-        verify(authenticationWebClient).getAuth(any(), argThat(authBodyWithOrganization(organizationId)));
+        verify(authenticationWebClient).verifyPassword(argThat(passwordAuthBody()));
         verify(roleWebClient, never()).isOrgAdminInOrgId(any(), any(), any());
+    }
+
+    @Test
+    void passkeyLoginUsesSharedClientAuthorizationAndRecordsSuccess() {
+        MockHttpServletRequest request = bindRequestHost(FREE_HOST);
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
+        when(clientOrganizationRepository.existsByClientIdAndOrganizationId(clientUuid, organizationId))
+                .thenReturn(Optional.of(true));
+        when(organizationWebClient.userExistInOrganization(userId, organizationId)).thenReturn(Mono.just(true));
+        when(roleWebClient.getRoleNameForClientOrganizationUser(null, clientUuid, organizationId, userId))
+                .thenReturn(Mono.just("MESSAGE_USER"));
+        when(loginAttemptWebClient.loginSucccess("user1", userId, "127.0.0.1"))
+                .thenReturn(Mono.just("success"));
+
+        Authentication result = authenticationCallout.authenticatePasskey("user1", request);
+
+        assertThat(result.getName()).isEqualTo("user1");
+        assertThat(result.getAuthorities()).extracting("authority")
+                .containsExactly("MESSAGE_USER", "FACTOR_WEBAUTHN");
+        verify(clientOrganizationRepository).existsByClientIdAndOrganizationId(clientUuid, organizationId);
+        verify(organizationWebClient).userExistInOrganization(userId, organizationId);
+        verify(loginAttemptWebClient).loginSucccess("user1", userId, "127.0.0.1");
+        verify(authenticationWebClient, never()).verifyPassword(any());
     }
 
     @Test
@@ -191,21 +222,22 @@ public class AuthenticationCalloutHostAwareTest {
         when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
                 .thenReturn(Mono.just(organizationId));
 
-        UsernamePasswordAuthenticationToken expected =
-                new UsernamePasswordAuthenticationToken("principal", "password");
-        when(authenticationWebClient.getAuth(any(), argThat(passkeyManagementAuthBody())))
-                .thenReturn(Mono.just(expected));
+        when(authenticationWebClient.verifyPassword(argThat(passkeyManagementAuthBody())))
+                .thenReturn(Mono.just(userId));
+        when(loginAttemptWebClient.loginSucccess("user1", userId, ""))
+                .thenReturn(Mono.just("success"));
 
         UsernamePasswordAuthenticationToken request =
                 new UsernamePasswordAuthenticationToken("user1", "password");
 
         Object result = authenticationCallout.authenticate(request);
 
-        assertThat(result).isSameAs(expected);
+        assertThat(((Authentication) result).getAuthorities()).extracting("authority")
+                .containsExactly("FACTOR_PASSWORD");
         verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId);
         verify(registeredClientRepository, never()).findByClientId(any());
         verify(clientOrganizationRepository, never()).findByClientId(any());
-        verify(authenticationWebClient).getAuth(any(), argThat(passkeyManagementAuthBody()));
+        verify(authenticationWebClient).verifyPassword(argThat(passkeyManagementAuthBody()));
     }
 
     @Test
@@ -225,21 +257,23 @@ public class AuthenticationCalloutHostAwareTest {
                 .hasMessageContaining("You must be an OrgAdmin for this organization to sign in to the admin site");
 
         verify(roleWebClient).isOrgAdminInOrgId(null, userId, organizationId);
-        verify(authenticationWebClient, never()).getAuth(any(), any());
+        verify(authenticationWebClient, never()).verifyPassword(any());
     }
 
-    private void bindRequestHost(String host) {
+    private MockHttpServletRequest bindRequestHost(String host) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setServerName(host);
         request.setServerPort(9001);
+        request.setRemoteAddr("127.0.0.1");
         RequestContextHolder.setRequestAttributes(
                 new ServletRequestAttributes(request, new MockHttpServletResponse()));
+        return request;
     }
 
-    private ArgumentMatcher<Map<String, Object>> authBodyWithOrganization(UUID expectedOrganizationId) {
+    private ArgumentMatcher<Map<String, Object>> passwordAuthBody() {
         return body -> body != null
                 && clientUuid.equals(body.get("clientId"))
-                && expectedOrganizationId.equals(body.get("organizationId"))
+                && !body.containsKey("organizationId")
                 && "user1".equals(body.get("authenticationId"))
                 && "password".equals(body.get("password"));
     }
