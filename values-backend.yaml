@@ -75,6 +75,8 @@ httproute:
   namespace: "main"
   exactPaths:
     - "/"
+    - "/favicon.ico"
+    - "/favicon.svg"
     - "/accounts/active"
     - "/accounts/lock"
     - "/accounts/lock/secret"
@@ -82,6 +84,7 @@ httproute:
     - "/accounts/lock/email/secret"
   pathPrefixes:
     - "/css"
+    - "/js"
     - "/oauth2"
     - "/login"
     - "/logout"
@@ -90,6 +93,7 @@ httproute:
     - "/username"
     - "/loginHelp"
     - "/mfa"
+    - "/passkeys"
     - "/webauthn"
     - "/userinfo"
     - "/.well-known"
