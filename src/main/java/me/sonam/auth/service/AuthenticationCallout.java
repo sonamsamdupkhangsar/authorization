@@ -132,8 +132,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
          String clientId = ClientIdUtil.getClientId(requestCache);
          LOG.info("clientId: {}", clientId);
-         boolean passkeyManagementLogin = ClientIdUtil.isSavedRequestFor(requestCache, "/mfa/passkeys");
-         if ((clientId == null || clientId.equals("")) && !passkeyManagementLogin) {
+         boolean selfServiceLogin = ClientIdUtil.isSavedRequestFor(requestCache, "/mfa/passkeys")
+                 || ClientIdUtil.isSavedRequestFor(requestCache, "/account");
+         if ((clientId == null || clientId.equals("")) && !selfServiceLogin) {
              LOG.error("client id not found");
              throw new BadCredentialsException("Please go back to your main application that brought you here to this sign-in page");
          }
@@ -183,9 +184,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
                  })
                 .flatMap(aBoolean -> {
                     LOG.debug("authentication request has {} authorities", authentication.getAuthorities().size());
-                    if (passkeyManagementLogin) {
-                        LOG.info("clientless passkey management login");
-                        return checkUserForPasskeyManagement(authentication, currentHost, passkeyAuthenticated);
+                    if (selfServiceLogin) {
+                        LOG.info("clientless account self-service login");
+                        return checkUserForAccountSelfService(authentication, currentHost, passkeyAuthenticated);
                     }
                     LOG.info("get registeredClient from clientId: {}", clientId);
                     RegisteredClient registeredClient = issuerContextExecutor.withIssuer(currentIssuer,
@@ -266,18 +267,18 @@ public class AuthenticationCallout implements AuthenticationProvider {
         );
     }
 
-    private Mono<UsernamePasswordAuthenticationToken> checkUserForPasskeyManagement(Authentication authentication,
-                                                                                     String currentHost,
-                                                                                     boolean passkeyAuthenticated) {
+    private Mono<UsernamePasswordAuthenticationToken> checkUserForAccountSelfService(Authentication authentication,
+                                                                                      String currentHost,
+                                                                                      boolean passkeyAuthenticated) {
         final String authenticationId = authentication.getName();
         return userWebClient.getUserId(authenticationId)
                 .onErrorResume(throwable -> {
-                    LOG.error("failed to make get user by authId call for passkey management: {}", throwable.getMessage());
+                    LOG.error("failed to get user for account self-service: {}", throwable.getMessage());
                     return Mono.error(new BadCredentialsException("Bad credentials"));
                 })
                 .flatMap(userId -> {
                     if (currentHost == null) {
-                        return Mono.error(new BadCredentialsException("passkey management requires a tenant issuer host"));
+                        return Mono.error(new BadCredentialsException("account self-service requires a tenant issuer host"));
                     }
                     return resolveDefaultHostOrganization(currentHost, userId)
                             .switchIfEmpty(Mono.error(new BadCredentialsException("user is not allowed for this issuer")))
@@ -288,8 +289,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                     passkeyAuthenticated));
                 })
                 .onErrorResume(throwable -> {
-                    LOG.debug("exception occurred during passkey management login", throwable);
-                    LOG.error("exception occurred during passkey management login: {}", throwable.getMessage());
+                    LOG.debug("exception occurred during account self-service login", throwable);
+                    LOG.error("exception occurred during account self-service login: {}", throwable.getMessage());
                     if (throwable instanceof BadCredentialsException) {
                         return loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication))
                                 .flatMap(s -> Mono.error(new BadCredentialsException(throwable.getMessage() + " " + s)));

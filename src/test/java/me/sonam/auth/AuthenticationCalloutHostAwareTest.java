@@ -241,6 +241,28 @@ public class AuthenticationCalloutHostAwareTest {
     }
 
     @Test
+    void accountSelfServiceLoginDoesNotRequireClientId() {
+        bindRequestHost(FREE_HOST);
+        when(savedRequest.getParameterValues("client_id")).thenReturn(null);
+        when(savedRequest.getRedirectUrl()).thenReturn("http://" + FREE_HOST + ":9001/account/profile");
+        when(organizationWebClient.getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId))
+                .thenReturn(Mono.just(organizationId));
+        when(authenticationWebClient.verifyPassword(argThat(passkeyManagementAuthBody())))
+                .thenReturn(Mono.just(userId));
+        when(loginAttemptWebClient.loginSucccess("user1", userId, ""))
+                .thenReturn(Mono.just("success"));
+
+        Object result = authenticationCallout.authenticate(
+                new UsernamePasswordAuthenticationToken("user1", "password"));
+
+        assertThat(((Authentication) result).getAuthorities()).extracting("authority")
+                .containsExactly("FACTOR_PASSWORD");
+        verify(organizationWebClient).getDefaultOrganizationIdBySubdomainAndUserId(FREE_HOST, userId);
+        verify(registeredClientRepository, never()).findByClientId(any());
+        verify(authenticationWebClient).verifyPassword(argThat(passkeyManagementAuthBody()));
+    }
+
+    @Test
     void authzManagerLoginRequiresOrgAdminForHostOrganization() {
         bindRequestHost(FREE_HOST);
         ReflectionTestUtils.setField(authenticationCallout, "authzManagerId", clientUuid);

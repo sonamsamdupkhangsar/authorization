@@ -8,6 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
@@ -124,6 +128,47 @@ public class UserWebClient {
 
     }
 
+    public Mono<User> getUserById(UUID userId) {
+        String endpoint = userRestServiceEndpoint + "/" + userId;
+        LOG.info("get user profile by id");
 
+        return webClientBuilder.build().get().uri(endpoint)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(User.class);
+    }
+
+    public Mono<String> updateProfile(User user) {
+        LOG.info("update authenticated user profile");
+
+        return webClientBuilder.build().put().uri(userRestServiceEndpoint)
+                .bodyValue(user)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(String.class);
+    }
+
+    public Mono<Map<String, String>> updateProfilePhoto(String authenticationId, String filename,
+                                                         MediaType contentType, byte[] content) {
+        MultipartBodyBuilder parts = new MultipartBodyBuilder();
+        parts.part("authenticationId", authenticationId);
+        parts.part("file", new ByteArrayResource(content) {
+                    @Override
+                    public String getFilename() {
+                        return filename;
+                    }
+                })
+                .filename(filename)
+                .contentType(contentType);
+
+        return webClientBuilder.build().post().uri(userRestServiceEndpoint + "/profile/photo")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(parts.build()))
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response -> response.bodyToMono(String.class)
+                        .defaultIfEmpty("Profile photo service returned HTTP " + response.statusCode().value())
+                        .flatMap(message -> Mono.error(new IllegalArgumentException(message))))
+                .bodyToMono(new ParameterizedTypeReference<Map<String, String>>() {});
+    }
 
 }
