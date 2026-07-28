@@ -42,6 +42,9 @@
                 <label class="btn btn-outline-secondary" for="profilePhoto">Choose photo</label>
                 <input id="profilePhoto" name="file" type="file" accept="image/jpeg,image/png,image/gif" required>
                 <small>JPEG, PNG, or GIF. Maximum 5 MB.</small>
+                <div id="profilePhotoError" class="text-danger mt-1" role="alert" hidden>
+                    The selected image is larger than 5 MB. Choose a smaller image.
+                </div>
             </form>
         </div>
 
@@ -79,7 +82,16 @@
 </div>
 <script>
     document.getElementById('profilePhoto').addEventListener('change', function () {
+        const maximumFileSize = 5 * 1024 * 1024;
+        const error = document.getElementById('profilePhotoError');
+
+        error.hidden = true;
         if (!this.files.length) {
+            return;
+        }
+        if (this.files[0].size > maximumFileSize) {
+            error.hidden = false;
+            this.value = '';
             return;
         }
         if (window.confirm('Upload this image as your profile photo?')) {

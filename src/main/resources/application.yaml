@@ -15,6 +15,10 @@ logging:
 #    org.springframework.boot.autoconfigure: warn
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
   application:
     name: authorization-server
   datasource:
