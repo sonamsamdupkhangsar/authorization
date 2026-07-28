@@ -12,6 +12,10 @@
 <div class="container">
     <main class="passkey-page">
     <h1 class="h3 mb-4">Passkeys</h1>
+    <nav class="account-nav" aria-label="Account settings">
+        <a th:href="@{/account/profile}">Profile</a>
+        <a class="active" th:href="@{/mfa/passkeys}">Passkeys</a>
+    </nav>
 
     <div id="passkeySuccess" class="alert alert-success" role="alert" style="display:none">
         Passkey settings updated.

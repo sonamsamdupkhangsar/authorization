@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My account</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" th:href="@{/css/auth.css}">
+</head>
+<body class="auth-page">
+<div class="container">
+    <main class="account-page">
+        <div class="account-header">
+            <div>
+                <h1>My account</h1>
+                <p>Manage your personal profile and sign-in methods.</p>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <button class="btn btn-outline-secondary" type="submit">Sign out</button>
+            </form>
+        </div>
+
+        <nav class="account-nav" aria-label="Account settings">
+            <a class="active" th:href="@{/account/profile}">Profile</a>
+            <a th:href="@{/mfa/passkeys}">Passkeys</a>
+        </nav>
+
+        <div th:if="${updated}" class="alert alert-success" role="alert">Profile updated.</div>
+        <div th:if="${param.photoUpdated}" class="alert alert-success" role="alert">Profile photo updated.</div>
+        <div th:if="${param.photoError}" class="alert alert-danger" role="alert">
+            Profile photo upload failed. Select a JPEG, PNG, or GIF image no larger than 5 MB.
+        </div>
+
+        <div class="profile-photo-section">
+            <div class="profile-photo" th:classappend="${#strings.isEmpty(profilePhotoUrl)} ? ' profile-photo-empty'">
+                <img th:if="${!#strings.isEmpty(profilePhotoUrl)}" th:src="${profilePhotoUrl}" alt="Profile photo">
+                <span th:if="${#strings.isEmpty(profilePhotoUrl)}" aria-hidden="true"
+                      th:text="${#strings.substring(user.firstName ?: user.authenticationId, 0, 1).toUpperCase()}">U</span>
+            </div>
+            <form id="profilePhotoForm" th:action="@{/account/profile/photo}" method="post" enctype="multipart/form-data">
+                <label class="btn btn-outline-secondary" for="profilePhoto">Choose photo</label>
+                <input id="profilePhoto" name="file" type="file" accept="image/jpeg,image/png,image/gif" required>
+                <small>JPEG, PNG, or GIF. Maximum 5 MB.</small>
+            </form>
+        </div>
+
+        <form th:action="@{/account/profile}" th:object="${profile}" method="post">
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="firstName">First name</label>
+                    <input id="firstName" class="form-control" type="text" th:field="*{firstName}" maxlength="100">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="lastName">Last name</label>
+                    <input id="lastName" class="form-control" type="text" th:field="*{lastName}" maxlength="100">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input id="email" class="form-control" type="email" th:value="${user.email}" readonly>
+            </div>
+            <div class="form-group">
+                <label for="authenticationId">Username</label>
+                <input id="authenticationId" class="form-control" type="text" th:value="${user.authenticationId}" readonly>
+            </div>
+            <div class="form-check account-searchable">
+                <input id="searchable" class="form-check-input" type="checkbox" th:field="*{searchable}">
+                <label class="form-check-label" for="searchable">Allow other users to find my profile</label>
+            </div>
+
+            <div class="account-actions">
+                <button class="btn btn-primary" type="submit">Save profile</button>
+                <a class="btn btn-outline-secondary" th:href="@{/account/profile}">Cancel</a>
+            </div>
+        </form>
+    </main>
+</div>
+<script>
+    document.getElementById('profilePhoto').addEventListener('change', function () {
+        if (!this.files.length) {
+            return;
+        }
+        if (window.confirm('Upload this image as your profile photo?')) {
+            document.getElementById('profilePhotoForm').requestSubmit();
+        } else {
+            this.value = '';
+        }
+    });
+</script>
+</body>
+</html>

@@ -173,7 +173,9 @@ public class JwtUserInfoMapperSecurityConfig {
                 .csrf(httpSecurityCsrfConfigurer -> httpSecurityCsrfConfigurer.disable())
                 .exceptionHandling(exceptionHandlingConfigurer -> exceptionHandlingConfigurer
                         .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/"),
-                                PathPatternRequestMatcher.pathPattern("/mfa/passkeys")))
+                                PathPatternRequestMatcher.pathPattern("/mfa/passkeys"))
+                        .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/"),
+                                PathPatternRequestMatcher.pathPattern("/account/**")))
                 .oauth2ResourceServer(httpSecurityOAuth2ResourceServerConfigurer ->
                         httpSecurityOAuth2ResourceServerConfigurer.jwt(Customizer.withDefaults()))
                 .formLogin(httpSecurityFormLoginConfigurer ->

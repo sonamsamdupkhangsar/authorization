@@ -72,6 +72,26 @@ body.auth-page {
   text-transform: uppercase;
 }
 
+.auth-page h1.login-heading::before {
+  content: none;
+}
+
+.auth-page .auth-brand {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #2d6a4f !important;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.auth-page .auth-brand:hover,
+.auth-page .auth-brand:focus-visible {
+  text-decoration: underline;
+}
+
 .auth-page p {
   color: #43514c;
   line-height: 1.6;
@@ -141,7 +161,7 @@ body.auth-page {
   margin-top: 24px;
 }
 
-.auth-page .passkey-page {
+.auth-page .container > main.passkey-page {
   width: min(100%, 760px);
   padding: 28px;
   border: 1px solid #d8ded8;
@@ -154,6 +174,98 @@ body.auth-page {
   background: #f9fcf8;
 }
 
+.auth-page .container > main.account-page {
+  width: min(100%, 760px);
+  padding: 28px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #fffef9;
+  box-shadow: 0 22px 70px rgba(35, 48, 44, .13);
+}
+
+.account-header,
+.account-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.account-header p {
+  margin: 0;
+}
+
+.account-nav {
+  display: flex;
+  gap: 24px;
+  margin: 26px 0;
+  border-bottom: 1px solid #d8ded8;
+}
+
+.account-nav a {
+  padding: 10px 2px;
+  border-bottom: 3px solid transparent;
+  text-decoration: none;
+}
+
+.account-nav a.active {
+  border-bottom-color: #2d6a4f;
+}
+
+.account-searchable {
+  margin: 20px 0;
+}
+
+.profile-photo-section {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 20px;
+}
+
+.profile-photo {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  overflow: hidden;
+  border: 1px solid #cfd8d2;
+  border-radius: 50%;
+  background: #eef3ef;
+}
+
+.profile-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-photo-empty {
+  display: grid;
+  place-items: center;
+  color: #2d6a4f;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.profile-photo-section input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.profile-photo-section small {
+  display: block;
+  margin-top: 7px;
+  color: #5b6762;
+}
+
+.account-actions {
+  justify-content: flex-start;
+  margin-top: 24px;
+}
+
 @media (max-width: 560px) {
   .auth-page .container {
     width: min(100% - 24px, 1120px);
@@ -164,6 +276,11 @@ body.auth-page {
   .auth-page .container > div,
   .auth-page .container > main {
     padding: 22px;
+  }
+
+  .account-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 .auth-separator {

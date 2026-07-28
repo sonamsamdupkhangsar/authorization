@@ -94,6 +94,7 @@ httproute:
     - "/loginHelp"
     - "/mfa"
     - "/passkeys"
+    - "/account"
     - "/webauthn"
     - "/userinfo"
     - "/.well-known"
