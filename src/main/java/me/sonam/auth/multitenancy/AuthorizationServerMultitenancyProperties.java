@@ -9,8 +9,17 @@ import java.util.Map;
 
 @ConfigurationProperties(prefix = "authorization-server.multitenancy")
 public class AuthorizationServerMultitenancyProperties {
+    private boolean additionalTenantsEnabled = true;
     private List<String> defaultHosts = new ArrayList<>();
     private Map<String, Tenant> tenants = new LinkedHashMap<>();
+
+    public boolean isAdditionalTenantsEnabled() {
+        return additionalTenantsEnabled;
+    }
+
+    public void setAdditionalTenantsEnabled(boolean additionalTenantsEnabled) {
+        this.additionalTenantsEnabled = additionalTenantsEnabled;
+    }
 
     public List<String> getDefaultHosts() {
         return defaultHosts;
