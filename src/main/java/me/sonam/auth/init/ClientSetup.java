@@ -406,6 +406,9 @@ public class ClientSetup {
 
     private Set<String> configuredIssuers() {
         Set<String> issuers = new LinkedHashSet<>();
+        if (!multitenancyProperties.isAdditionalTenantsEnabled()) {
+            return issuers;
+        }
         multitenancyProperties.getTenants().values().forEach(tenant ->
                 tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
         return issuers;
