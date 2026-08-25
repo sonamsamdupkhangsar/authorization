@@ -149,8 +149,6 @@ envs:
     value: "{{ .Release.Namespace }}"
   - name: SPRING_AUTH_SERVER_PORT
     value: 8080
-  - name: APPLICATION_REST_SERVICE
-    value: "http://application-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: AUTHENTICATION_REST_SERVICE
     value: "http://authentication-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ORGANIZATION_REST_SERVICE

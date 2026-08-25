@@ -109,10 +109,6 @@ demo-cleanup:
   preserved-client-ids: ${DEMO_CLEANUP_PRESERVED_CLIENT_IDS:nextauth-demo}
   initial-delay-seconds: ${DEMO_CLEANUP_INITIAL_DELAY_SECONDS:300}
   fixed-delay-seconds: ${DEMO_CLEANUP_FIXED_DELAY_SECONDS:21600}
-application-rest-service:
-  root: ${APPLICATION_REST_SERVICE}
-  client-role: /applications/clients/{clientId}/users/{authenticationId}
-
 authentication-rest-service:
   root: ${AUTHENTICATION_REST_SERVICE}
   context: ${authentication-rest-service.root}/authentications
