@@ -2,7 +2,6 @@ package me.sonam.auth.config;
 
 import me.sonam.auth.service.OidcUserInfoService;
 import me.sonam.auth.webclient.RoleWebClient;
-import me.sonam.auth.webclient.SettingWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -28,12 +27,6 @@ import java.util.stream.Collectors;
 public class IdTokenCustomizerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(IdTokenCustomizerConfig.class);
     static final String AUTH_FACTOR_PREFIX = "FACTOR_";
-
-    private final SettingWebClient settingWebClient;
-
-    public IdTokenCustomizerConfig(SettingWebClient settingWebClient) {
-        this.settingWebClient = settingWebClient;
-    }
 
     @Bean
     public OAuth2TokenCustomizer<JwtEncodingContext> tokenCustomizer(

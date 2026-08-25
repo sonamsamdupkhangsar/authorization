@@ -161,16 +161,12 @@ envs:
     value: "http://attempt-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ROLE_REST_SERVICE
     value: "http://role-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
-  - name: SETTING_REST_SERVICE
-    value: "http://setting-rest-service.{{ .Release.Namespace }}.svc.cluster.local"
   - name: private-client-url
     value: http://127.0.0.1:8090
   - name: AUTH_SERVER_PORT
     value: 8080
   - name: AUTH_SERVER_ROOT
     value: "http://authorization-server.{{ .Release.Namespace }}.svc.cluster.local"
-  - name: TOKEN_MEDIATOR
-    value: "http://oauth2-token-mediator.{{ .Release.Namespace }}.svc.cluster.local"
   - name: ISSUER_URI
     value: https://platform.openissuer.com
   - name: ISSUER_ADDRESS

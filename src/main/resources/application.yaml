@@ -163,12 +163,6 @@ role-rest-service:
   root: ${ROLE_REST_SERVICE}
   context: ${role-rest-service.root}/roles
 
-setting-rest-service:
-  root: ${SETTING_REST_SERVICE}
-  context: ${setting-rest-service.root}/settings
-  users: ${setting-rest-service.context}/users
-  defaultOrganization: ${setting-rest-service.users}/{userId}
-
 client:
   url: ${client-app}
   forgot-username-password: /forgot
