@@ -43,13 +43,16 @@ public class TenantOnboardingService {
         Assert.hasText(request.getPasswordSecretRef(), "passwordSecretRef is required");
         Assert.hasText(request.getDriverClassName(), "driverClassName is required");
 
-        if (multitenancyProperties.getTenants().containsKey(request.getTenantName())) {
+        AuthorizationServerMultitenancyProperties.Tenant existingTenant =
+                multitenancyProperties.getTenants().get(request.getTenantName());
+        if (multitenancyProperties.shouldLoadTenant(existingTenant)) {
             throw new IllegalStateException("tenant already exists: " + request.getTenantName());
         }
 
         request.getHosts().forEach(this::assertHostIsAvailable);
 
         AuthorizationServerMultitenancyProperties.Tenant tenant = new AuthorizationServerMultitenancyProperties.Tenant();
+        tenant.setDeploymentNamespace(multitenancyProperties.getDeploymentNamespace());
         tenant.setHosts(request.getHosts());
         tenant.setUrl(request.getUrl());
         tenant.setUsername(request.getUsername());
@@ -69,14 +72,18 @@ public class TenantOnboardingService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("defaultHosts", multitenancyProperties.getDefaultHosts());
         Map<String, Object> tenants = new LinkedHashMap<>();
-        multitenancyProperties.getTenants().forEach((tenantName, tenant) -> tenants.put(tenantName, toResponse(tenantName, tenant)));
+        multitenancyProperties.getTenants().entrySet().stream()
+                .filter(entry -> multitenancyProperties.shouldLoadTenant(entry.getValue()))
+                .forEach(entry -> tenants.put(entry.getKey(), toResponse(entry.getKey(), entry.getValue())));
         response.put("tenants", tenants);
         return response;
     }
 
     public synchronized void loadPersistedTenants() {
         tenantRegistrationRepository.findAll().forEach(registration -> {
-            if (multitenancyProperties.getTenants().containsKey(registration.getTenantName())) {
+            AuthorizationServerMultitenancyProperties.Tenant existingTenant =
+                    multitenancyProperties.getTenants().get(registration.getTenantName());
+            if (multitenancyProperties.shouldLoadTenant(existingTenant)) {
                 return;
             }
             AuthorizationServerMultitenancyProperties.Tenant tenant = toTenant(registration);
@@ -118,6 +125,7 @@ public class TenantOnboardingService {
 
     private AuthorizationServerMultitenancyProperties.Tenant toTenant(TenantRegistration registration) {
         AuthorizationServerMultitenancyProperties.Tenant tenant = new AuthorizationServerMultitenancyProperties.Tenant();
+        tenant.setDeploymentNamespace(multitenancyProperties.getDeploymentNamespace());
         tenant.setHosts(parseHosts(registration.getHosts()));
         tenant.setUrl(registration.getUrl());
         tenant.setUsername(registration.getUsername());
@@ -136,6 +144,7 @@ public class TenantOnboardingService {
     private Map<String, Object> toResponse(String tenantName, AuthorizationServerMultitenancyProperties.Tenant tenant) {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("tenantName", tenantName);
+        response.put("deploymentNamespace", tenant.getDeploymentNamespace());
         response.put("hosts", tenant.getHosts());
         response.put("url", tenant.getUrl());
         response.put("username", tenant.getUsername());

@@ -409,8 +409,10 @@ public class ClientSetup {
         if (!multitenancyProperties.isAdditionalTenantsEnabled()) {
             return issuers;
         }
-        multitenancyProperties.getTenants().values().forEach(tenant ->
-                tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
+        multitenancyProperties.getTenants().values().stream()
+                .filter(multitenancyProperties::shouldLoadTenant)
+                .forEach(tenant ->
+                        tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
         return issuers;
     }
 

@@ -49,14 +49,16 @@ public class PerIssuerAuthorizationServerComponentsConfig {
         registerDefaultHosts(multitenancyProperties, componentRegistry);
         issuerComponentRegistrar.registerDefaultComponents(dataSource, componentRegistry);
         if (multitenancyProperties.isAdditionalTenantsEnabled()) {
-            multitenancyProperties.getTenants().values().forEach(tenant -> {
-                Assert.state(!tenant.getHosts().isEmpty(), "at least one host must be configured");
-                issuerComponentRegistrar.registerTenantComponents(
-                        issuerComponentRegistrar.createDataSource(tenant),
-                        tenant.getHosts(),
-                        componentRegistry
-                );
-            });
+            multitenancyProperties.getTenants().values().stream()
+                    .filter(multitenancyProperties::shouldLoadTenant)
+                    .forEach(tenant -> {
+                        Assert.state(!tenant.getHosts().isEmpty(), "at least one host must be configured");
+                        issuerComponentRegistrar.registerTenantComponents(
+                                issuerComponentRegistrar.createDataSource(tenant),
+                                tenant.getHosts(),
+                                componentRegistry
+                        );
+                    });
             tenantRegistrationRepository.findAll().forEach(registration -> registerPersistedTenant(
                     registration, multitenancyProperties, issuerComponentRegistrar, componentRegistry));
         }
@@ -123,6 +125,7 @@ public class PerIssuerAuthorizationServerComponentsConfig {
             return;
         }
         AuthorizationServerMultitenancyProperties.Tenant tenant = new AuthorizationServerMultitenancyProperties.Tenant();
+        tenant.setDeploymentNamespace(multitenancyProperties.getDeploymentNamespace());
         tenant.setHosts(Arrays.stream(registration.getHosts().split(","))
                 .map(String::trim)
                 .filter(host -> !host.isEmpty())

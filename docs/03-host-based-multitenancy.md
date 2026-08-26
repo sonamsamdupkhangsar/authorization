@@ -56,17 +56,24 @@ If the current host is a default host, the default/platform components are used.
 
 ## Configured Tenants
 
-Static tenants are configured under:
+Every authorization deployment has one implicit default tenant backed by its normal
+datasource. `default-hosts` maps request hosts to that datasource; the default tenant is
+therefore not repeated in the `tenants` map.
+
+Static additional tenants are configured under `tenants`. Each one declares the
+Kubernetes namespace whose authorization deployment owns it:
 
 ```yaml
 authorization-server:
   multitenancy:
+    deployment-namespace: ${AUTHORIZATION_SERVER_MULTITENANCY_DEPLOYMENT_NAMESPACE:main}
     default-hosts:
       - localhost
       - 127.0.0.1
       - authorization-server
     tenants:
       free:
+        deployment-namespace: main
         hosts:
           - free.openissuer.com
         url: ${FREE_AUTH_DB_URL}
@@ -74,7 +81,15 @@ authorization-server:
         password-secret-ref: ${FREE_AUTH_DB_PASSWORD_SECRET_REF}
 ```
 
-Persisted tenants are stored in `TenantRegistration` rows and loaded on startup.
+Only tenants whose `deployment-namespace` matches the running deployment are loaded.
+The same filtered set controls tenant datasource registration and bootstrap client
+creation. This permits every namespace to have its own default tenant plus zero or more
+additional tenants with separate authorization databases.
+
+Persisted tenants are stored in `TenantRegistration` rows in the deployment's default
+authorization database and loaded on startup. Since each namespace stack has its own
+default authorization database, persisted registrations naturally remain scoped to
+that namespace.
 
 ## Runtime Tenant Registration
 
