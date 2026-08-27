@@ -22,6 +22,8 @@ COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
 COPY --from=build /workspace/app/newrelic/newrelic.jar /app/newrelic/newrelic.jar
 COPY --from=build /workspace/app/newrelic/newrelic.yml /app/newrelic/newrelic.yml
 
+USER 10001:10001
+
 ENTRYPOINT ["java", "-javaagent:app/newrelic/newrelic.jar","-cp","app:app/lib/*","me.sonam.auth.DefaultAuthorizationServerApplication"]
 
 LABEL org.opencontainers.image.source https://github.com/sonamsamdupkhangsar/authorization
