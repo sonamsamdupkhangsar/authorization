@@ -70,7 +70,6 @@ public class ClientOrganizationRestIntegTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry r) throws IOException {
         r.add("auth-server.root", () -> "http://localhost:"+mockWebServer.getPort());
-        r.add("oauth2-token-mediator.root", () -> "http://localhost:"+mockWebServer.getPort());
     }
 
     @Test

@@ -79,12 +79,6 @@ public class BeanConfig {
     @Value("${role-rest-service.context}")
     private String roleEndpoint;
 
-    @Value("${setting-rest-service.users}")
-    private String userSettingEndpoint;
-
-    @Value("${setting-rest-service.defaultOrganization}")
-    private String defaultOrganizationSettingEndpoint;
-
     @Value("${authIdNotExist}")
     private String authIdNotExist;
 
@@ -139,11 +133,6 @@ public class BeanConfig {
     @Bean
     public RoleWebClient roleWebClient() {
         return new RoleWebClient(webClientBuilder, roleEndpoint);
-    }
-
-    @Bean
-    public SettingWebClient settingWebClient() {
-        return new SettingWebClient(webClientBuilder, userSettingEndpoint, defaultOrganizationSettingEndpoint);
     }
 
     @Bean

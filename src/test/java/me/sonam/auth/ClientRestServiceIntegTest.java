@@ -152,8 +152,6 @@ public class ClientRestServiceIntegTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry r) throws IOException {
         r.add("auth-server.root", () -> "http://localhost:"+mockWebServer.getPort());
-        r.add("oauth2-token-mediator.root", () -> "http://localhost:"+mockWebServer.getPort());
-        r.add("setting-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("role-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
         r.add("organization-rest-service.root", () -> "http://localhost:"+mockWebServer.getPort());
     }

@@ -75,12 +75,6 @@ attempt-rest-service:
   delete: ${attempt-rest-service.context}/{username}
   check: ${attempt-rest-service.context}/login
 
-setting-rest-service:
-  root: http://localhost:{port}
-  context: ${setting-rest-service.root}/settings
-  users: ${setting-rest-service.context}/users
-  defaultOrganization: ${setting-rest-service.context}/users
-
 role-rest-service:
   root: http://localhost:{port}
   context: ${role-rest-service.root}/roles

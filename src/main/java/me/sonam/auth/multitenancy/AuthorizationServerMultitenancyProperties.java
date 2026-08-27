@@ -9,8 +9,33 @@ import java.util.Map;
 
 @ConfigurationProperties(prefix = "authorization-server.multitenancy")
 public class AuthorizationServerMultitenancyProperties {
+    private boolean additionalTenantsEnabled = true;
+    private String deploymentNamespace = "main";
     private List<String> defaultHosts = new ArrayList<>();
     private Map<String, Tenant> tenants = new LinkedHashMap<>();
+
+    public boolean isAdditionalTenantsEnabled() {
+        return additionalTenantsEnabled;
+    }
+
+    public void setAdditionalTenantsEnabled(boolean additionalTenantsEnabled) {
+        this.additionalTenantsEnabled = additionalTenantsEnabled;
+    }
+
+    public String getDeploymentNamespace() {
+        return deploymentNamespace;
+    }
+
+    public void setDeploymentNamespace(String deploymentNamespace) {
+        this.deploymentNamespace = deploymentNamespace;
+    }
+
+    public boolean shouldLoadTenant(Tenant tenant) {
+        return additionalTenantsEnabled
+                && deploymentNamespace != null
+                && tenant != null
+                && deploymentNamespace.equals(tenant.getDeploymentNamespace());
+    }
 
     public List<String> getDefaultHosts() {
         return defaultHosts;
@@ -29,12 +54,21 @@ public class AuthorizationServerMultitenancyProperties {
     }
 
     public static class Tenant {
+        private String deploymentNamespace = "main";
         private List<String> hosts = new ArrayList<>();
         private String url;
         private String username;
         private String passwordSecretRef;
         private String driverClassName;
         private Integer maximumPoolSize;
+
+        public String getDeploymentNamespace() {
+            return deploymentNamespace;
+        }
+
+        public void setDeploymentNamespace(String deploymentNamespace) {
+            this.deploymentNamespace = deploymentNamespace;
+        }
 
         public List<String> getHosts() {
             return hosts;

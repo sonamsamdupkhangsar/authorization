@@ -406,8 +406,13 @@ public class ClientSetup {
 
     private Set<String> configuredIssuers() {
         Set<String> issuers = new LinkedHashSet<>();
-        multitenancyProperties.getTenants().values().forEach(tenant ->
-                tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
+        if (!multitenancyProperties.isAdditionalTenantsEnabled()) {
+            return issuers;
+        }
+        multitenancyProperties.getTenants().values().stream()
+                .filter(multitenancyProperties::shouldLoadTenant)
+                .forEach(tenant ->
+                        tenant.getHosts().forEach(host -> issuers.add(toIssuer(host))));
         return issuers;
     }
 
