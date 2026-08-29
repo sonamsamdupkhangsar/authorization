@@ -84,6 +84,7 @@ httproute:
     - "/accounts/lock/secret"
     - "/accounts/lock/email"
     - "/accounts/lock/email/secret"
+    - "/users/username"
   pathPrefixes:
     - "/css"
     - "/js"
