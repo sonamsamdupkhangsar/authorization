@@ -1,8 +1,6 @@
 package me.sonam.auth.init;
 
 import jakarta.annotation.PostConstruct;
-import me.sonam.auth.jpa.entity.Client;
-import me.sonam.auth.jpa.repo.ClientRepository;
 import me.sonam.auth.multitenancy.AuthorizationServerMultitenancyProperties;
 import me.sonam.auth.multitenancy.IssuerAwareAuthorizationServerOperations;
 import org.slf4j.Logger;
@@ -16,14 +14,12 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
 
 import java.time.Duration;
 import java.net.URI;
 import java.util.Base64;
 import java.util.LinkedHashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -39,9 +35,6 @@ public class ClientSetup {
 
     @Autowired
     private AuthorizationServerMultitenancyProperties multitenancyProperties;
-
-    @Autowired
-    private ClientRepository clientRepository;
 
     @Value("${BASE64_CLIENT_ID_SECRET}")
     private String base64ClientIdSecret;
@@ -65,220 +58,17 @@ public class ClientSetup {
     private PasswordEncoder passwordEncoder;
 
     @PostConstruct
-    public void createAuthzManagerClient() {
-        LOG.info("create authzManager client if it is not created for each issuer");
+    public void seedConfiguredClients() {
+        LOG.info("create authzManager and service account clients if they are not created for each issuer");
+        String[] serviceAccountCredentials = serviceAccountCredentials();
+        String clientId = serviceAccountCredentials[0];
+        String secret = serviceAccountCredentials[1];
+
         seedDefaultIssuerAuthzManagerClient();
-        configuredIssuers().forEach(this::seedIssuerClients);
-    }
-
-    @PostConstruct
-    public void createServiceAccount() {
-        LOG.info("create service account if it is not created for each issuer");
-        String decodedString = new String(Base64.getDecoder().decode(base64ClientIdSecret));
-        String[] clientIdSecretArray = decodedString.split(":");
-        final String clientId = clientIdSecretArray[0];
-        final String secret = clientIdSecretArray[1];
-
         LOG.info("create service account for clientId {}", clientId);
-
         seedDefaultIssuerServiceAccount(clientId, secret);
-        configuredIssuers().forEach(this::seedIssuerClients);
-/*
-        final String nextJsClientId = "nextjs-client";
-
-        registeredClient = registeredClientRepository.findByClientId(nextJsClientId);
-
-        if (registeredClient != null) {
-            LOG.info("found registered client");
-        }
-        else {
-            ClientSettings clientSettings = ClientSettings.builder()
-                    .requireAuthorizationConsent(true)
-                    .requireProofKey(false)
-                    .build();
-
-            registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientSettings(clientSettings)
-                    .clientId(nextJsClientId)
-                    .clientSecret("{noop}nextjs-secret")
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                    .redirectUri("http://localhost:3001/api/auth/callback/myauth")
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .scope(OidcScopes.EMAIL)
-                    .scope("message.read")
-                    .scope("message.write")
-                    .build();
-            registeredClientRepository.save(registeredClient);
-
-            LOG.info("save a client-credential");
-        }*/
+        configuredIssuers().forEach(issuer -> seedIssuerClients(issuer, clientId, secret));
     }
-
-    //test cases depend on this
-    //@PostConstruct
-    public void saveClient() {
-        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                .clientId("messaging-client")
-                .clientSecret("{noop}secret")
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
-                .redirectUri("http://127.0.0.1:8080/authorized")
-                .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
-                .scope("message.read")
-                .scope("message.write")
-                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
-                .build();
-
-        // Save registered client in db as if in-memory
-        //JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-        registeredClientRepository.save(registeredClient);
-
-        //	return registeredClientRepository;
-    }
-
-    //@PostConstruct
-    public void saveAnotherClient() {
-        LOG.info("save myclient");
-        final String myclient = "myclient";
-        if (registeredClientRepository.findByClientId(myclient) == null) {
-            RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientId(myclient)
-                    .clientSecret("{noop}secret")
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_JWT)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                    .redirectUri("http://127.0.0.1:8080/login/oauth2/code/myclient-oidc")
-                    .redirectUri("http://127.0.0.1:8080/authorized")
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .scope("message.read")
-                    .scope("message.write")
-                    .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).requireProofKey(false).build())
-                    .build();
-
-            // Save registered client in db as if in-memory
-            //JdbcRegisteredClientRepository registeredClientRepository = new JdbcRegisteredClientRepository(jdbcTemplate);
-            registeredClientRepository.save(registeredClient);
-        }
-        //	return registeredClientRepository;
-    }
-
-    //  @PostConstruct
-    private void savePublicRegisteredClient() {
-        final String clientId = "public-client";
-        Optional<Client> cLientOptional = clientRepository.findByClientId(clientId);
-        cLientOptional.ifPresent(client -> clientRepository.delete(client));
-
-        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
-        if (registeredClient != null) {
-            LOG.info("registered public client exists");
-        }
-        else {
-            registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientId(clientId)
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    //.redirectUri("http://localhost:8080")
-                    // .redirectUri("http://127.0.0.1:8080/login/oauth2/code/pkce")
-                    .redirectUri("http://127.0.0.1:8080")
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .scope("message.read")
-                    .scope("message.write")
-                    .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true)
-                            .requireProofKey(true).build())
-                    .build();
-            registeredClientRepository.save(registeredClient);
-
-            LOG.info("saved registeredClient");
-        }
-    }
-
-    // @PostConstruct
-  /*  private void savePrivateRegisteredClient() {
-        final String clientId = "private-client";
-
-        RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
-        if (registeredClient != null) {
-            LOG.info("registered private client exists");
-        }
-        else {
-            registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientId(clientId)
-                    .clientSecret("{noop}secret")
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                    .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .redirectUri(privateClientUrl+"/login/oauth2/code/pkce") //+"http://127.0.0.1:8080/login/oauth2/code/pkce")
-                    .redirectUri(privateClientUrl+"/authorized") //http://127.0.0.1:8080/authorized")
-                    .postLogoutRedirectUri(privateClientUrl+"/logged-out") //http://127.0.0.1:8080/logged-out")
-                    .scope(OidcScopes.OPENID)
-                    .scope(OidcScopes.PROFILE)
-                    .scope(OidcScopes.EMAIL)
-                    .scope("message.read")
-                    .scope("message.write")
-                    .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false)
-                            .requireProofKey(true).build())
-                    .build();
-            registeredClientRepository.save(registeredClient);
-
-            LOG.info("saved registeredClient");
-        }
-    }
-*/
-
-    //@PostConstruct
-    private void saveArticlesClient() {
-        final String clientId = "articles-client";
-
-        //clientRepository.deleteAll();
-
-        if (registeredClientRepository.findByClientId(clientId) != null) {
-            LOG.info("registered articles client exists");
-        }
-        else {
-            ClientSettings clientSettings = ClientSettings.builder()
-                    .requireAuthorizationConsent(true)
-                    .requireProofKey(false)
-                    .build();
-
-            RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
-                    .clientSettings(clientSettings)
-                    .clientId(clientId)
-                    .clientSecret("{noop}secret")
-                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                    .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                    .redirectUri("http://127.0.0.1:8080/login/oauth2/code/articles-client-oidc")
-                    .scope(OidcScopes.OPENID)
-                    .scope("articles.read")
-                    .scope("articles.write")
-                    .build();
-
-            registeredClientRepository.save(registeredClient);
-            LOG.info("saved arcticles client oidc");
-        }
-    }
-
-    //@PostConstruct
-    public void deleteAll() {
-        clientRepository.deleteAll();
-    }
-
-   //@PostConstruct
-
 
     private void seedDefaultIssuerAuthzManagerClient() {
         String expectedAuthzManagerUri = authzManagerUri;
@@ -424,9 +214,17 @@ public class ClientSetup {
     }
 
     public void seedIssuerClients(String issuer) {
+        String[] serviceAccountCredentials = serviceAccountCredentials();
+        seedIssuerClients(issuer, serviceAccountCredentials[0], serviceAccountCredentials[1]);
+    }
+
+    private void seedIssuerClients(String issuer, String clientId, String secret) {
         seedAuthzManagerClient(issuer);
+        seedServiceAccount(issuer, clientId, secret);
+    }
+
+    private String[] serviceAccountCredentials() {
         String decodedString = new String(Base64.getDecoder().decode(base64ClientIdSecret));
-        String[] clientIdSecretArray = decodedString.split(":");
-        seedServiceAccount(issuer, clientIdSecretArray[0], clientIdSecretArray[1]);
+        return decodedString.split(":", 2);
     }
 }
