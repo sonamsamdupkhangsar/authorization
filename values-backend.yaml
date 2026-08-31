@@ -111,10 +111,6 @@ httproute:
       hostname: "business1.openissuer.com"
       httpsListenerName: "https-business1"
       httpListenerName: "http-business1"
-    - name: business2
-      hostname: "business2.openissuer.com"
-      httpsListenerName: "https-business2"
-      httpListenerName: "http-business2"
     - name: free
       hostname: "free.openissuer.com"
       httpsListenerName: "https-free"
@@ -202,12 +198,6 @@ envs:
     value: business1auth
   - name: BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF
     value: business1-db-password
-  - name: BUSINESS2_AUTH_DB_URL
-    value: jdbc:postgresql://business2-auth-db-rw/business2auth
-  - name: BUSINESS2_AUTH_DB_USERNAME
-    value: business2auth
-  - name: BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF
-    value: business2-db-password
   - name: FREE_AUTH_DB_URL
     value: jdbc:postgresql://free-auth-db-rw/freeauth
   - name: FREE_AUTH_DB_USERNAME
@@ -267,10 +257,6 @@ secretFiles:
     keys:
       - key: password
         name: TENANT_SECRET_BUSINESS1_DB_PASSWORD
-  - file: business2-auth-db-app
-    keys:
-      - key: password
-        name: TENANT_SECRET_BUSINESS2_DB_PASSWORD
   - file: free-auth-db-app
     keys:
       - key: password
