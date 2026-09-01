@@ -69,14 +69,6 @@ authorization-server:
         username: ${BUSINESS1_AUTH_DB_USERNAME}
         password-secret-ref: ${BUSINESS1_AUTH_DB_PASSWORD_SECRET_REF}
         driver-class-name: ${BUSINESS1_AUTH_DB_DRIVER:org.postgresql.Driver}
-      business2:
-        deployment-namespace: main
-        hosts:
-          - business2.openissuer.com
-        url: ${BUSINESS2_AUTH_DB_URL}
-        username: ${BUSINESS2_AUTH_DB_USERNAME}
-        password-secret-ref: ${BUSINESS2_AUTH_DB_PASSWORD_SECRET_REF}
-        driver-class-name: ${BUSINESS2_AUTH_DB_DRIVER:org.postgresql.Driver}
       demo:
         deployment-namespace: main
         hosts:
@@ -97,11 +89,6 @@ authorization-server:
         create-organization-on-signup: false
         allowed-email-domains:
           - business1.com
-      business2.openissuer.com:
-        allow-signup: true
-        create-organization-on-signup: false
-        allowed-email-domains:
-          - business2.com
       demo.openissuer.com:
         allow-account-self-service: true
         allow-signup: false
