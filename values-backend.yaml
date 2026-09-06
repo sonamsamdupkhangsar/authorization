@@ -166,8 +166,10 @@ envs:
     value: 8080
   - name: AUTH_SERVER_ROOT
     value: "http://authorization-server.{{ .Release.Namespace }}.svc.cluster.local"
+  - name: AUTH_SERVER_CONTEXT_PATH
+    value: "/issuer"
   - name: ISSUER_URI
-    value: https://platform.openissuer.com
+    value: https://platform.openissuer.com/issuer
   - name: ISSUER_ADDRESS
     value: https://platform.openissuer.com
   - name: ALLOWED_ORIGINS
