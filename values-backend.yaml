@@ -101,6 +101,7 @@ httproute:
     - "/webauthn"
     - "/userinfo"
     - "/.well-known"
+    - "/issuer"
   hostRoutes:
     - name: platform
       hostname: "platform.openissuer.com"
