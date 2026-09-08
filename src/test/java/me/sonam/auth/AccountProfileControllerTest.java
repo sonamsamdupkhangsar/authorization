@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import me.sonam.auth.account.AccountProfileController;
 import me.sonam.auth.account.AccountProfileForm;
 import me.sonam.auth.rest.signup.User;
+import me.sonam.auth.util.AdminReturnUrlValidator;
 import me.sonam.auth.webclient.UserWebClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.http.MediaType;
 import reactor.core.publisher.Mono;
 
@@ -38,7 +40,7 @@ class AccountProfileControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AccountProfileController(userWebClient, new ObjectMapper());
+        controller = new AccountProfileController(userWebClient, new ObjectMapper(), new AdminReturnUrlValidator());
         authentication = new UsernamePasswordAuthenticationToken("user1", "");
         user = new User();
         user.setId(userId);
@@ -55,11 +57,25 @@ class AccountProfileControllerTest {
         when(userWebClient.getUserById(userId)).thenReturn(Mono.just(user));
         ConcurrentModel model = new ConcurrentModel();
 
-        String view = controller.profile(authentication, null, model).block();
+        String view = controller.profile(authentication, null, null, new MockHttpServletRequest(), model).block();
 
         assertThat(view).isEqualTo("account/profile");
         assertThat(model.getAttribute("user")).isSameAs(user);
         assertThat(model.getAttribute("profile")).isInstanceOf(AccountProfileForm.class);
+    }
+
+    @Test
+    void profilePreservesValidAdminReturnUrl() {
+        when(userWebClient.getUserId("user1")).thenReturn(Mono.just(userId));
+        when(userWebClient.getUserById(userId)).thenReturn(Mono.just(user));
+        ConcurrentModel model = new ConcurrentModel();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setServerName("free.openissuer.com");
+        String returnUrl = "https://free.admin.openissuer.com/admin/user/profile";
+
+        controller.profile(authentication, null, returnUrl, request, model).block();
+
+        assertThat(model.getAttribute("returnUrl")).isEqualTo(returnUrl);
     }
 
     @Test

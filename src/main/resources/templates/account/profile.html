@@ -22,9 +22,13 @@
         </div>
 
         <nav class="account-nav" aria-label="Account settings">
-            <a class="active" th:href="@{/account/profile}">Profile</a>
-            <a th:href="@{/mfa/passkeys}">Passkeys</a>
+            <a class="active" th:href="@{/account/profile(return_url=${returnUrl})}">Profile</a>
+            <a th:href="@{/mfa/passkeys(return_url=${returnUrl})}">Passkeys</a>
         </nav>
+
+        <div class="mb-3" th:if="${returnUrl != null}">
+            <a class="btn btn-outline-secondary" th:href="${returnUrl}">Back to admin</a>
+        </div>
 
         <div th:if="${updated}" class="alert alert-success" role="alert">Profile updated.</div>
         <div th:if="${param.photoUpdated}" class="alert alert-success" role="alert">Profile photo updated.</div>
