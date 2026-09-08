@@ -13,7 +13,7 @@
     <main class="passkey-page">
     <h1 class="h3 mb-4">Passkeys</h1>
     <nav class="account-nav" aria-label="Account settings">
-        <a th:href="@{/account/profile}">Profile</a>
+        <a th:href="@{/account/profile(return_url=${returnUrl})}">Profile</a>
         <a class="active" th:href="@{/mfa/passkeys}">Passkeys</a>
     </nav>
 

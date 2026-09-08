@@ -3,7 +3,9 @@ package me.sonam.auth.account;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import me.sonam.auth.rest.signup.User;
+import me.sonam.auth.util.AdminReturnUrlValidator;
 import me.sonam.auth.webclient.UserWebClient;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -27,10 +29,13 @@ public class AccountProfileController {
 
     private final UserWebClient userWebClient;
     private final ObjectMapper objectMapper;
+    private final AdminReturnUrlValidator adminReturnUrlValidator;
 
-    public AccountProfileController(UserWebClient userWebClient, ObjectMapper objectMapper) {
+    public AccountProfileController(UserWebClient userWebClient, ObjectMapper objectMapper,
+                                    AdminReturnUrlValidator adminReturnUrlValidator) {
         this.userWebClient = userWebClient;
         this.objectMapper = objectMapper;
+        this.adminReturnUrlValidator = adminReturnUrlValidator;
     }
 
     @GetMapping
@@ -41,7 +46,11 @@ public class AccountProfileController {
     @GetMapping("/profile")
     public Mono<String> profile(Authentication authentication,
                                 @RequestParam(required = false) String updated,
+                                @RequestParam(name = "return_url", required = false) String returnUrl,
+                                HttpServletRequest request,
                                 Model model) {
+        adminReturnUrlValidator.validate(returnUrl, request)
+                .ifPresent(url -> model.addAttribute("returnUrl", url));
         return loadAuthenticatedUser(authentication)
                 .doOnNext(user -> {
                     model.addAttribute("user", user);
