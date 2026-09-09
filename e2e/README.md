@@ -122,3 +122,30 @@ npm run test:account
 ```
 
 The email-request tests send real email each time they run. Use only a dedicated test account and inbox.
+
+## Test tenant admin navigation
+
+The admin smoke test signs in through the tenant issuer and verifies the dashboard,
+clients list, an existing client when one is available, AuthzManager profile, issuer
+profile, Passkeys page, and the return navigation back to AuthzManager. It does not
+create, update, or delete application data.
+
+Use a dedicated active test account that can sign in to AuthzManager. The account must
+not require an already-enrolled physical passkey. Enter the password through a hidden
+prompt so it is not written to the repository or shell history:
+
+```bash
+read -r "E2E_USERNAME?Username: "
+read -s "E2E_PASSWORD?Password: "
+echo
+export E2E_USERNAME E2E_PASSWORD
+
+E2E_ISSUER_URL="https://dedicated-tenant.openissuer.com" \
+E2E_ADMIN_URL="https://dedicated-tenant.admin.openissuer.com" \
+npm run test:admin:headed
+
+unset E2E_USERNAME E2E_PASSWORD
+```
+
+Use `npm run test:admin` for the normal headless run. Playwright traces are retained
+under `test-results/` when the test fails.

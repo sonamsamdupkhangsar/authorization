@@ -9,6 +9,8 @@
     "inspect:mailbox": "node --no-warnings --experimental-strip-types support/inspect-mailbox.ts",
     "test:links": "playwright test tests/signin-links.spec.ts",
     "test:account": "playwright test tests/account-actions.spec.ts",
+    "test:admin": "playwright test tests/admin-navigation.spec.ts",
+    "test:admin:headed": "playwright test tests/admin-navigation.spec.ts --headed",
     "report": "playwright show-report"
   },
   "devDependencies": {
