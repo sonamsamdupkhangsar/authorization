@@ -80,6 +80,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
     @Value("${authzmanager-id}")
     private UUID authzManagerId;
 
+    @Value("${fraud.observation.enabled:true}")
+    private boolean fraudObservationEnabled;
+
     final String ROLES = "roles";
 
     public AuthenticationCallout(@Qualifier("serviceWebClientBuilder") WebClient.Builder webClientBuilder,
@@ -244,8 +247,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                 LOG.debug("failed login includes remote-address metadata");
             }
 
-            return observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN)
-                    .then(loginAttemptWebClient.loginFailed(authenticationId, ipAddress))
+            observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN);
+            return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
                     .doOnNext(s -> LOG.error("user was not found during authentication", throwable))
                     .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
@@ -272,8 +275,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                 LOG.debug("failed login includes remote-address metadata");
                             }
 
-                            return observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN)
-                                    .then(loginAttemptWebClient.loginFailed(authenticationId, ipAddress))
+                            observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN);
+                            return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
                                     .doOnNext(s -> LOG.trace("authentication failed", throwable))
                                     .flatMap(s -> {
                                         final String message = throwable.getMessage() + " " + s;
@@ -310,8 +313,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     LOG.debug("exception occurred during account self-service login", throwable);
                     LOG.error("exception occurred during account self-service login: {}", throwable.getMessage());
                     if (throwable instanceof BadCredentialsException) {
-                        return observeFraud(authenticationId, remoteAddress(authentication), FraudEvent.EventType.LOGIN)
-                                .then(loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication)))
+                        observeFraud(authenticationId, remoteAddress(authentication), FraudEvent.EventType.LOGIN);
+                        return loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication))
                                 .flatMap(s -> Mono.error(new BadCredentialsException(throwable.getMessage() + " " + s)));
                     }
                     return Mono.error(throwable);
@@ -325,12 +328,12 @@ public class AuthenticationCallout implements AuthenticationProvider {
         return "";
     }
 
-    private Mono<Void> observeFraud(String authenticationId, String sourceIp, FraudEvent.EventType eventType) {
-        if (fraudObservationService == null) {
-            return Mono.empty();
+    private void observeFraud(String authenticationId, String sourceIp, FraudEvent.EventType eventType) {
+        if (!fraudObservationEnabled || fraudObservationService == null) {
+            return;
         }
-        return fraudObservationService.observe(eventType, hostOrganizationResolver.currentHost().orElse(null),
-                authenticationId, sourceIp);
+        fraudObservationService.observe(eventType, hostOrganizationResolver.currentHost().orElse(null),
+                authenticationId, sourceIp).subscribe();
     }
 
     /**
@@ -521,8 +524,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
             User principal = new User(authentication.getName(), "", authorities);
             String sourceIp = remoteAddress(authentication);
-            return observeFraud(authentication.getName(), sourceIp, FraudEvent.EventType.LOGIN)
-                    .then(loginAttemptWebClient.loginSucccess(authentication.getName(), userId, sourceIp))
+            observeFraud(authentication.getName(), sourceIp, FraudEvent.EventType.LOGIN);
+            return loginAttemptWebClient.loginSucccess(authentication.getName(), userId, sourceIp)
                     .thenReturn(new UsernamePasswordAuthenticationToken(principal, "", authorities));
         });
     }

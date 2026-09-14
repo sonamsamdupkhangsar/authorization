@@ -8,6 +8,7 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.HexFormat;
 
 /** Executes the fraud policy in observe-only mode. It never changes authentication flow. */
@@ -37,6 +38,7 @@ public final class FraudObservationService {
                             eventType, decision.outcome(), decision.matchedRules(), decision.policyVersion());
                 })
                 .then()
+                .timeout(Duration.ofSeconds(2))
                 .onErrorResume(error -> {
                     LOG.warn("fraud observation unavailable; authentication is unaffected: {}", error.getMessage());
                     return Mono.empty();
