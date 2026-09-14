@@ -1,6 +1,8 @@
 package me.sonam.auth.config;
 
 import me.sonam.auth.webclient.*;
+import me.sonam.auth.fraud.DeterministicFraudEvaluator;
+import me.sonam.auth.fraud.FraudObservationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +61,11 @@ public class BeanConfig {
 
     @Value("${attempt-rest-service.check}")
     private String checkLoginAttempt;
+    @Value("${attempt-rest-service.fraud-history}")
+    private String fraudHistory;
+
+    @Value("${fraud.blocked-source-hashes:}")
+    private String blockedSourceHashes;
 
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
@@ -121,7 +128,19 @@ public class BeanConfig {
 
     @Bean
     public LoginAttemptWebClient loginAttemptWebClient() {
-        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt, checkLoginAttempt);
+        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt, checkLoginAttempt, fraudHistory);
+    }
+
+    @Bean
+    public DeterministicFraudEvaluator deterministicFraudEvaluator() {
+        java.util.List<String> blocked = java.util.Arrays.stream(blockedSourceHashes.split(","))
+                .map(String::trim).filter(value -> !value.isBlank()).toList();
+        return new DeterministicFraudEvaluator(blocked);
+    }
+
+    @Bean
+    public FraudObservationService fraudObservationService() {
+        return new FraudObservationService(loginAttemptWebClient(), deterministicFraudEvaluator());
     }
 
     @Bean

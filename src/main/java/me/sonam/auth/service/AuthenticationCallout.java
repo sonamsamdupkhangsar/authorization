@@ -6,6 +6,8 @@ import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
 import me.sonam.auth.jpa.repo.HClientUserRepository;
 import me.sonam.auth.multitenancy.IssuerContextExecutor;
 import me.sonam.auth.service.exception.BadCredentialsException;
+import me.sonam.auth.fraud.FraudEvent;
+import me.sonam.auth.fraud.FraudObservationService;
 import me.sonam.auth.webclient.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +60,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
 
     @Autowired
     private final LoginAttemptWebClient loginAttemptWebClient;
+    private final FraudObservationService fraudObservationService;
     @Autowired
     private final OrganizationWebClient organizationWebClient;
 
@@ -86,6 +89,18 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                  AuthenticationWebClient authenticationWebClient,
                                  UserWebClient userWebClient, AccountWebClient accountWebClient,
                                  RoleWebClient roleWebClient) {
+        this(webClientBuilder, requestCache, loginAttemptWebClient, organizationWebClient,
+                authenticationWebClient, userWebClient, accountWebClient, roleWebClient, null);
+    }
+
+    @Autowired
+    public AuthenticationCallout(@Qualifier("serviceWebClientBuilder") WebClient.Builder webClientBuilder,
+                                 RequestCache requestCache,
+                                 LoginAttemptWebClient loginAttemptWebClient,
+                                 OrganizationWebClient organizationWebClient,
+                                 AuthenticationWebClient authenticationWebClient,
+                                 UserWebClient userWebClient, AccountWebClient accountWebClient,
+                                 RoleWebClient roleWebClient, FraudObservationService fraudObservationService) {
         this.webClientBuilder = webClientBuilder;
         this.requestCache = requestCache;
         this.loginAttemptWebClient = loginAttemptWebClient;
@@ -94,6 +109,7 @@ public class AuthenticationCallout implements AuthenticationProvider {
         this.userWebClient = userWebClient;
         this.accountWebClient = accountWebClient;
         this.roleWebClient = roleWebClient;
+        this.fraudObservationService = fraudObservationService;
     }
 
     // Loads the saved OAuth client context, applies account lock checks, and then routes login
@@ -228,7 +244,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                 LOG.debug("failed login includes remote-address metadata");
             }
 
-            return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
+            return observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN)
+                    .then(loginAttemptWebClient.loginFailed(authenticationId, ipAddress))
                     .doOnNext(s -> LOG.error("user was not found during authentication", throwable))
                     .flatMap(s -> Mono.error(new BadCredentialsException("Bad credentials")));
 
@@ -255,7 +272,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                                 LOG.debug("failed login includes remote-address metadata");
                             }
 
-                            return loginAttemptWebClient.loginFailed(authenticationId, ipAddress)
+                            return observeFraud(authenticationId, ipAddress, FraudEvent.EventType.LOGIN)
+                                    .then(loginAttemptWebClient.loginFailed(authenticationId, ipAddress))
                                     .doOnNext(s -> LOG.trace("authentication failed", throwable))
                                     .flatMap(s -> {
                                         final String message = throwable.getMessage() + " " + s;
@@ -292,7 +310,8 @@ public class AuthenticationCallout implements AuthenticationProvider {
                     LOG.debug("exception occurred during account self-service login", throwable);
                     LOG.error("exception occurred during account self-service login: {}", throwable.getMessage());
                     if (throwable instanceof BadCredentialsException) {
-                        return loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication))
+                        return observeFraud(authenticationId, remoteAddress(authentication), FraudEvent.EventType.LOGIN)
+                                .then(loginAttemptWebClient.loginFailed(authenticationId, remoteAddress(authentication)))
                                 .flatMap(s -> Mono.error(new BadCredentialsException(throwable.getMessage() + " " + s)));
                     }
                     return Mono.error(throwable);
@@ -304,6 +323,14 @@ public class AuthenticationCallout implements AuthenticationProvider {
             return webDetails.getRemoteAddress();
         }
         return "";
+    }
+
+    private Mono<Void> observeFraud(String authenticationId, String sourceIp, FraudEvent.EventType eventType) {
+        if (fraudObservationService == null) {
+            return Mono.empty();
+        }
+        return fraudObservationService.observe(eventType, hostOrganizationResolver.currentHost().orElse(null),
+                authenticationId, sourceIp);
     }
 
     /**
@@ -493,8 +520,9 @@ public class AuthenticationCallout implements AuthenticationProvider {
             authorities.add(FactorGrantedAuthority.fromAuthority(factor));
 
             User principal = new User(authentication.getName(), "", authorities);
-            return loginAttemptWebClient.loginSucccess(authentication.getName(), userId,
-                            remoteAddress(authentication))
+            String sourceIp = remoteAddress(authentication);
+            return observeFraud(authentication.getName(), sourceIp, FraudEvent.EventType.LOGIN)
+                    .then(loginAttemptWebClient.loginSucccess(authentication.getName(), userId, sourceIp))
                     .thenReturn(new UsernamePasswordAuthenticationToken(principal, "", authorities));
         });
     }
