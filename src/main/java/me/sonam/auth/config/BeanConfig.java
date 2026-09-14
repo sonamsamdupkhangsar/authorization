@@ -67,6 +67,9 @@ public class BeanConfig {
     @Value("${fraud.blocked-source-hashes:}")
     private String blockedSourceHashes;
 
+    @Value("${fraud.observation.max-in-flight:32}")
+    private int fraudObservationMaxInFlight;
+
 
     @Value("${organization-rest-service.root}${organization-rest-service.userExistsInOrganization}")
     private String userExistsInOrganizationEndpoint;
@@ -140,7 +143,8 @@ public class BeanConfig {
 
     @Bean
     public FraudObservationService fraudObservationService() {
-        return new FraudObservationService(loginAttemptWebClient(), deterministicFraudEvaluator());
+        return new FraudObservationService(loginAttemptWebClient(), deterministicFraudEvaluator(),
+                fraudObservationMaxInFlight);
     }
 
     @Bean

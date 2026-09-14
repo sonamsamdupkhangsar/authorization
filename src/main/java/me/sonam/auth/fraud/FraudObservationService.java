@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
+import java.util.concurrent.Semaphore;
 
 /** Executes the fraud policy in observe-only mode. It never changes authentication flow. */
 public final class FraudObservationService {
@@ -17,18 +18,31 @@ public final class FraudObservationService {
 
     private final LoginAttemptWebClient loginAttemptWebClient;
     private final DeterministicFraudEvaluator evaluator;
+    private final Semaphore inFlight;
 
     public FraudObservationService(LoginAttemptWebClient loginAttemptWebClient,
                                    DeterministicFraudEvaluator evaluator) {
+        this(loginAttemptWebClient, evaluator, 32);
+    }
+
+    public FraudObservationService(LoginAttemptWebClient loginAttemptWebClient,
+                                   DeterministicFraudEvaluator evaluator,
+                                   int maxInFlight) {
         this.loginAttemptWebClient = loginAttemptWebClient;
         this.evaluator = evaluator;
+        this.inFlight = new Semaphore(Math.max(1, maxInFlight));
     }
 
     public Mono<Void> observe(FraudEvent.EventType eventType, String tenantHost,
                               String authenticationId, String sourceIp) {
         String authenticationIdHash = hash(authenticationId);
         String sourceIpHash = hash(sourceIp);
-        return loginAttemptWebClient.fraudHistory(authenticationIdHash, sourceIpHash)
+        return Mono.defer(() -> {
+            if (!inFlight.tryAcquire()) {
+                LOG.debug("fraud observation skipped because concurrency limit was reached");
+                return Mono.empty();
+            }
+            return loginAttemptWebClient.fraudHistory(authenticationIdHash, sourceIpHash)
                 .doOnNext(history -> {
                     FraudEvent event = new FraudEvent(eventType, tenantHost, authenticationIdHash, sourceIpHash,
                             count(history.accountFailures()), count(history.ipFailures()),
@@ -42,7 +56,9 @@ public final class FraudObservationService {
                 .onErrorResume(error -> {
                     LOG.warn("fraud observation unavailable; authentication is unaffected: {}", error.getMessage());
                     return Mono.empty();
-                });
+                })
+                .doFinally(signal -> inFlight.release());
+        });
     }
 
     static String hash(String value) {

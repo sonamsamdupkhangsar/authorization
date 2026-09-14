@@ -165,6 +165,7 @@ maxRoles: 5
 fraud:
   observation:
     enabled: false
+    max-in-flight: 4
 
 organization-seed:
   delay-seconds: 0
