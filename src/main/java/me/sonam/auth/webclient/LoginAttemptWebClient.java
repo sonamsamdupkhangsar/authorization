@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -23,17 +24,25 @@ public class LoginAttemptWebClient {
     private final String success;
     private final String delete;
     private final String checkLoginAttempt;
+    private final String fraudHistory;
 
     private AccountWebClient accountWebClient;
 
     public LoginAttemptWebClient(WebClient.Builder webClientBuilder, String failed,
                                  String success, AccountWebClient accountWebClient,
                                  String delete, String checkLoginAttempt) {
+        this(webClientBuilder, failed, success, accountWebClient, delete, checkLoginAttempt, null);
+    }
+
+    public LoginAttemptWebClient(WebClient.Builder webClientBuilder, String failed,
+                                 String success, AccountWebClient accountWebClient,
+                                 String delete, String checkLoginAttempt, String fraudHistory) {
         this.webClientBuilder = webClientBuilder;
         this.failed = failed;
         this.success = success;
         this.delete = delete;
         this.checkLoginAttempt = checkLoginAttempt;
+        this.fraudHistory = fraudHistory;
         this.accountWebClient = accountWebClient;
     }
 
@@ -133,5 +142,29 @@ public class LoginAttemptWebClient {
                     LOG.debug("error stack trace ", throwable);
                     return Mono.error(throwable);
                 });
+    }
+
+    public Mono<FraudHistory> fraudHistory(String authenticationIdHash, String sourceIpHash) {
+        if (fraudHistory == null) {
+            return Mono.error(new IllegalStateException("fraud history endpoint is not configured"));
+        }
+        String endpoint = UriComponentsBuilder.fromUriString(fraudHistory)
+                .queryParam("authenticationIdHash", authenticationIdHash)
+                .queryParam("sourceIpHash", sourceIpHash)
+                .build().toUriString();
+        return webClientBuilder.build().get().uri(endpoint).retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Long>>() {})
+                .map(values -> new FraudHistory(
+                        values.getOrDefault("accountFailures", 0L),
+                        values.getOrDefault("ipFailures", 0L),
+                        values.getOrDefault("distinctAccounts", 0L),
+                        values.getOrDefault("signupAttempts", 0L)));
+    }
+
+    /** @deprecated The attempt service owns the canonical 10/15/30-minute windows. */
+    @Deprecated
+    public Mono<FraudHistory> fraudHistory(String authenticationIdHash, String sourceIpHash,
+                                           java.time.LocalDateTime ignoredSince) {
+        return fraudHistory(authenticationIdHash, sourceIpHash);
     }
 }

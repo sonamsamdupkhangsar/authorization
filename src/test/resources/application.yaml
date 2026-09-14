@@ -74,6 +74,7 @@ attempt-rest-service:
   success: ${attempt-rest-service.context}/login/success
   delete: ${attempt-rest-service.context}/{username}
   check: ${attempt-rest-service.context}/login
+  fraud-history: ${attempt-rest-service.context}/fraud/history
 
 role-rest-service:
   root: http://localhost:{port}
@@ -160,6 +161,10 @@ maxClients: 5
 maxOrganizations: 1
 maxUserPerOrganization: 5
 maxRoles: 5
+
+fraud:
+  observation:
+    enabled: false
 
 organization-seed:
   delay-seconds: 0
