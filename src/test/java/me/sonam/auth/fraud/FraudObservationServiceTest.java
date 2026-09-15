@@ -18,12 +18,36 @@ class FraudObservationServiceTest {
         LoginAttemptWebClient client = mock(LoginAttemptWebClient.class);
         when(client.fraudHistory(anyString(), anyString()))
                 .thenReturn(Mono.just(new FraudHistory(5, 20, 10, 3)));
+        when(client.recordFraudDecision(anyString(), any(), anyString(), anyString(), anyString(), any(), anyString()))
+                .thenReturn(Mono.just("{\"id\":\"audit-id\"}"));
         FraudObservationService service = new FraudObservationService(client,
                 new DeterministicFraudEvaluator(List.of()));
 
         service.observe(FraudEvent.EventType.LOGIN, "free.openissuer.com", "user", "203.0.113.10").block();
 
         verify(client, times(1)).fraudHistory(anyString(), anyString());
+        verify(client).recordFraudDecision(eq("LOGIN"), eq("free.openissuer.com"),
+                anyString(), anyString(), eq("BLOCK"),
+                eq(List.of("IP_FAILURE_RATE", "DISTRIBUTED_ACCOUNT_ATTACK", "ACCOUNT_FAILURE_RATE", "NEW_ACCOUNT_VELOCITY")),
+                eq("2026-09-13"));
+    }
+
+    @Test
+    void persistsReviewDecisionWithMatchedRule() {
+        LoginAttemptWebClient client = mock(LoginAttemptWebClient.class);
+        when(client.fraudHistory(anyString(), anyString()))
+                .thenReturn(Mono.just(new FraudHistory(5, 0, 0, 0)));
+        when(client.recordFraudDecision(anyString(), any(), anyString(), anyString(), anyString(), any(), anyString()))
+                .thenReturn(Mono.just("created"));
+
+        FraudObservationService service = new FraudObservationService(client,
+                new DeterministicFraudEvaluator(List.of()));
+
+        service.observe(FraudEvent.EventType.LOGIN, "free.openissuer.com", "user", "203.0.113.10").block();
+
+        verify(client).recordFraudDecision(eq("LOGIN"), eq("free.openissuer.com"),
+                anyString(), anyString(), eq("REVIEW"), eq(List.of("ACCOUNT_FAILURE_RATE")),
+                eq("2026-09-13"));
     }
 
     @Test
