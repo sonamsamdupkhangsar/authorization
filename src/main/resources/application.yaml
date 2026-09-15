@@ -151,6 +151,7 @@ attempt-rest-service:
   delete: ${attempt-rest-service.context}/{username}
   check: ${attempt-rest-service.context}/login
   fraud-history: ${attempt-rest-service.context}/fraud/history
+  fraud-decision: ${attempt-rest-service.context}/fraud/decisions
 
 role-rest-service:
   root: ${ROLE_REST_SERVICE}

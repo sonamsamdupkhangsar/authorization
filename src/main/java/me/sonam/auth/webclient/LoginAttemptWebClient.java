@@ -25,6 +25,7 @@ public class LoginAttemptWebClient {
     private final String delete;
     private final String checkLoginAttempt;
     private final String fraudHistory;
+    private final String fraudDecision;
 
     private AccountWebClient accountWebClient;
 
@@ -37,12 +38,20 @@ public class LoginAttemptWebClient {
     public LoginAttemptWebClient(WebClient.Builder webClientBuilder, String failed,
                                  String success, AccountWebClient accountWebClient,
                                  String delete, String checkLoginAttempt, String fraudHistory) {
+        this(webClientBuilder, failed, success, accountWebClient, delete, checkLoginAttempt, fraudHistory, null);
+    }
+
+    public LoginAttemptWebClient(WebClient.Builder webClientBuilder, String failed,
+                                 String success, AccountWebClient accountWebClient,
+                                 String delete, String checkLoginAttempt, String fraudHistory,
+                                 String fraudDecision) {
         this.webClientBuilder = webClientBuilder;
         this.failed = failed;
         this.success = success;
         this.delete = delete;
         this.checkLoginAttempt = checkLoginAttempt;
         this.fraudHistory = fraudHistory;
+        this.fraudDecision = fraudDecision;
         this.accountWebClient = accountWebClient;
     }
 
@@ -166,5 +175,24 @@ public class LoginAttemptWebClient {
     public Mono<FraudHistory> fraudHistory(String authenticationIdHash, String sourceIpHash,
                                            java.time.LocalDateTime ignoredSince) {
         return fraudHistory(authenticationIdHash, sourceIpHash);
+    }
+
+    public Mono<String> recordFraudDecision(String eventType, String tenantHost,
+                                            String authenticationIdHash, String sourceIpHash,
+                                            String outcome, java.util.List<String> matchedRules,
+                                            String policyVersion) {
+        if (fraudDecision == null) {
+            return Mono.error(new IllegalStateException("fraud decision endpoint is not configured"));
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("eventType", eventType);
+        body.put("tenantHost", tenantHost);
+        body.put("authenticationIdHash", authenticationIdHash);
+        body.put("sourceIpHash", sourceIpHash);
+        body.put("outcome", outcome);
+        body.put("matchedRules", matchedRules);
+        body.put("policyVersion", policyVersion);
+        return webClientBuilder.build().post().uri(fraudDecision).bodyValue(body).retrieve()
+                .bodyToMono(String.class);
     }
 }

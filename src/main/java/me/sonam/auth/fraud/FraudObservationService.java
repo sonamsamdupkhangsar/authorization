@@ -43,13 +43,18 @@ public final class FraudObservationService {
                 return Mono.empty();
             }
             return loginAttemptWebClient.fraudHistory(authenticationIdHash, sourceIpHash)
-                .doOnNext(history -> {
+                .flatMap(history -> {
                     FraudEvent event = new FraudEvent(eventType, tenantHost, authenticationIdHash, sourceIpHash,
                             count(history.accountFailures()), count(history.ipFailures()),
                             count(history.distinctAccounts()), count(history.signupAttempts()));
                     FraudDecision decision = evaluator.evaluate(event);
                     LOG.info("fraud observation eventType={} outcome={} rules={} policyVersion={}",
                             eventType, decision.outcome(), decision.matchedRules(), decision.policyVersion());
+                    return loginAttemptWebClient.recordFraudDecision(eventType.name(), tenantHost,
+                                    authenticationIdHash, sourceIpHash, decision.outcome().name(),
+                                    decision.matchedRules(), decision.policyVersion())
+                            .doOnError(error -> LOG.warn("fraud decision audit unavailable: {}", error.getMessage()))
+                            .onErrorResume(error -> Mono.empty());
                 })
                 .then()
                 .timeout(Duration.ofSeconds(2))

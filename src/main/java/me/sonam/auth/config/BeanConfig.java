@@ -64,6 +64,9 @@ public class BeanConfig {
     @Value("${attempt-rest-service.fraud-history}")
     private String fraudHistory;
 
+    @Value("${attempt-rest-service.fraud-decision}")
+    private String fraudDecision;
+
     @Value("${fraud.blocked-source-hashes:}")
     private String blockedSourceHashes;
 
@@ -131,7 +134,7 @@ public class BeanConfig {
 
     @Bean
     public LoginAttemptWebClient loginAttemptWebClient() {
-        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt, checkLoginAttempt, fraudHistory);
+        return new LoginAttemptWebClient(webClientBuilder, loginAttemptFail, loginAttemptSuccess, accountWebClient(), deleteAttempt, checkLoginAttempt, fraudHistory, fraudDecision);
     }
 
     @Bean
