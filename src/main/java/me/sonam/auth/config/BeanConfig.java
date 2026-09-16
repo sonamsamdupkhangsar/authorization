@@ -15,6 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.reactive.function.client.WebClient;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Configuration
 public class BeanConfig {
@@ -105,6 +106,9 @@ public class BeanConfig {
     @Qualifier("serviceWebClientBuilder")
     private WebClient.Builder webClientBuilder;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
 
     @Bean
     public PasswordEncoder encoder() {
@@ -147,7 +151,7 @@ public class BeanConfig {
     @Bean
     public FraudObservationService fraudObservationService() {
         return new FraudObservationService(loginAttemptWebClient(), deterministicFraudEvaluator(),
-                fraudObservationMaxInFlight);
+                fraudObservationMaxInFlight, meterRegistry);
     }
 
     @Bean

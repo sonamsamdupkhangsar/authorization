@@ -153,6 +153,12 @@ attempt-rest-service:
   fraud-history: ${attempt-rest-service.context}/fraud/history
   fraud-decision: ${attempt-rest-service.context}/fraud/decisions
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
 role-rest-service:
   root: ${ROLE_REST_SERVICE}
   context: ${role-rest-service.root}/roles
