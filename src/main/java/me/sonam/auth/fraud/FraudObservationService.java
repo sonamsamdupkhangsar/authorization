@@ -5,6 +5,8 @@ import me.sonam.auth.webclient.LoginAttemptWebClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -42,7 +44,9 @@ public final class FraudObservationService {
                 LOG.debug("fraud observation skipped because concurrency limit was reached");
                 return Mono.empty();
             }
-            return loginAttemptWebClient.fraudHistory(authenticationIdHash, sourceIpHash)
+            return Mono.defer(() -> loginAttemptWebClient.fraudHistory(authenticationIdHash, sourceIpHash))
+                .timeout(Duration.ofSeconds(2))
+                .retryWhen(transientRetry("fraud history"))
                 .flatMap(history -> {
                     FraudEvent event = new FraudEvent(eventType, tenantHost, authenticationIdHash, sourceIpHash,
                             count(history.accountFailures()), count(history.ipFailures()),
@@ -53,17 +57,26 @@ public final class FraudObservationService {
                     return loginAttemptWebClient.recordFraudDecision(eventType.name(), tenantHost,
                                     authenticationIdHash, sourceIpHash, decision.outcome().name(),
                                     decision.matchedRules(), decision.policyVersion())
+                            .timeout(Duration.ofSeconds(2))
                             .doOnError(error -> LOG.warn("fraud decision audit unavailable: {}", error.getMessage()))
+                            .retryWhen(transientRetry("fraud decision audit"))
                             .onErrorResume(error -> Mono.empty());
                 })
                 .then()
-                .timeout(Duration.ofSeconds(2))
                 .onErrorResume(error -> {
                     LOG.warn("fraud observation unavailable; authentication is unaffected: {}", error.getMessage());
                     return Mono.empty();
                 })
                 .doFinally(signal -> inFlight.release());
         });
+    }
+
+    private static Retry transientRetry(String operation) {
+        return Retry.backoff(2, Duration.ofMillis(100))
+                .filter(error -> !(error instanceof WebClientResponseException response
+                        && response.getStatusCode().is4xxClientError()))
+                .doBeforeRetry(signal -> LOG.warn("retrying {} after attempt {}: {}",
+                        operation, signal.totalRetries() + 1, signal.failure().getMessage()));
     }
 
     static String hash(String value) {

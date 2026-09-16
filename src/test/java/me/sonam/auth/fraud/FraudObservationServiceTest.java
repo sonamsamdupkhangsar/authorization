@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
@@ -59,5 +60,23 @@ class FraudObservationServiceTest {
                 new DeterministicFraudEvaluator(List.of()));
 
         assertDoesNotThrow(() -> service.observe(FraudEvent.EventType.LOGIN, null, "user", "203.0.113.10").block());
+    }
+
+    @Test
+    void retriesTransientHistoryFailureBeforeRecordingDecision() {
+        LoginAttemptWebClient client = mock(LoginAttemptWebClient.class);
+        AtomicInteger calls = new AtomicInteger();
+        when(client.fraudHistory(anyString(), anyString())).thenAnswer(invocation ->
+                calls.getAndIncrement() == 0
+                        ? Mono.error(new RuntimeException("temporary timeout"))
+                        : Mono.just(new FraudHistory(0, 0, 0, 0)));
+        when(client.recordFraudDecision(anyString(), any(), anyString(), anyString(), anyString(), any(), anyString()))
+                .thenReturn(Mono.just("created"));
+
+        new FraudObservationService(client, new DeterministicFraudEvaluator(List.of()))
+                .observe(FraudEvent.EventType.LOGIN, "free.openissuer.com", "user", "203.0.113.10").block();
+
+        org.junit.jupiter.api.Assertions.assertEquals(2, calls.get());
+        verify(client).recordFraudDecision(anyString(), any(), anyString(), anyString(), eq("ALLOW"), any(), anyString());
     }
 }
