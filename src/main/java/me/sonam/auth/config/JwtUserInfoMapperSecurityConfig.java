@@ -147,6 +147,7 @@ public class JwtUserInfoMapperSecurityConfig {
                 .authorizeHttpRequests((authorize) ->
                         authorize.requestMatchers("/api/health/liveness").permitAll()
                                 .requestMatchers("/api/health/readiness").permitAll()
+                                .requestMatchers("/actuator/**").permitAll()
                                 .requestMatchers("/favicon.ico").permitAll()
                                 .requestMatchers("/favicon.svg").permitAll()
                                 .requestMatchers("/css/**").permitAll()
