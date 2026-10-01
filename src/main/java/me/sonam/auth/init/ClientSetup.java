@@ -163,7 +163,8 @@ public class ClientSetup {
     private void seedDefaultIssuerServiceAccount(String clientId, String secret) {
         RegisteredClient registeredClient = registeredClientRepository.findByClientId(clientId);
         if (registeredClient != null) {
-            LOG.info("keeping existing service-account client in default issuer store: {}", registeredClient.getClientId());
+            registeredClientRepository.save(withServiceAccountSecret(registeredClient, secret));
+            LOG.info("reconciled existing service-account client in default issuer store: {}", registeredClient.getClientId());
             return;
         }
         registeredClientRepository.save(buildServiceAccount(clientId, secret));
@@ -173,7 +174,8 @@ public class ClientSetup {
     private void seedServiceAccount(String issuer, String clientId, String secret) {
         RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, clientId);
         if (registeredClient != null) {
-            LOG.info("keeping existing service-account client for issuer {}: {}", issuer, registeredClient.getClientId());
+            issuerAwareAuthorizationServerOperations.save(issuer, withServiceAccountSecret(registeredClient, secret));
+            LOG.info("reconciled existing service-account client for issuer {}: {}", issuer, registeredClient.getClientId());
             return;
         }
         issuerAwareAuthorizationServerOperations.save(issuer, buildServiceAccount(clientId, secret));
@@ -191,6 +193,20 @@ public class ClientSetup {
                 .scope(OidcScopes.EMAIL)
                 .scope("message.read")
                 .scope("message.write")
+                .build();
+    }
+
+    private RegisteredClient withServiceAccountSecret(RegisteredClient existingClient, String secret) {
+        return RegisteredClient.withId(existingClient.getId())
+                .clientId(existingClient.getClientId())
+                .clientSecret(passwordEncoder.encode(secret))
+                .clientAuthenticationMethods(methods -> methods.addAll(existingClient.getClientAuthenticationMethods()))
+                .authorizationGrantTypes(grants -> grants.addAll(existingClient.getAuthorizationGrantTypes()))
+                .scopes(scopes -> scopes.addAll(existingClient.getScopes()))
+                .redirectUris(redirects -> redirects.addAll(existingClient.getRedirectUris()))
+                .postLogoutRedirectUris(redirects -> redirects.addAll(existingClient.getPostLogoutRedirectUris()))
+                .clientSettings(existingClient.getClientSettings())
+                .tokenSettings(existingClient.getTokenSettings())
                 .build();
     }
 
