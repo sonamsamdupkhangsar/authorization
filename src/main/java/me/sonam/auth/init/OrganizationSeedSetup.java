@@ -186,7 +186,7 @@ public class OrganizationSeedSetup {
     }
 
     // Converts the local YAML seed entry into the signup payload expected by user-rest-service.
-    private UserSignup toUserSignup(OrganizationSeedProperties.SeedUser seedUser) {
+    static UserSignup toUserSignup(OrganizationSeedProperties.SeedUser seedUser) {
         UserSignup userSignup = new UserSignup();
         userSignup.setFirstName(seedUser.getFirstName());
         userSignup.setLastName(seedUser.getLastName());
@@ -194,6 +194,7 @@ public class OrganizationSeedSetup {
         userSignup.setAuthenticationId(seedUser.getAuthenticationId());
         userSignup.setPassword(seedUser.getPassword() == null ? null : seedUser.getPassword().toCharArray());
         userSignup.setActive(seedUser.isActive());
+        userSignup.setActivationHost(seedUser.getOrganizationSubdomain());
         return userSignup;
     }
 
