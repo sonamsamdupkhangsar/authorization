@@ -149,3 +149,17 @@ unset E2E_USERNAME E2E_PASSWORD
 
 Use `npm run test:admin` for the normal headless run. Playwright traces are retained
 under `test-results/` when the test fails.
+
+To test the destructive **Delete my account** flow, use a disposable
+organization-admin account. The test is opt-in and deletes that account's data:
+
+```bash
+E2E_ISSUER_URL="https://pr-test-4.openissuer.com" \
+E2E_ADMIN_URL="https://pr-test-4.admin.openissuer.com" \
+E2E_USERNAME="disposable-admin" \
+E2E_PASSWORD="..." \
+E2E_DELETE_ACCOUNT=true \
+npm run test:admin -- --grep "deletes the signed-in user's data"
+```
+
+Never set `E2E_DELETE_ACCOUNT=true` for a production or shared administrator.
