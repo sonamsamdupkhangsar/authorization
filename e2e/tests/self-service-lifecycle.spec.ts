@@ -49,7 +49,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
   const issuer = new URL(issuerUrl!);
   const admin = new URL(adminUrl!);
   const uniqueSuffix = Date.now().toString().slice(-10);
-  const username = `e2e-lifecycle-${uniqueSuffix}`;
+  const username = process.env.E2E_SIGNUP_USERNAME ?? `e2e-lifecycle-${uniqueSuffix}`;
   const email = signupInbox
     ? plusAddress(signupInbox, uniqueSuffix)
     : configuredSignupEmail!;
