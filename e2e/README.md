@@ -163,3 +163,22 @@ npm run test:admin -- --grep "deletes the signed-in user's data"
 ```
 
 Never set `E2E_DELETE_ACCOUNT=true` for a production or shared account.
+
+## Run the complete disposable-user lifecycle
+
+The lifecycle test creates a unique user, activates it from the email, exercises the forgot-username and
+forgot-password requests, signs in to the admin application, and deletes that same user's profile as its final
+step. It requires a plus-addressable inbox (or an exact signup email) and is explicitly opt-in because deletion is
+irreversible:
+
+```bash
+E2E_SELF_SERVICE_LIFECYCLE=true \
+E2E_ISSUER_URL="https://pr-test-4.openissuer.com" \
+E2E_ADMIN_URL="https://pr-test-4.admin.openissuer.com" \
+E2E_SIGNUP_INBOX="your-test-inbox@example.com" \
+E2E_MAILBOX_PASSWORD="mailbox-password" \
+npm run test:lifecycle
+```
+
+Use only a disposable test inbox and namespace. The lifecycle test is independent of the other specs so its
+generated username, password, and email can be carried through every step and deletion is always last.
