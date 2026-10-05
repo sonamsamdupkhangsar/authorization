@@ -121,7 +121,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
 test.describe("destructive account self-service", () => {
   test.skip(
     process.env.E2E_DELETE_ACCOUNT !== "true",
-    "Set E2E_DELETE_ACCOUNT=true with a disposable organization-admin account.",
+    "Set E2E_DELETE_ACCOUNT=true with a disposable user account.",
   );
 
   test("deletes the signed-in user's data", async ({ page }) => {
