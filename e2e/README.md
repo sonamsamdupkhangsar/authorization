@@ -172,12 +172,21 @@ step. It requires a plus-addressable inbox (or an exact signup email) and is exp
 irreversible:
 
 ```bash
+
+read -r "E2E_MAILBOX_USERNAME?Mailbox username: "
+read -s "E2E_MAILBOX_PASSWORD?Mailbox password: "
+echo
+export E2E_MAILBOX_USERNAME
+export E2E_MAILBOX_PASSWORD
+export E2E_SIGNUP_INBOX="$E2E_MAILBOX_USERNAME"
+
 E2E_SELF_SERVICE_LIFECYCLE=true \
 E2E_ISSUER_URL="https://pr-test-4.openissuer.com" \
 E2E_ADMIN_URL="https://pr-test-4.admin.openissuer.com" \
-E2E_SIGNUP_INBOX="your-test-inbox@example.com" \
-E2E_MAILBOX_PASSWORD="mailbox-password" \
-npm run test:lifecycle
+E2E_SIGNUP_INBOX="$E2E_MAILBOX_USERNAME" \
+E2E_MAILBOX_PASSWORD="$E2E_MAILBOX_PASSWORD" \
+npm run test:lifecycle -- --headed --workers=1
+
 ```
 
 Use only a disposable test inbox and namespace. The lifecycle test is independent of the other specs so its
