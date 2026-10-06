@@ -83,6 +83,9 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
   const email = signupInbox
     ? plusAddress(signupInbox, uniqueSuffix)
     : configuredSignupEmail!;
+  const clientId = `e2e-lifecycle-client-${uniqueSuffix}`;
+  const clientSecret = `e2e-lifecycle-secret-${uniqueSuffix}`;
+  const roleName = `E2E Lifecycle Role ${uniqueSuffix}`;
   const mailbox = mailboxConfigFromEnv(signupInbox ?? email);
   const startedAt = new Date();
   test.setTimeout((mailbox?.timeoutMs ?? 120_000) * 3 + 90_000);
@@ -148,6 +151,40 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
       await expect(page.getByRole("heading", { name: "Client Update Page" })).toBeVisible();
       await pauseWithCountdown(page, "Showing the first existing client.", stepDelayMs);
     }
+
+    await page.getByRole("link", { name: "Create Client", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/clients\/createForm/);
+    await page.locator("#clientId").fill(clientId);
+    await page.locator("#clientSecret").fill(clientSecret);
+    await page.locator("#redirectUris").fill("https://example.com/callback");
+    await page.locator("#postLogoutRedirectUris").fill("https://example.com/callback");
+    const customScopes = page.locator("input[name='customScopes']");
+    if (await customScopes.count()) {
+      await customScopes.fill("message.read,message.write");
+    }
+    await page.locator("input[name='clientAuthenticationMethods'][value='CLIENT_SECRET_BASIC']").check();
+    await page.locator("input[name='authorizationGrantTypes'][value='CLIENT_CREDENTIALS']").check();
+    await page.locator("input[name='authorizationGrantTypes'][value='AUTHORIZATION_CODE']").check();
+    await page.locator("input[name='scopes'][value='OPENID']").check();
+    await page.locator("input[name='scopes'][value='PROFILE']").check();
+    await page.locator("form button[type='submit']").first().click();
+    await expect(page.locator("body")).toContainText(/Client created successfully/i);
+    await pauseWithCountdown(page, "Showing the newly created client.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Organizations", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations(?:\?.*)?$/);
+    const organization = page.locator("ol.list-group li a").first();
+    await expect(organization).toBeVisible();
+    await organization.click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+$/);
+    await page.getByRole("link", { name: /Roles$/ }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+\/roles(?:\?.*)?$/);
+    await page.getByRole("link", { name: "Create role", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+\/roles\/new$/);
+    await page.locator("#name").fill(roleName);
+    await page.getByRole("button", { name: "Save role", exact: true }).click();
+    await expect(page.locator("body")).toContainText(roleName);
+    await pauseWithCountdown(page, "Showing the newly created organization role.", stepDelayMs);
 
     await page.getByRole("link", { name: "Your Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/user\/profile/);
