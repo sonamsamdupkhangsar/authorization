@@ -195,5 +195,15 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     expect((await deletion).ok(), "Delete-my-account request failed").toBe(true);
     await loggedOut;
     await pauseWithCountdown(page, "The profile was deleted and the session logged out.", stepDelayMs);
+
+    await page.goto(new URL("/admin/dashboard", admin).toString());
+    await expect(page).toHaveURL(new RegExp(`^${issuer.origin.replaceAll(".", "\\.")}/`));
+    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+    await page.locator("#username").fill(username);
+    await page.locator("#password").fill(signupPassword);
+    await page.locator("#submit").click();
+    await expect(page).toHaveURL(/\/oauth2-login-error(?:\?.*)?$/);
+    await expect(page.locator("body")).toContainText(/login error|could not be completed/i);
+    await pauseWithCountdown(page, "The deleted user's credentials were rejected as expected.", stepDelayMs);
   });
 });
