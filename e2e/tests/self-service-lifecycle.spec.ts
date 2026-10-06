@@ -86,6 +86,10 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
   const clientId = `e2e-lifecycle-client-${uniqueSuffix}`;
   const clientSecret = `e2e-lifecycle-secret-${uniqueSuffix}`;
   const roleName = `E2E Lifecycle Role ${uniqueSuffix}`;
+  const managedUserEmail = signupInbox
+    ? plusAddress(signupInbox, `managed-${uniqueSuffix}`)
+    : `e2e-managed-${uniqueSuffix}@example.com`;
+  const managedUserPassword = `Managed-User-${uniqueSuffix}`;
   const mailbox = mailboxConfigFromEnv(signupInbox ?? email);
   const startedAt = new Date();
   test.setTimeout((mailbox?.timeoutMs ?? 120_000) * 3 + 90_000);
@@ -194,6 +198,20 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.getByRole("link", { name: "Details", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+$/);
     await pauseWithCountdown(page, "Returning to the organization details page.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Add User", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/users(?:\?.*)?$/);
+    await page.locator("#firstName").fill("E2E Managed");
+    await page.locator("#lastName").fill("User");
+    await page.locator("#email").fill(managedUserEmail);
+    await page.locator("#email").dispatchEvent("change");
+    await expect(page.locator("#authenticationId")).toHaveValue(managedUserEmail);
+    await page.locator("#setPassword").check();
+    await page.locator("#password").fill(managedUserPassword);
+    await page.locator("#active").check();
+    await page.locator("#submit").click();
+    await expect(page.locator("body")).toContainText(/User Signup Success/i);
+    await pauseWithCountdown(page, "Showing the user created through the admin form.", stepDelayMs);
 
     await page.getByRole("link", { name: "Add User", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/organizations\/users(?:\?.*)?$/);
