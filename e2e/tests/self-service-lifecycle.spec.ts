@@ -183,7 +183,8 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+\/roles\/new$/);
     await page.locator("#name").fill(roleName);
     await page.getByRole("button", { name: "Save role", exact: true }).click();
-    await expect(page.locator("body")).toContainText(roleName);
+    await expect(page.locator("body")).toContainText(/role updated/i);
+    await expect(page.locator("#name")).toHaveValue(roleName);
     await pauseWithCountdown(page, "Showing the newly created organization role.", stepDelayMs);
 
     await page.getByRole("link", { name: "Your Profile", exact: true }).click();
