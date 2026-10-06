@@ -11,6 +11,7 @@ const signupInbox = process.env.E2E_SIGNUP_INBOX;
 const configuredSignupEmail = process.env.E2E_SIGNUP_EMAIL;
 const signupPassword = process.env.E2E_SIGNUP_PASSWORD ?? "OpenIssuer-Test-42";
 const emailCooldownMs = Number(process.env.E2E_EMAIL_COOLDOWN_MS ?? "11000");
+const stepDelayMs = Number(process.env.E2E_STEP_DELAY_MS ?? "3000");
 
 test.skip(
   process.env.E2E_SELF_SERVICE_LIFECYCLE !== "true"
@@ -27,6 +28,10 @@ function plusAddress(email: string, suffix: string): string {
     throw new Error("E2E_SIGNUP_INBOX must be a valid email address.");
   }
   return `${email.slice(0, separator)}+${suffix}${email.slice(separator)}`;
+}
+
+async function pauseBetweenActions(): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, stepDelayMs));
 }
 
 async function signInToAdmin(
@@ -69,12 +74,14 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("#submitButton").click();
     await expect(page.getByText(/your signup was successful/i)).toBeVisible();
     await expect(page.getByText(/check your email/i)).toBeVisible();
+    await pauseBetweenActions();
 
     const message = await waitForActivationLink(email, startedAt, mailbox!);
     expect(message.activationUrl).toBeTruthy();
     const response = await page.goto(message.activationUrl!);
     expect(response?.ok(), `Activation request failed for ${email}`).toBe(true);
     await expect(page).toHaveURL(/\/accounts\/active\/password-secret\//);
+    await pauseBetweenActions();
   });
 
   await test.step("Exercise username and password email self-service", async () => {
@@ -84,6 +91,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("#emailAddress").fill(email);
     await page.locator("#emailUsername").click();
     await expect(page.getByText(/username has been sent/i)).toBeVisible();
+    await pauseBetweenActions();
     await waitForNewestMessage(email, usernameRequestAt, mailbox!);
 
     await page.waitForTimeout(emailCooldownMs);
@@ -92,6 +100,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("#email").fill(email);
     await page.locator("#changePassword").click();
     await expect(page.getByText(/check your email for changing your password/i)).toBeVisible();
+    await pauseBetweenActions();
     await waitForNewestMessage(email, passwordRequestAt, mailbox!);
   });
 
@@ -100,6 +109,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.getByRole("link", { name: "Your Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/user\/profile/);
     await expect(page.locator("#authenticationId")).toHaveValue(username);
+    await pauseBetweenActions();
   });
 
   await test.step("Delete the signed-in user's profile last", async () => {
@@ -115,5 +125,6 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.getByRole("button", { name: "Delete my account" }).click();
     expect((await deletion).ok(), "Delete-my-account request failed").toBe(true);
     await loggedOut;
+    await pauseBetweenActions();
   });
 });
