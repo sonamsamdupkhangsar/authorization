@@ -30,8 +30,32 @@ function plusAddress(email: string, suffix: string): string {
   return `${email.slice(0, separator)}+${suffix}${email.slice(separator)}`;
 }
 
-async function pauseBetweenActions(): Promise<void> {
-  await new Promise(resolve => setTimeout(resolve, stepDelayMs));
+async function pauseWithCountdown(page: Page, reason: string, durationMs: number): Promise<void> {
+  await page.evaluate(({ reason: message, seconds }) => {
+    const existing = document.getElementById("e2e-countdown");
+    existing?.remove();
+    const banner = document.createElement("div");
+    banner.id = "e2e-countdown";
+    banner.style.cssText = [
+      "position:fixed", "top:16px", "left:50%", "transform:translateX(-50%)",
+      "z-index:2147483647", "padding:14px 20px", "border-radius:8px",
+      "background:#172554", "color:#fff", "font:16px sans-serif",
+      "box-shadow:0 4px 16px #0006", "text-align:center",
+    ].join(";");
+    banner.innerHTML = `<strong>Playwright is pausing</strong><br>${message}<br><span id="e2e-countdown-seconds">${seconds}</span> seconds remaining`;
+    document.body.appendChild(banner);
+  }, { reason, seconds: Math.ceil(durationMs / 1000) });
+
+  const end = Date.now() + durationMs;
+  while (Date.now() < end) {
+    const seconds = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+    await page.evaluate(value => {
+      const element = document.getElementById("e2e-countdown-seconds");
+      if (element) element.textContent = String(value);
+    }, seconds);
+    await new Promise(resolve => setTimeout(resolve, Math.min(1_000, end - Date.now())));
+  }
+  await page.evaluate(() => document.getElementById("e2e-countdown")?.remove());
 }
 
 async function signInToAdmin(
@@ -74,33 +98,33 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("#submitButton").click();
     await expect(page.getByText(/your signup was successful/i)).toBeVisible();
     await expect(page.getByText(/check your email/i)).toBeVisible();
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "Showing the signup result before checking the activation email.", stepDelayMs);
 
     const message = await waitForActivationLink(email, startedAt, mailbox!);
     expect(message.activationUrl).toBeTruthy();
     const response = await page.goto(message.activationUrl!);
     expect(response?.ok(), `Activation request failed for ${email}`).toBe(true);
     await expect(page).toHaveURL(/\/accounts\/active\/password-secret\//);
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "The account is activated; pausing before the next self-service action.", stepDelayMs);
   });
 
   await test.step("Exercise username and password email self-service", async () => {
-    await page.waitForTimeout(emailCooldownMs);
+    await pauseWithCountdown(page, "Waiting for the email anti-spam cooldown before requesting the username email.", emailCooldownMs);
     const usernameRequestAt = new Date();
     await page.goto(new URL("/username", issuer).toString());
     await page.locator("#emailAddress").fill(email);
     await page.locator("#emailUsername").click();
     await expect(page.getByText(/username has been sent/i)).toBeVisible();
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "Showing the username-email result before requesting another email.", stepDelayMs);
     await waitForNewestMessage(email, usernameRequestAt, mailbox!);
 
-    await page.waitForTimeout(emailCooldownMs);
+    await pauseWithCountdown(page, "Waiting for the email anti-spam cooldown before requesting the password-reset email.", emailCooldownMs);
     const passwordRequestAt = new Date();
     await page.goto(new URL("/password", issuer).toString());
     await page.locator("#email").fill(email);
     await page.locator("#changePassword").click();
     await expect(page.getByText(/check your email for changing your password/i)).toBeVisible();
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "Showing the password-reset request result before signing in.", stepDelayMs);
     await waitForNewestMessage(email, passwordRequestAt, mailbox!);
   });
 
@@ -109,7 +133,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.getByRole("link", { name: "Your Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/user\/profile/);
     await expect(page.locator("#authenticationId")).toHaveValue(username);
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "Showing the signed-in user's profile before deletion.", stepDelayMs);
   });
 
   await test.step("Delete the signed-in user's profile last", async () => {
@@ -125,6 +149,6 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.getByRole("button", { name: "Delete my account" }).click();
     expect((await deletion).ok(), "Delete-my-account request failed").toBe(true);
     await loggedOut;
-    await pauseBetweenActions();
+    await pauseWithCountdown(page, "The profile was deleted and the session logged out.", stepDelayMs);
   });
 });
