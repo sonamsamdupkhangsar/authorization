@@ -136,6 +136,51 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await pauseWithCountdown(page, "Showing the signed-in user's profile before deletion.", stepDelayMs);
   });
 
+  await test.step("Exercise the admin clients and passkeys navigation", async () => {
+    await page.getByRole("link", { name: "Clients", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/clients(?:\?.*)?$/);
+    await pauseWithCountdown(page, "Showing the admin clients list.", stepDelayMs);
+
+    const firstClient = page.locator("ol.list-group li a").first();
+    if (await firstClient.count()) {
+      await firstClient.click();
+      await expect(page).toHaveURL(/\/admin\/clients\/[0-9a-f-]+(?:\?.*)?$/);
+      await expect(page.getByRole("heading", { name: "Client Update Page" })).toBeVisible();
+      await pauseWithCountdown(page, "Showing the first existing client.", stepDelayMs);
+    }
+
+    await page.getByRole("link", { name: "Your Profile", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/user\/profile/);
+    await page.getByRole("link", { name: "Passkeys", exact: true }).click();
+    await expect(page).toHaveURL(url =>
+      url.origin === issuer.origin
+      && url.pathname === "/issuer/mfa/passkeys"
+      && url.searchParams.get("return_url") === new URL("/admin/user/profile", admin).toString(),
+    );
+    await expect(page.getByRole("heading", { name: /Passkeys$/ })).toBeVisible();
+    await pauseWithCountdown(page, "Showing the issuer passkeys page.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Profile", exact: true }).click();
+    await expect(page).toHaveURL(url =>
+      url.origin === issuer.origin
+      && url.pathname === "/account/profile"
+      && url.searchParams.get("return_url") === new URL("/admin/user/profile", admin).toString(),
+    );
+    await pauseWithCountdown(page, "Showing the issuer account profile page.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Passkeys", exact: true }).click();
+    await expect(page).toHaveURL(url =>
+      url.origin === issuer.origin
+      && url.pathname === "/mfa/passkeys"
+      && url.searchParams.get("return_url") === new URL("/admin/user/profile", admin).toString(),
+    );
+    await pauseWithCountdown(page, "Showing passkeys from the issuer account profile.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Back to admin" }).click();
+    await expect(page).toHaveURL(/\/admin\/user\/profile/);
+    await pauseWithCountdown(page, "Returned to the admin profile before deletion.", stepDelayMs);
+  });
+
   await test.step("Delete the signed-in user's profile last", async () => {
     page.on("dialog", async dialog => dialog.accept());
     const deletion = page.waitForResponse(response =>
