@@ -2,16 +2,23 @@ import { expect, Page, test } from "@playwright/test";
 
 const issuerUrl = process.env.E2E_ISSUER_URL;
 const adminUrl = process.env.E2E_ADMIN_URL;
-const username = process.env.E2E_USERNAME;
-const password = process.env.E2E_PASSWORD;
+const username = process.env.E2E_USERNAME ?? process.env.E2E_SIGNUP_USERNAME;
+const password = process.env.E2E_PASSWORD ?? process.env.E2E_SIGNUP_PASSWORD;
+const stepDelayMs = Number(process.env.E2E_STEP_DELAY_MS ?? "0");
 
 test.skip(
   !issuerUrl || !adminUrl || !username || !password,
-  "Set E2E_ISSUER_URL, E2E_ADMIN_URL, E2E_USERNAME, and E2E_PASSWORD.",
+  "Set E2E_ISSUER_URL, E2E_ADMIN_URL, and either E2E_USERNAME/E2E_PASSWORD or E2E_SIGNUP_USERNAME/E2E_SIGNUP_PASSWORD.",
 );
 
 function escapedPath(path: string): RegExp {
   return new RegExp(`${path.replaceAll("/", "\\/")}(?:\\?.*)?$`);
+}
+
+async function pauseBetweenActions(): Promise<void> {
+  if (stepDelayMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, stepDelayMs));
+  }
 }
 
 async function expectApplicationPage(page: Page): Promise<void> {
@@ -19,33 +26,37 @@ async function expectApplicationPage(page: Page): Promise<void> {
   await expect(page.locator("body")).not.toContainText("Internal Server Error");
 }
 
+async function signInToAdmin(page: Page, issuer: URL, admin: URL): Promise<void> {
+  await page.goto(new URL("/admin/dashboard", admin).toString());
+  await expect(page).toHaveURL(new RegExp(`^${issuer.origin.replaceAll(".", "\\.")}/`));
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
+
+  await page.locator("#username").fill(username!);
+  await page.locator("#password").fill(password!);
+  const submit = page.locator("#submit");
+  await expect(submit).toBeEnabled();
+  await submit.click();
+
+  const passkeyChallenge = page.getByRole("heading", { name: "Verify your passkey" });
+  if (await passkeyChallenge.isVisible().catch(() => false)) {
+    throw new Error(
+      "The E2E account requires passkey MFA. Use a dedicated test account without an enrolled physical passkey.",
+    );
+  }
+
+  await expect(page).toHaveURL(new RegExp(`^${admin.origin.replaceAll(".", "\\.")}/admin/dashboard`));
+  await expect(
+    page.getByRole("heading", { name: "Manage tenant authorization." }),
+  ).toBeVisible();
+  await pauseBetweenActions();
+}
+
 test("admin login, clients, profile, and passkeys navigation", async ({ page }) => {
   const issuer = new URL(issuerUrl!);
   const admin = new URL(adminUrl!);
 
   await test.step("Sign in to the tenant admin application", async () => {
-    await page.goto(new URL("/admin/dashboard", admin).toString());
-
-    await expect(page).toHaveURL(new RegExp(`^${issuer.origin.replaceAll(".", "\\.")}/`));
-    await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
-
-    await page.locator("#username").fill(username!);
-    await page.locator("#password").fill(password!);
-    const submit = page.locator("#submit");
-    await expect(submit).toBeEnabled();
-    await submit.click();
-
-    const passkeyChallenge = page.getByRole("heading", { name: "Verify your passkey" });
-    if (await passkeyChallenge.isVisible().catch(() => false)) {
-      throw new Error(
-        "The E2E account requires passkey MFA. Use a dedicated test account without an enrolled physical passkey.",
-      );
-    }
-
-    await expect(page).toHaveURL(new RegExp(`^${admin.origin.replaceAll(".", "\\.")}/admin/dashboard`));
-    await expect(
-      page.getByRole("heading", { name: "Manage tenant authorization." }),
-    ).toBeVisible();
+    await signInToAdmin(page, issuer, admin);
     await expectApplicationPage(page);
   });
 
@@ -54,6 +65,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
     await expect(page).toHaveURL(escapedPath("/admin/clients"));
     await expect(page.locator('.admin-sidebar a.active')).toHaveText("Clients");
     await expectApplicationPage(page);
+    await pauseBetweenActions();
 
     const firstClient = page.locator("ol.list-group li a").first();
     if (await firstClient.count()) {
@@ -64,6 +76,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
       ).toBeVisible();
       await expect(page.getByRole("textbox", { name: "Client id" })).toBeVisible();
       await expectApplicationPage(page);
+      await pauseBetweenActions();
     }
   });
 
@@ -72,6 +85,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
     await expect(page).toHaveURL(escapedPath("/admin/user/profile"));
     await expect(page.locator("#authenticationId")).toHaveValue(username!);
     await expectApplicationPage(page);
+    await pauseBetweenActions();
   });
 
   await test.step("Open Passkeys through the issuer route", async () => {
@@ -86,6 +100,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
     await expect(page.locator("#registerPasskey")).toBeVisible();
     await expect(page.getByRole("link", { name: "Back to admin" })).toBeVisible();
     await expectApplicationPage(page);
+    await pauseBetweenActions();
   });
 
   await test.step("Preserve the admin return URL across issuer tabs", async () => {
@@ -105,6 +120,7 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
       && url.searchParams.get("return_url") === new URL("/admin/user/profile", admin).toString()
     );
     await expectApplicationPage(page);
+    await pauseBetweenActions();
   });
 
   await test.step("Return to AuthzManager", async () => {
@@ -112,5 +128,37 @@ test("admin login, clients, profile, and passkeys navigation", async ({ page }) 
     await expect(page).toHaveURL(escapedPath("/admin/user/profile"));
     await expect(page.locator("#authenticationId")).toHaveValue(username!);
     await expectApplicationPage(page);
+    await pauseBetweenActions();
+  });
+});
+
+test.describe("destructive account self-service", () => {
+  test.skip(
+    process.env.E2E_DELETE_ACCOUNT !== "true",
+    "Set E2E_DELETE_ACCOUNT=true with a disposable user account.",
+  );
+
+  test("deletes the signed-in user's data", async ({ page }) => {
+    const issuer = new URL(issuerUrl!);
+    const admin = new URL(adminUrl!);
+    await signInToAdmin(page, issuer, admin);
+
+    page.on("dialog", async dialog => {
+      await dialog.accept();
+    });
+
+    const deletion = page.waitForResponse(response =>
+      response.request().method() === "DELETE"
+      && response.url().includes("/admin/users/delete"),
+    );
+    const loggedOut = page.waitForURL(url =>
+      url.origin !== admin.origin || !url.pathname.startsWith("/admin/"),
+    );
+    await page.goto(new URL("/admin/users/delete", admin).toString());
+    await page.getByRole("button", { name: "Delete my account" }).click();
+
+    expect((await deletion).ok(), "Delete-my-account request failed").toBe(true);
+    await loggedOut;
+    await pauseBetweenActions();
   });
 });
