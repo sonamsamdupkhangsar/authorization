@@ -10,6 +10,7 @@ const adminUrl = process.env.E2E_ADMIN_URL;
 const signupInbox = process.env.E2E_SIGNUP_INBOX;
 const configuredSignupEmail = process.env.E2E_SIGNUP_EMAIL;
 const signupPassword = process.env.E2E_SIGNUP_PASSWORD ?? "OpenIssuer-Test-42";
+const emailCooldownMs = Number(process.env.E2E_EMAIL_COOLDOWN_MS ?? "11000");
 
 test.skip(
   process.env.E2E_SELF_SERVICE_LIFECYCLE !== "true"
@@ -77,6 +78,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
   });
 
   await test.step("Exercise username and password email self-service", async () => {
+    await page.waitForTimeout(emailCooldownMs);
     const usernameRequestAt = new Date();
     await page.goto(new URL("/username", issuer).toString());
     await page.locator("#emailAddress").fill(email);
@@ -84,6 +86,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await expect(page.getByText(/username has been sent/i)).toBeVisible();
     await waitForNewestMessage(email, usernameRequestAt, mailbox!);
 
+    await page.waitForTimeout(emailCooldownMs);
     const passwordRequestAt = new Date();
     await page.goto(new URL("/password", issuer).toString());
     await page.locator("#email").fill(email);
