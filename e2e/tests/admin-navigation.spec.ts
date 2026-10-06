@@ -2,13 +2,13 @@ import { expect, Page, test } from "@playwright/test";
 
 const issuerUrl = process.env.E2E_ISSUER_URL;
 const adminUrl = process.env.E2E_ADMIN_URL;
-const username = process.env.E2E_USERNAME;
-const password = process.env.E2E_PASSWORD;
+const username = process.env.E2E_USERNAME ?? process.env.E2E_SIGNUP_USERNAME;
+const password = process.env.E2E_PASSWORD ?? process.env.E2E_SIGNUP_PASSWORD;
 const stepDelayMs = Number(process.env.E2E_STEP_DELAY_MS ?? "0");
 
 test.skip(
   !issuerUrl || !adminUrl || !username || !password,
-  "Set E2E_ISSUER_URL, E2E_ADMIN_URL, E2E_USERNAME, and E2E_PASSWORD.",
+  "Set E2E_ISSUER_URL, E2E_ADMIN_URL, and either E2E_USERNAME/E2E_PASSWORD or E2E_SIGNUP_USERNAME/E2E_SIGNUP_PASSWORD.",
 );
 
 function escapedPath(path: string): RegExp {
