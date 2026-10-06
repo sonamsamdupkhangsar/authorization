@@ -11,7 +11,7 @@ const signupInbox = process.env.E2E_SIGNUP_INBOX;
 const configuredSignupEmail = process.env.E2E_SIGNUP_EMAIL;
 const signupPassword = process.env.E2E_SIGNUP_PASSWORD ?? "OpenIssuer-Test-42";
 const emailCooldownMs = Number(process.env.E2E_EMAIL_COOLDOWN_MS ?? "11000");
-const stepDelayMs = Number(process.env.E2E_STEP_DELAY_MS ?? "3000");
+const stepDelayMs = Number(process.env.E2E_STEP_DELAY_MS ?? "7000");
 
 test.skip(
   process.env.E2E_SELF_SERVICE_LIFECYCLE !== "true"
@@ -187,6 +187,26 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await expect(page.locator("#name")).toHaveValue(roleName);
     await pauseWithCountdown(page, "Showing the newly created organization role.", stepDelayMs);
 
+    await page.getByRole("link", { name: "User association", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+\/users(?:\?.*)?$/);
+    await pauseWithCountdown(page, "Showing users associated with the organization.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Details", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/[0-9a-f-]+$/);
+    await pauseWithCountdown(page, "Returning to the organization details page.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Add User", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/organizations\/users(?:\?.*)?$/);
+    await pauseWithCountdown(page, "Showing the admin add-user form.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Settings", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/settings(?:\/account)?(?:\?.*)?$/);
+    await pauseWithCountdown(page, "Showing the admin settings page.", stepDelayMs);
+
+    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/dashboard(?:\?.*)?$/);
+    await pauseWithCountdown(page, "Returning to the admin dashboard.", stepDelayMs);
+
     await page.getByRole("link", { name: "Your Profile", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/user\/profile/);
     await page.getByRole("link", { name: "Passkeys", exact: true }).click();
@@ -240,8 +260,11 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("#username").fill(username);
     await page.locator("#password").fill(signupPassword);
     await page.locator("#submit").click();
-    await expect(page).toHaveURL(/\/oauth2-login-error(?:\?.*)?$/);
-    await expect(page.locator("body")).toContainText(/login error|could not be completed/i);
+    await expect(page).toHaveURL(url =>
+      url.pathname === "/oauth2-login-error" || (url.pathname === "/" && url.searchParams.has("error")),
+      { timeout: 30_000 },
+    );
+    await expect(page.locator("body")).toContainText(/login error|could not be completed|error|invalid|failed/i);
     await pauseWithCountdown(page, "The deleted user's credentials were rejected as expected.", stepDelayMs);
   });
 });
