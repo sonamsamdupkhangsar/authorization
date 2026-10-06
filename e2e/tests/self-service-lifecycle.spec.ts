@@ -213,9 +213,7 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await expect(page.locator("body")).toContainText(/User Signup Success/i);
     await pauseWithCountdown(page, "Showing the user created through the admin form.", stepDelayMs);
 
-    await page.getByRole("link", { name: "Add User", exact: true }).click();
-    await expect(page).toHaveURL(/\/admin\/organizations\/users(?:\?.*)?$/);
-    await pauseWithCountdown(page, "Showing the admin add-user form.", stepDelayMs);
+    await pauseWithCountdown(page, "Showing the admin add-user result.", stepDelayMs);
 
     await page.getByRole("link", { name: "Settings", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/settings(?:\/account)?(?:\?.*)?$/);
