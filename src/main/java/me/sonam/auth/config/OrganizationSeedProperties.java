@@ -9,7 +9,6 @@ import java.util.UUID;
 @ConfigurationProperties(prefix = "organization-seed")
 public class OrganizationSeedProperties {
     private long delaySeconds = 120;
-    private final List<SeedUser> users = new ArrayList<>();
     private final List<SeedOrganization> organizations = new ArrayList<>();
 
     public long getDelaySeconds() {
@@ -18,10 +17,6 @@ public class OrganizationSeedProperties {
 
     public void setDelaySeconds(long delaySeconds) {
         this.delaySeconds = delaySeconds;
-    }
-
-    public List<SeedUser> getUsers() {
-        return users;
     }
 
     public List<SeedOrganization> getOrganizations() {
@@ -108,6 +103,7 @@ public class OrganizationSeedProperties {
         private UUID creatorUserId;
         private String creatorAuthenticationId;
         private String subdomain;
+        private final List<SeedUser> users = new ArrayList<>();
 
         public String getName() {
             return name;
@@ -139,6 +135,10 @@ public class OrganizationSeedProperties {
 
         public void setSubdomain(String subdomain) {
             this.subdomain = subdomain;
+        }
+
+        public List<SeedUser> getUsers() {
+            return users;
         }
     }
 }

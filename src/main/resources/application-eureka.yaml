@@ -143,62 +143,61 @@ tenant-secrets:
 
 organization-seed:
   delay-seconds: 120
-  users:
-    - firstName: Business
-      lastName: One
-      email: owner1@openissuer.test
-      authenticationId: owner1@openissuer.test
-      password: owner1-secret
-      active: true
-    - firstName: Business
-      lastName: One User
-      email: business1user@openissuer.test
-      authenticationId: business1user@openissuer.test
-      password: business1user-secret
-      active: true
-      organizationSubdomain: business1.openissuer.test
-    - firstName: Business
-      lastName: Two
-      email: owner2@openissuer.test
-      authenticationId: owner2@openissuer.test
-      password: owner2-secret
-      active: true
-    - firstName: Business
-      lastName: Two User
-      email: business2user@openissuer.test
-      authenticationId: business2user@openissuer.test
-      password: business2user-secret
-      active: true
-      organizationSubdomain: business2.openissuer.test
-    - firstName: Free
-      lastName: User
-      email: freeuser@openissuer.test
-      authenticationId: freeuser@openissuer.test
-      password: freeuser-secret
-      active: true
-      organizationSubdomain: free.openissuer.test
-      subdomainAdmin: true
-    - firstName: Demo
-      lastName: Administrator
-      email: demo@openissuer.test
-      authenticationId: demo@openissuer.test
-      password: ${DEMO_USER_PASSWORD}
-      active: true
-      organizationSubdomain: demo.openissuer.test
-      subdomainAdmin: false
   organizations:
     - name: Business 1
       creatorAuthenticationId: owner1@openissuer.test
       subdomain: business1.openissuer.test
+      users:
+        - firstName: Business
+          lastName: One
+          email: owner1@openissuer.test
+          authenticationId: owner1@openissuer.test
+          password: owner1-secret
+          active: true
+        - firstName: Business
+          lastName: One User
+          email: business1user@openissuer.test
+          authenticationId: business1user@openissuer.test
+          password: business1user-secret
+          active: true
     - name: Business 2
       creatorAuthenticationId: owner2@openissuer.test
       subdomain: business2.openissuer.test
+      users:
+        - firstName: Business
+          lastName: Two
+          email: owner2@openissuer.test
+          authenticationId: owner2@openissuer.test
+          password: owner2-secret
+          active: true
+        - firstName: Business
+          lastName: Two User
+          email: business2user@openissuer.test
+          authenticationId: business2user@openissuer.test
+          password: business2user-secret
+          active: true
     - name: Free
       creatorAuthenticationId: freeuser@openissuer.test
       subdomain: free.openissuer.test
+      users:
+        - firstName: Free
+          lastName: User
+          email: freeuser@openissuer.test
+          authenticationId: freeuser@openissuer.test
+          password: freeuser-secret
+          active: true
+          subdomainAdmin: true
     - name: OpenIssuer Demo
       creatorAuthenticationId: demo@openissuer.test
       subdomain: demo.openissuer.test
+      users:
+        - firstName: Demo
+          lastName: Administrator
+          email: demo@openissuer.test
+          authenticationId: demo@openissuer.test
+          password: ${DEMO_USER_PASSWORD}
+          active: true
+          subdomainAdmin: false
 
 client-limits:
   hosts:
