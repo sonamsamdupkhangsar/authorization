@@ -18,6 +18,8 @@ import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -47,7 +49,7 @@ public class OrganizationSeedSetup {
     // and service discovery time to stabilize before making remote seed calls.
     @EventListener(ApplicationReadyEvent.class)
     public void scheduleSeeding() {
-        if (organizationSeedProperties.getUsers().isEmpty() && organizationSeedProperties.getOrganizations().isEmpty()) {
+        if (getSeedUsers().isEmpty() && organizationSeedProperties.getOrganizations().isEmpty()) {
             LOG.info("organization seeding skipped because no seed users or organizations are configured");
             return;
         }
@@ -62,7 +64,8 @@ public class OrganizationSeedSetup {
     // already exist in organization-rest-service.
     public void seedOrganizations() {
         LOG.info("seeding organizations");
-        Map<String, UUID> seededUsers = seedUsers();
+        List<OrganizationSeedProperties.SeedUser> seedUsers = getSeedUsers();
+        Map<String, UUID> seededUsers = seedUsers(seedUsers);
 
         organizationSeedProperties.getOrganizations().forEach(seedOrganization -> {
             if (!StringUtils.hasText(seedOrganization.getSubdomain())) {
@@ -97,15 +100,27 @@ public class OrganizationSeedSetup {
                     .block();
         });
 
-        attachSeedUsersToOrganizationsAsOrgAdmins(seededUsers);
+        attachSeedUsersToOrganizationsAsOrgAdmins(seedUsers, seededUsers);
     }
 
     // Ensures each configured bootstrap user exists and returns a lookup map that later seed
     // organizations can use to resolve creatorAuthenticationId to a real user id.
-    private Map<String, UUID> seedUsers() {
+    private List<OrganizationSeedProperties.SeedUser> getSeedUsers() {
+        List<OrganizationSeedProperties.SeedUser> seedUsers = new ArrayList<>(organizationSeedProperties.getUsers());
+        organizationSeedProperties.getOrganizations().forEach(organization ->
+                organization.getUsers().forEach(user -> {
+                    if (!StringUtils.hasText(user.getOrganizationSubdomain())) {
+                        user.setOrganizationSubdomain(organization.getSubdomain());
+                    }
+                    seedUsers.add(user);
+                }));
+        return seedUsers;
+    }
+
+    private Map<String, UUID> seedUsers(List<OrganizationSeedProperties.SeedUser> seedUsers) {
         Map<String, UUID> seededUsers = new HashMap<>();
 
-        organizationSeedProperties.getUsers().forEach(seedUser -> {
+        seedUsers.forEach(seedUser -> {
             if (!StringUtils.hasText(seedUser.getAuthenticationId())) {
                 LOG.info("skipping seed user without authenticationId");
                 return;
@@ -139,8 +154,9 @@ public class OrganizationSeedSetup {
      *   -> make Business 2 the user's default organization
      *   -> allow login at business2.admin.openissuer.test
      */
-    private void attachSeedUsersToOrganizationsAsOrgAdmins(Map<String, UUID> seededUsers) {
-        organizationSeedProperties.getUsers().forEach(seedUser -> {
+    private void attachSeedUsersToOrganizationsAsOrgAdmins(List<OrganizationSeedProperties.SeedUser> seedUsers,
+                                                           Map<String, UUID> seededUsers) {
+        seedUsers.forEach(seedUser -> {
             if (!StringUtils.hasText(seedUser.getOrganizationSubdomain())) {
                 return;
             }

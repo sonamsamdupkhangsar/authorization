@@ -108,6 +108,7 @@ public class OrganizationSeedProperties {
         private UUID creatorUserId;
         private String creatorAuthenticationId;
         private String subdomain;
+        private final List<SeedUser> users = new ArrayList<>();
 
         public String getName() {
             return name;
@@ -139,6 +140,10 @@ public class OrganizationSeedProperties {
 
         public void setSubdomain(String subdomain) {
             this.subdomain = subdomain;
+        }
+
+        public List<SeedUser> getUsers() {
+            return users;
         }
     }
 }
