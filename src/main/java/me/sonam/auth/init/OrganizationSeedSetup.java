@@ -106,7 +106,7 @@ public class OrganizationSeedSetup {
     // Ensures each configured bootstrap user exists and returns a lookup map that later seed
     // organizations can use to resolve creatorAuthenticationId to a real user id.
     private List<OrganizationSeedProperties.SeedUser> getSeedUsers() {
-        List<OrganizationSeedProperties.SeedUser> seedUsers = new ArrayList<>(organizationSeedProperties.getGlobalUsers());
+        List<OrganizationSeedProperties.SeedUser> seedUsers = new ArrayList<>();
         organizationSeedProperties.getOrganizations().forEach(organization ->
                 organization.getUsers().forEach(user -> {
                     if (!StringUtils.hasText(user.getOrganizationSubdomain())) {
