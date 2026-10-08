@@ -143,7 +143,7 @@ tenant-secrets:
 
 organization-seed:
   delay-seconds: 120
-  users:
+  global-users:
     - firstName: Business
       lastName: One
       email: owner1@openissuer.test

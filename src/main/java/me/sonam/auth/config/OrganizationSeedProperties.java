@@ -9,7 +9,7 @@ import java.util.UUID;
 @ConfigurationProperties(prefix = "organization-seed")
 public class OrganizationSeedProperties {
     private long delaySeconds = 120;
-    private final List<SeedUser> users = new ArrayList<>();
+    private final List<SeedUser> globalUsers = new ArrayList<>();
     private final List<SeedOrganization> organizations = new ArrayList<>();
 
     public long getDelaySeconds() {
@@ -20,8 +20,8 @@ public class OrganizationSeedProperties {
         this.delaySeconds = delaySeconds;
     }
 
-    public List<SeedUser> getUsers() {
-        return users;
+    public List<SeedUser> getGlobalUsers() {
+        return globalUsers;
     }
 
     public List<SeedOrganization> getOrganizations() {
