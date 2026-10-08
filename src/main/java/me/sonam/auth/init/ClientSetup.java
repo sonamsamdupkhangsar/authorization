@@ -62,8 +62,8 @@ public class ClientSetup {
     @Value("${TENANT_PORTAL_CLIENT_SECRET:}")
     private String tenantPortalClientSecret;
 
-    @Value("${TENANT_PORTAL_BASE_URI:}")
-    private String tenantPortalBaseUri;
+    @Value("${TENANT_PORTAL_REDIRECT_URI:}")
+    private String tenantPortalRedirectUri;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -91,26 +91,20 @@ public class ClientSetup {
     private void seedTenantPortalClient() {
         if (!StringUtils.hasText(tenantPortalClientId)
                 && !StringUtils.hasText(tenantPortalClientSecret)
-                && !StringUtils.hasText(tenantPortalBaseUri)) {
+                && !StringUtils.hasText(tenantPortalRedirectUri)) {
             return;
         }
         if (!StringUtils.hasText(tenantPortalClientId)
                 || !StringUtils.hasText(tenantPortalClientSecret)
-                || !StringUtils.hasText(tenantPortalBaseUri)) {
+                || !StringUtils.hasText(tenantPortalRedirectUri)) {
             throw new IllegalStateException(
-                    "TENANT_PORTAL_CLIENT_ID, TENANT_PORTAL_CLIENT_SECRET, and TENANT_PORTAL_BASE_URI must be configured together");
+                    "TENANT_PORTAL_CLIENT_ID, TENANT_PORTAL_CLIENT_SECRET, and TENANT_PORTAL_REDIRECT_URI must be configured together");
         }
 
-        String redirectUri = tenantPortalRedirectUri();
         RegisteredClient existingClient = registeredClientRepository.findByClientId(tenantPortalClientId);
-        registeredClientRepository.save(buildTenantPortalClient(existingClient, redirectUri));
+        registeredClientRepository.save(buildTenantPortalClient(existingClient, tenantPortalRedirectUri));
         LOG.info("{} tenant portal client in default issuer store: {}",
                 existingClient == null ? "saved" : "reconciled", tenantPortalClientId);
-    }
-
-    private String tenantPortalRedirectUri() {
-        return tenantPortalBaseUri.replaceAll("/+$", "")
-                + "/login/oauth2/code/" + tenantPortalClientId;
     }
 
     private RegisteredClient buildTenantPortalClient(RegisteredClient existingClient, String redirectUri) {

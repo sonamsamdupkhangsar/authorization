@@ -83,7 +83,7 @@ class ClientSetupTest {
         ReflectionTestUtils.setField(clientSetup, "authzManagerHostLabel", "admin");
         ReflectionTestUtils.setField(clientSetup, "tenantPortalClientId", "tenant-portal");
         ReflectionTestUtils.setField(clientSetup, "tenantPortalClientSecret", "portal-secret");
-        ReflectionTestUtils.setField(clientSetup, "tenantPortalBaseUri", "https://portal.openissuer.com/");
+        ReflectionTestUtils.setField(clientSetup, "tenantPortalRedirectUri", "https://portal.openissuer.com/login/oauth2/code/tenant-portal");
 
         clientSetup.seedConfiguredClients();
 
