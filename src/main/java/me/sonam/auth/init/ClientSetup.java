@@ -117,7 +117,6 @@ public class ClientSetup {
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
                 .scope(OidcScopes.OPENID)
-                .scope(OidcScopes.PROFILE)
                 .scope(OidcScopes.EMAIL)
                 .redirectUri(redirectUri)
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false).build())
