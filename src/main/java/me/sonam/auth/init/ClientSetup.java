@@ -92,6 +92,7 @@ public class ClientSetup {
         if (!StringUtils.hasText(tenantPortalClientId)
                 && !StringUtils.hasText(tenantPortalClientSecret)
                 && !StringUtils.hasText(tenantPortalRedirectUri)) {
+            LOG.info("tenant portal OAuth client is not configured; skipping portal client seeding");
             return;
         }
         if (!StringUtils.hasText(tenantPortalClientId)
