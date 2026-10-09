@@ -14,7 +14,9 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.core.oidc.OidcScopes;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.net.URI;
@@ -54,6 +56,15 @@ public class ClientSetup {
     @Value("${authzmanager-admin-label:admin}")
     private String authzManagerHostLabel;
 
+    @Value("${TENANT_PORTAL_CLIENT_ID:}")
+    private String tenantPortalClientId;
+
+    @Value("${TENANT_PORTAL_CLIENT_SECRET:}")
+    private String tenantPortalClientSecret;
+
+    @Value("${TENANT_PORTAL_REDIRECT_URI:}")
+    private String tenantPortalRedirectUri;
+
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -65,9 +76,52 @@ public class ClientSetup {
         String secret = serviceAccountCredentials[1];
 
         seedDefaultIssuerAuthzManagerClient();
+        seedTenantPortalClient();
         LOG.info("create service account for clientId {}", clientId);
         seedDefaultIssuerServiceAccount(clientId, secret);
         configuredIssuers().forEach(issuer -> seedIssuerClients(issuer, clientId, secret));
+    }
+
+    /**
+     * Registers the platform tenant portal as a dedicated system client in the
+     * default (platform) issuer. Unlike authzmanager, its redirect URI is
+     * explicit because the portal host does not follow the admin-host naming
+     * convention.
+     */
+    private void seedTenantPortalClient() {
+        if (!StringUtils.hasText(tenantPortalClientId)
+                && !StringUtils.hasText(tenantPortalClientSecret)
+                && !StringUtils.hasText(tenantPortalRedirectUri)) {
+            LOG.info("tenant portal OAuth client is not configured; skipping portal client seeding");
+            return;
+        }
+        if (!StringUtils.hasText(tenantPortalClientId)
+                || !StringUtils.hasText(tenantPortalClientSecret)
+                || !StringUtils.hasText(tenantPortalRedirectUri)) {
+            throw new IllegalStateException(
+                    "TENANT_PORTAL_CLIENT_ID, TENANT_PORTAL_CLIENT_SECRET, and TENANT_PORTAL_REDIRECT_URI must be configured together");
+        }
+
+        RegisteredClient existingClient = registeredClientRepository.findByClientId(tenantPortalClientId);
+        registeredClientRepository.save(buildTenantPortalClient(existingClient, tenantPortalRedirectUri));
+        LOG.info("{} tenant portal client in default issuer store: {}",
+                existingClient == null ? "saved" : "reconciled", tenantPortalClientId);
+    }
+
+    private RegisteredClient buildTenantPortalClient(RegisteredClient existingClient, String redirectUri) {
+        String id = existingClient == null ? UUID.randomUUID().toString() : existingClient.getId();
+        return RegisteredClient.withId(id)
+                .clientId(tenantPortalClientId)
+                .clientSecret(passwordEncoder.encode(tenantPortalClientSecret))
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.EMAIL)
+                .redirectUri(redirectUri)
+                .clientSettings(ClientSettings.builder().requireAuthorizationConsent(false).build())
+                .tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofSeconds(1200)).build())
+                .build();
     }
 
     private void seedDefaultIssuerAuthzManagerClient() {

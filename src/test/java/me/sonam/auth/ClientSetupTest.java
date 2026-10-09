@@ -18,6 +18,7 @@ import java.util.List;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.argThat;
 
 class ClientSetupTest {
     private static final String AUTHZ_MANAGER_CLIENT_ID = "authzmanager-client";
@@ -55,6 +56,42 @@ class ClientSetupTest {
 
         verify(issuerOperations).findByClientId(FREE_ISSUER, AUTHZ_MANAGER_CLIENT_ID);
         verify(issuerOperations).findByClientId(FREE_ISSUER, SERVICE_ACCOUNT_CLIENT_ID);
+    }
+
+    @Test
+    void seedsTenantPortalClientInDefaultIssuerWithExplicitRedirectUri() {
+        RegisteredClientRepository registeredClientRepository = mock(RegisteredClientRepository.class);
+        IssuerAwareAuthorizationServerOperations issuerOperations = mock(IssuerAwareAuthorizationServerOperations.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+
+        when(registeredClientRepository.findByClientId(AUTHZ_MANAGER_CLIENT_ID))
+                .thenReturn(authzManagerClient("https://platform.admin.openissuer.com"));
+        when(registeredClientRepository.findByClientId(SERVICE_ACCOUNT_CLIENT_ID))
+                .thenReturn(serviceAccountClient());
+        when(passwordEncoder.encode("portal-secret")).thenReturn("encoded-portal-secret");
+
+        ClientSetup clientSetup = new ClientSetup();
+        ReflectionTestUtils.setField(clientSetup, "registeredClientRepository", registeredClientRepository);
+        ReflectionTestUtils.setField(clientSetup, "issuerAwareAuthorizationServerOperations", issuerOperations);
+        ReflectionTestUtils.setField(clientSetup, "multitenancyProperties", new AuthorizationServerMultitenancyProperties());
+        ReflectionTestUtils.setField(clientSetup, "passwordEncoder", passwordEncoder);
+        ReflectionTestUtils.setField(clientSetup, "base64ClientIdSecret", encodedServiceAccountCredentials());
+        ReflectionTestUtils.setField(clientSetup, "authzManagerId", "authzmanager-id");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerClient", AUTHZ_MANAGER_CLIENT_ID);
+        ReflectionTestUtils.setField(clientSetup, "authzManagerInitialSecret", "initial-secret");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerUri", "https://platform.admin.openissuer.com");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerHostLabel", "admin");
+        ReflectionTestUtils.setField(clientSetup, "tenantPortalClientId", "tenant-portal");
+        ReflectionTestUtils.setField(clientSetup, "tenantPortalClientSecret", "portal-secret");
+        ReflectionTestUtils.setField(clientSetup, "tenantPortalRedirectUri", "https://portal.openissuer.com/login/oauth2/code/tenant-portal");
+
+        clientSetup.seedConfiguredClients();
+
+        verify(registeredClientRepository).save(argThat(client ->
+                "tenant-portal".equals(client.getClientId())
+                        && "encoded-portal-secret".equals(client.getClientSecret())
+                        && client.getRedirectUris().contains(
+                        "https://portal.openissuer.com/login/oauth2/code/tenant-portal")));
     }
 
     private AuthorizationServerMultitenancyProperties multitenancyProperties() {
