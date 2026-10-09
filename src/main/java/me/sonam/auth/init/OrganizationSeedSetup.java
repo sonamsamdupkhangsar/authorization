@@ -6,6 +6,9 @@ import me.sonam.auth.rest.signup.UserSignup;
 import me.sonam.auth.webclient.OrganizationWebClient;
 import me.sonam.auth.webclient.RoleWebClient;
 import me.sonam.auth.webclient.UserWebClient;
+import me.sonam.auth.jpa.entity.ClientOrganization;
+import me.sonam.auth.jpa.repo.ClientOrganizationRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -17,11 +20,14 @@ import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 
 @Component
 public class OrganizationSeedSetup {
@@ -32,17 +38,29 @@ public class OrganizationSeedSetup {
     private final RoleWebClient roleWebClient;
     private final UserWebClient userWebClient;
     private final TaskScheduler taskScheduler;
+    private final ClientOrganizationRepository clientOrganizationRepository;
+    private final RegisteredClientRepository registeredClientRepository;
+
+    @Value("${TENANT_PORTAL_CLIENT_ID:}")
+    private String tenantPortalClientId;
+
+    @Value("${ISSUER_URI:}")
+    private String issuerUri;
 
     public OrganizationSeedSetup(OrganizationSeedProperties organizationSeedProperties,
                                  OrganizationWebClient organizationWebClient,
                                  RoleWebClient roleWebClient,
                                  UserWebClient userWebClient,
-                                 TaskScheduler taskScheduler) {
+                                 TaskScheduler taskScheduler,
+                                 ClientOrganizationRepository clientOrganizationRepository,
+                                 RegisteredClientRepository registeredClientRepository) {
         this.organizationSeedProperties = organizationSeedProperties;
         this.organizationWebClient = organizationWebClient;
         this.roleWebClient = roleWebClient;
         this.userWebClient = userWebClient;
         this.taskScheduler = taskScheduler;
+        this.clientOrganizationRepository = clientOrganizationRepository;
+        this.registeredClientRepository = registeredClientRepository;
     }
 
     // Wait until the application is fully ready, then delay seeding to give downstream clients
@@ -96,11 +114,47 @@ public class OrganizationSeedSetup {
                             .flatMap(org -> organizationWebClient.addOrganizationToSubdomain(seedOrganization.getSubdomain(), org.getId())
                                     .thenReturn(org))
                             .map(Organization::getId))
-                    .then()
+                    .then(associateTenantPortalClient(seedOrganization.getSubdomain()))
                     .block();
         });
 
         attachSeedUsersToOrganizationsAsOrgAdmins(seedUsers, seededUsers);
+    }
+
+    private Mono<Void> associateTenantPortalClient(String subdomain) {
+        if (!StringUtils.hasText(tenantPortalClientId) || !isDefaultIssuerHost(subdomain)) {
+            return Mono.empty();
+        }
+
+        return organizationWebClient.getOrganizationIdBySubdomain(subdomain)
+                .flatMap(organizationId -> {
+                    RegisteredClient client = registeredClientRepository.findByClientId(tenantPortalClientId);
+                    if (client == null) {
+                        LOG.warn("tenant portal client {} is not registered; skipping organization association", tenantPortalClientId);
+                        return Mono.empty();
+                    }
+                    UUID clientId = UUID.fromString(client.getId());
+                    if (!clientOrganizationRepository.existsByClientIdAndOrganizationId(clientId, organizationId).orElse(false)) {
+                        clientOrganizationRepository.deleteByClientId(clientId);
+                        clientOrganizationRepository.save(new ClientOrganization(clientId, organizationId));
+                        LOG.info("associated tenant portal client {} with platform organization {}", tenantPortalClientId, organizationId);
+                    } else {
+                        LOG.info("tenant portal client {} already associated with platform organization {}", tenantPortalClientId, organizationId);
+                    }
+                    return Mono.empty();
+                });
+    }
+
+    private boolean isDefaultIssuerHost(String subdomain) {
+        if (!StringUtils.hasText(issuerUri)) {
+            return false;
+        }
+        try {
+            return subdomain.equals(URI.create(issuerUri).getHost());
+        } catch (IllegalArgumentException exception) {
+            LOG.warn("invalid ISSUER_URI {}; skipping tenant portal client association", issuerUri);
+            return false;
+        }
     }
 
     // Ensures each configured bootstrap user exists and returns a lookup map that later seed
