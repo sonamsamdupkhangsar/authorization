@@ -83,7 +83,7 @@ class ClientSetupTest {
         ReflectionTestUtils.setField(clientSetup, "authzManagerHostLabel", "admin");
         ReflectionTestUtils.setField(clientSetup, "tenantPortalClientId", "tenant-portal");
         ReflectionTestUtils.setField(clientSetup, "tenantPortalClientSecret", "portal-secret");
-        ReflectionTestUtils.setField(clientSetup, "tenantPortalRedirectUri", "https://portal.openissuer.com/login/oauth2/code/tenant-portal");
+        ReflectionTestUtils.setField(clientSetup, "tenantPortalRedirectUri", "https://tenant-portal.openissuer.com/login/oauth2/code/main");
 
         clientSetup.seedConfiguredClients();
 
@@ -91,7 +91,7 @@ class ClientSetupTest {
                 "tenant-portal".equals(client.getClientId())
                         && "encoded-portal-secret".equals(client.getClientSecret())
                         && client.getRedirectUris().contains(
-                        "https://portal.openissuer.com/login/oauth2/code/tenant-portal")));
+                        "https://tenant-portal.openissuer.com/login/oauth2/code/main")));
     }
 
     private AuthorizationServerMultitenancyProperties multitenancyProperties() {
