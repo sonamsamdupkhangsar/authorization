@@ -40,6 +40,11 @@ Policy fields:
 | `create-organization-on-signup` | Creates a new organization for the user when true; attaches to the existing host organization when false. |
 | `allowed-email-domains` | Restricts signup email domains. `*` allows any domain unless the domain is reserved by another host. |
 
+The platform host is configured as a special case: signup and account self-service
+are enabled, but `create-organization-on-signup` is `false`. Activated users are
+attached to the existing Platform organization, which allows them to pass the
+organization boundary for the `tenant-portal` OAuth client.
+
 When signup is disabled for a host, the signup page displays a disabled message and the controller rejects submitted signup requests. The demo issuer uses this mode.
 
 ## Free/Public Signup

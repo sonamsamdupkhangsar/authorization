@@ -88,6 +88,12 @@ authorization-server:
         driver-class-name: ${DEMO_AUTH_DB_DRIVER:org.postgresql.Driver}
   signup-policy:
     hosts:
+      platform.openissuer.com:
+        allow-account-self-service: true
+        allow-signup: true
+        create-organization-on-signup: false
+        allowed-email-domains:
+          - "*"
       free.openissuer.com:
         allow-signup: true
         create-organization-on-signup: true
