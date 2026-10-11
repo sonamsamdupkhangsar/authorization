@@ -11,7 +11,12 @@
 <body class="auth-page">
 <div class="container">
     <main class="passkey-page">
-    <h1 class="h3 mb-4">Passkeys</h1>
+    <div class="account-header">
+        <h1 class="h3 mb-4">Passkeys</h1>
+        <form th:action="@{/logout}" method="post">
+            <button class="btn btn-outline-secondary" type="submit">Sign out</button>
+        </form>
+    </div>
     <nav class="account-nav" aria-label="Account settings">
         <a th:href="@{/account/profile(return_url=${returnUrl})}">Profile</a>
         <a class="active" th:href="@{/mfa/passkeys}">Passkeys</a>
