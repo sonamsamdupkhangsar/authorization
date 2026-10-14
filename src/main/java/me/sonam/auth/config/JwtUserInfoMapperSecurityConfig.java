@@ -150,6 +150,7 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/actuator/**").permitAll()
                                 .requestMatchers("/favicon.ico").permitAll()
                                 .requestMatchers("/favicon.svg").permitAll()
+                                .requestMatchers("/favicon.png").permitAll()
                                 .requestMatchers("/css/**").permitAll()
                                 .requestMatchers("/js/**").permitAll()
                                 .requestMatchers("/username").permitAll()
@@ -245,7 +246,10 @@ public class JwtUserInfoMapperSecurityConfig {
         HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
         requestCache.setRequestMatcher(request -> {
             String uri = request.getRequestURI();
-            return !"/favicon.ico".equals(uri) && !"/favicon.svg".equals(uri) && !"/error".equals(uri);
+            return !"/favicon.ico".equals(uri)
+                    && !"/favicon.svg".equals(uri)
+                    && !"/favicon.png".equals(uri)
+                    && !"/error".equals(uri);
         });
         return requestCache;
     }
