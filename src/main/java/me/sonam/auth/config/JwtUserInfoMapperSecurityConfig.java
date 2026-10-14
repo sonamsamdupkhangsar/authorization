@@ -151,6 +151,7 @@ public class JwtUserInfoMapperSecurityConfig {
                                 .requestMatchers("/favicon.ico").permitAll()
                                 .requestMatchers("/favicon.svg").permitAll()
                                 .requestMatchers("/favicon.png").permitAll()
+                                .requestMatchers("/issuer/favicon.png").permitAll()
                                 .requestMatchers("/css/**").permitAll()
                                 .requestMatchers("/js/**").permitAll()
                                 .requestMatchers("/username").permitAll()
@@ -249,6 +250,7 @@ public class JwtUserInfoMapperSecurityConfig {
             return !"/favicon.ico".equals(uri)
                     && !"/favicon.svg".equals(uri)
                     && !"/favicon.png".equals(uri)
+                    && !"/issuer/favicon.png".equals(uri)
                     && !"/error".equals(uri);
         });
         return requestCache;
