@@ -117,6 +117,10 @@ public class JwtUserInfoMapperSecurityConfig {
                                 ))
                 )
                 .authorizeHttpRequests((authorize) -> authorize
+                        .requestMatchers("/favicon.ico").permitAll()
+                        .requestMatchers("/favicon.svg").permitAll()
+                        .requestMatchers("/favicon.png").permitAll()
+                        .requestMatchers("/issuer/favicon.png").permitAll()
                         .anyRequest().authenticated()
                 )
                 .csrf(csrf -> csrf.ignoringRequestMatchers(endpointsMatcher))
