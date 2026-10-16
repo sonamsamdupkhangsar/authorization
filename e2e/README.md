@@ -179,10 +179,12 @@ echo
 export E2E_MAILBOX_USERNAME
 export E2E_MAILBOX_PASSWORD
 export E2E_SIGNUP_INBOX="$E2E_MAILBOX_USERNAME"
+export E2E_CROSS_ISSUER_URL="https://snow-leopard.openissuer.com"
 
 E2E_SELF_SERVICE_LIFECYCLE=true \
-E2E_ISSUER_URL="https://pr-test-4.openissuer.com" \
-E2E_ADMIN_URL="https://pr-test-4.admin.openissuer.com" \
+E2E_CROSS_ISSUER_URL="https://snow-leopard.openissuer.com" \
+E2E_ISSUER_URL="https://snowlion.openissuer.com" \
+E2E_ADMIN_URL="https://snowlion.admin.openissuer.com" \
 E2E_SIGNUP_INBOX="$E2E_MAILBOX_USERNAME" \
 E2E_MAILBOX_PASSWORD="$E2E_MAILBOX_PASSWORD" \
 npm run test:lifecycle -- --headed --workers=1

@@ -7,6 +7,7 @@ import {
 
 const issuerUrl = process.env.E2E_ISSUER_URL;
 const adminUrl = process.env.E2E_ADMIN_URL;
+const crossIssuerUrl = process.env.E2E_CROSS_ISSUER_URL;
 const signupInbox = process.env.E2E_SIGNUP_INBOX;
 const configuredSignupEmail = process.env.E2E_SIGNUP_EMAIL;
 const signupPassword = process.env.E2E_SIGNUP_PASSWORD ?? "OpenIssuer-Test-42";
@@ -75,7 +76,7 @@ async function signInToAdmin(
   await expect(page.getByRole("heading", { name: "Manage tenant authorization." })).toBeVisible();
 }
 
-test("signup, self-service actions, and final profile deletion", async ({ page }) => {
+test("signup, self-service actions, and final profile deletion", async ({ page, request }) => {
   const issuer = new URL(issuerUrl!);
   const admin = new URL(adminUrl!);
   const uniqueSuffix = Date.now().toString().slice(-10);
@@ -171,8 +172,64 @@ test("signup, self-service actions, and final profile deletion", async ({ page }
     await page.locator("input[name='authorizationGrantTypes'][value='AUTHORIZATION_CODE']").check();
     await page.locator("input[name='scopes'][value='OPENID']").check();
     await page.locator("input[name='scopes'][value='PROFILE']").check();
-    await page.locator("form button[type='submit']").first().click();
+    await page
+      .locator("form")
+      .filter({ has: page.locator("#clientId") })
+      .locator("button[type='submit']")
+      .click();
     await expect(page.locator("body")).toContainText(/Client created successfully/i);
+    console.log(`[issuer-isolation] OAuth client created for ${issuer.hostname}`);
+
+    if (crossIssuerUrl) {
+      console.log(`[issuer-isolation] Sending a ${issuer.hostname} token to ${issuer.hostname} and ${new URL(crossIssuerUrl).hostname}`);
+      await pauseWithCountdown(
+        page,
+        `Issuer isolation: sending a Snowlion token to Snowlion and ${new URL(crossIssuerUrl).hostname}.`,
+        stepDelayMs,
+      );
+      const clientCredentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      const tokenResponse = await request.post(
+        `${issuer.origin}/issuer/oauth2/token`,
+        {
+          form: {
+            grant_type: "client_credentials",
+            scope: "openid profile",
+          },
+          headers: {
+            Authorization: `Basic ${clientCredentials}`,
+          },
+        },
+      );
+      expect(tokenResponse.status(), "the client should receive a token from its own issuer").toBe(200);
+      const { access_token: token } = await tokenResponse.json();
+      expect(token, "the token response should include an access token").toBeTruthy();
+
+      const validIssuerResponse = await request.post(
+        `${issuer.origin}/issuer/oauth2/introspect`,
+        {
+          form: { token },
+          headers: { Authorization: `Basic ${clientCredentials}` },
+        },
+      );
+      expect(validIssuerResponse.status(), "the own issuer should accept its token").toBe(200);
+      const validTokenDetails = await validIssuerResponse.json();
+      expect(validTokenDetails.active, "the own issuer should mark its token active").toBe(true);
+      console.log(`[issuer-isolation] ${issuer.hostname} introspection: HTTP ${validIssuerResponse.status()}, active=${validTokenDetails.active}`);
+
+      const crossIssuerResponse = await request.get(
+        `${new URL(crossIssuerUrl).origin}/issuer/userinfo`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(crossIssuerResponse.status(), "the other issuer must reject this token").toBe(401);
+      console.log(`[issuer-isolation] ${new URL(crossIssuerUrl).hostname} cross-token response: HTTP ${crossIssuerResponse.status()}`);
+
+      await pauseWithCountdown(
+        page,
+        `Issuer isolation: Snowlion accepted the token (HTTP ${validIssuerResponse.status()}); `
+          + `${new URL(crossIssuerUrl).hostname} rejected it (HTTP ${crossIssuerResponse.status()}).`,
+        stepDelayMs,
+      );
+    }
     await pauseWithCountdown(page, "Showing the newly created client.", stepDelayMs);
 
     await page.getByRole("link", { name: "Organizations", exact: true }).click();
