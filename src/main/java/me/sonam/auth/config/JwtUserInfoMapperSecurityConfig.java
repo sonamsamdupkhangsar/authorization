@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
@@ -84,6 +85,15 @@ public class JwtUserInfoMapperSecurityConfig {
 
     @Value("${allowedOrigins}")
     private String allowedOrigins; //csv allow origins
+
+    @Bean
+    public WebSecurityCustomizer publicStaticResources() {
+        return web -> web.ignoring().requestMatchers(
+                "/favicon.ico",
+                "/favicon.svg",
+                "/favicon.png",
+                "/issuer/favicon.png");
+    }
 
     @Bean
     @Order(1)

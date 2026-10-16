@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -51,6 +52,9 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
 /**
  * Test cases in the original one does not apply for the use case I have in this implementation.
@@ -151,6 +155,28 @@ public class DefaultAuthorizationServerApplicationTests {
 
 	@Autowired
 	private WebClient webClient;
+
+	@Autowired
+	private MockMvc mockMvc;
+
+	@Test
+	public void faviconIsPubliclyAccessible() throws Exception {
+		mockMvc.perform(get("/favicon.png"))
+				.andExpect(status().isOk());
+	}
+
+	@Test
+	public void issuerContextFaviconIsNotProtected() throws Exception {
+		mockMvc.perform(get("/issuer/favicon.png"))
+				.andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(HttpStatus.UNAUTHORIZED.value()));
+	}
+
+	@Test
+	public void legacyFaviconRedirectsToPng() throws Exception {
+		mockMvc.perform(get("/favicon.ico"))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(redirectedUrl("/favicon.png"));
+	}
 
 	@BeforeEach
 	public void setUp() {
