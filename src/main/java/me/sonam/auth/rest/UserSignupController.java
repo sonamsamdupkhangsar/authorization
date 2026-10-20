@@ -1,6 +1,8 @@
 package me.sonam.auth.rest;
 
 import jakarta.validation.Valid;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,8 +56,31 @@ public class UserSignupController {
     @Autowired
     private LoginReturnContextService loginReturnContextService;
 
-    public UserSignupController(UserWebClient userWebClient) {
+    private final Counter signupAttempts;
+    private final Counter signupPolicyRejected;
+    private final Counter signupValidationRejected;
+    private final Counter signupEmailRejected;
+    private final Counter signupHostRejected;
+    private final Counter signupUsersCreated;
+    private final Counter signupCompleted;
+    private final Counter signupFailures;
+
+    public UserSignupController(UserWebClient userWebClient, MeterRegistry meterRegistry) {
         this.userWebClient = userWebClient;
+        this.signupAttempts = counter(meterRegistry, "authorization.signup.attempts");
+        this.signupPolicyRejected = counter(meterRegistry, "authorization.signup.rejected.policy");
+        this.signupValidationRejected = counter(meterRegistry, "authorization.signup.rejected.validation");
+        this.signupEmailRejected = counter(meterRegistry, "authorization.signup.rejected.email");
+        this.signupHostRejected = counter(meterRegistry, "authorization.signup.rejected.host");
+        this.signupUsersCreated = counter(meterRegistry, "authorization.signup.users.created");
+        this.signupCompleted = counter(meterRegistry, "authorization.signup.completed");
+        this.signupFailures = counter(meterRegistry, "authorization.signup.failures");
+    }
+
+    private static Counter counter(MeterRegistry meterRegistry, String name) {
+        return Counter.builder(name)
+                .description("Signup funnel event")
+                .register(meterRegistry);
     }
 
     // Renders the signup form used by both the public signup subdomain and host-bound signup flows.
@@ -85,17 +110,20 @@ public class UserSignupController {
                                            HttpServletRequest request, HttpServletResponse response) {
         final String PATH = "signupform";
         final String currentHost = hostOrganizationResolver.currentHost().orElse(null);
+        signupAttempts.increment();
         LOG.info("signing up user: {}", userSignup);
         loginReturnContextService.addReturnContext(model, request, response);
 
         var signupAllowedError = signupPolicyService.validateSignupAllowedForHost(currentHost);
         if (signupAllowedError.isPresent()) {
+            signupPolicyRejected.increment();
             model.addAttribute("error", signupAllowedError.get());
             model.asMap().remove("userSignup");
             return Mono.just(PATH);
         }
 
         if (bindingResult.hasErrors()) {
+            signupValidationRejected.increment();
             LOG.info("user didn't enter required fields");
             model.addAttribute("error", "Data validation failed");
             return Mono.just(PATH);
@@ -103,12 +131,14 @@ public class UserSignupController {
 
         var emailValidationError = signupPolicyService.validateEmailForHost(currentHost, userSignup.getEmail());
         if (emailValidationError.isPresent()) {
+            signupEmailRejected.increment();
             model.addAttribute("error", emailValidationError.get());
             model.addAttribute("userSignup", userSignup);
             return Mono.just(PATH);
         }
 
         if (!StringUtils.hasText(currentHost)) {
+            signupHostRejected.increment();
             model.addAttribute("error", "signup must be performed from a tenant subdomain");
             model.addAttribute("userSignup", userSignup);
             return Mono.just(PATH);
@@ -118,6 +148,7 @@ public class UserSignupController {
         return  userWebClient.signupUser(userSignup)
                 .flatMap(s -> {
 
+                    signupUsersCreated.increment();
                     LOG.info("user signup successful with message: {}",s);
                     StringBuilder stringBuilder = new StringBuilder(userSignup.getFirstName())
                             .append(", your signup was successful!").append(
@@ -149,7 +180,9 @@ public class UserSignupController {
                                             "OrgAdmin", user.getId(), createdOrganization.getId()))
                                     .thenReturn(PATH));
                 })
+                .doOnSuccess(ignored -> signupCompleted.increment())
                 .onErrorResume(throwable -> {
+                                signupFailures.increment();
                                 setErrorInModel(throwable, model, "failed to signup user");
                                 model.addAttribute("userSignup", userSignup);
                                 return Mono.just(PATH);
