@@ -171,6 +171,7 @@ forgot-password requests, signs in to the admin application, and deletes that sa
 step. It requires a plus-addressable inbox (or an exact signup email) and is explicitly opt-in because deletion is
 irreversible:
 
+set to control delay E2E_STEP_DELAY_MS=30000
 ```bash
 
 read -r "E2E_MAILBOX_USERNAME?Mailbox username: "
