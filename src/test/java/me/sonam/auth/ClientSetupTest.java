@@ -18,12 +18,59 @@ import java.util.List;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 
 class ClientSetupTest {
     private static final String AUTHZ_MANAGER_CLIENT_ID = "authzmanager-client";
     private static final String SERVICE_ACCOUNT_CLIENT_ID = "service-account";
     private static final String FREE_ISSUER = "https://free.openissuer.com";
+    private static final String SUMMIT_ISSUER = "https://summit.openissuer.com";
+
+    @Test
+    void seedsAdditionalRedirectUriOnlyForConfiguredIssuer() {
+        RegisteredClientRepository registeredClientRepository = mock(RegisteredClientRepository.class);
+        IssuerAwareAuthorizationServerOperations issuerOperations = mock(IssuerAwareAuthorizationServerOperations.class);
+
+        when(registeredClientRepository.findByClientId(AUTHZ_MANAGER_CLIENT_ID))
+                .thenReturn(authzManagerClient("https://platform.admin.openissuer.com"));
+        when(registeredClientRepository.findByClientId(SERVICE_ACCOUNT_CLIENT_ID))
+                .thenReturn(serviceAccountClient());
+        when(issuerOperations.findByClientId(SUMMIT_ISSUER, AUTHZ_MANAGER_CLIENT_ID))
+                .thenReturn(authzManagerClient("https://summit.admin.openissuer.com"));
+        when(issuerOperations.findByClientId(SUMMIT_ISSUER, SERVICE_ACCOUNT_CLIENT_ID))
+                .thenReturn(serviceAccountClient());
+        when(issuerOperations.findByClientId(FREE_ISSUER, AUTHZ_MANAGER_CLIENT_ID))
+                .thenReturn(authzManagerClient("https://free.admin.openissuer.com"));
+        when(issuerOperations.findByClientId(FREE_ISSUER, SERVICE_ACCOUNT_CLIENT_ID))
+                .thenReturn(serviceAccountClient());
+
+        AuthorizationServerMultitenancyProperties properties = multitenancyProperties();
+        AuthorizationServerMultitenancyProperties.Tenant summit =
+                new AuthorizationServerMultitenancyProperties.Tenant();
+        summit.setDeploymentNamespace("main");
+        summit.setHosts(List.of("summit.openissuer.com"));
+        properties.getTenants().put("summit", summit);
+
+        ClientSetup clientSetup = configuredClientSetup(registeredClientRepository, issuerOperations, properties);
+        ReflectionTestUtils.setField(clientSetup, "authzManagerAdditionalRedirectUris",
+                "http://localhost:3000/api/auth/callback/openissuer");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerAdditionalRedirectIssuer",
+                "summit.openissuer.com");
+
+        clientSetup.seedConfiguredClients();
+
+        verify(issuerOperations).save(eq(SUMMIT_ISSUER), argThat(client ->
+                AUTHZ_MANAGER_CLIENT_ID.equals(client.getClientId())
+                        && client.getRedirectUris().contains("http://localhost:3000/api/auth/callback/openissuer")));
+        verify(issuerOperations, never()).save(eq(FREE_ISSUER), argThat(client ->
+                AUTHZ_MANAGER_CLIENT_ID.equals(client.getClientId())
+                        && !client.getRedirectUris().contains("http://localhost:3000/api/auth/callback/openissuer")));
+        verify(registeredClientRepository, never()).save(argThat(client ->
+                AUTHZ_MANAGER_CLIENT_ID.equals(client.getClientId())
+                        && !client.getRedirectUris().contains("http://localhost:3000/api/auth/callback/openissuer")));
+    }
 
     @Test
     void seedConfiguredClientsChecksEachAdditionalIssuerClientOnce() {
@@ -40,17 +87,7 @@ class ClientSetupTest {
         when(issuerOperations.findByClientId(FREE_ISSUER, SERVICE_ACCOUNT_CLIENT_ID))
                 .thenReturn(serviceAccountClient());
 
-        ClientSetup clientSetup = new ClientSetup();
-        ReflectionTestUtils.setField(clientSetup, "registeredClientRepository", registeredClientRepository);
-        ReflectionTestUtils.setField(clientSetup, "issuerAwareAuthorizationServerOperations", issuerOperations);
-        ReflectionTestUtils.setField(clientSetup, "multitenancyProperties", multitenancyProperties());
-        ReflectionTestUtils.setField(clientSetup, "passwordEncoder", mock(PasswordEncoder.class));
-        ReflectionTestUtils.setField(clientSetup, "base64ClientIdSecret", encodedServiceAccountCredentials());
-        ReflectionTestUtils.setField(clientSetup, "authzManagerId", "authzmanager-id");
-        ReflectionTestUtils.setField(clientSetup, "authzManagerClient", AUTHZ_MANAGER_CLIENT_ID);
-        ReflectionTestUtils.setField(clientSetup, "authzManagerInitialSecret", "initial-secret");
-        ReflectionTestUtils.setField(clientSetup, "authzManagerUri", "https://platform.admin.openissuer.com");
-        ReflectionTestUtils.setField(clientSetup, "authzManagerHostLabel", "admin");
+        ClientSetup clientSetup = configuredClientSetup(registeredClientRepository, issuerOperations, multitenancyProperties());
 
         clientSetup.seedConfiguredClients();
 
@@ -102,6 +139,23 @@ class ClientSetupTest {
         tenant.setHosts(List.of("free.openissuer.com"));
         properties.getTenants().put("free", tenant);
         return properties;
+    }
+
+    private ClientSetup configuredClientSetup(RegisteredClientRepository registeredClientRepository,
+                                              IssuerAwareAuthorizationServerOperations issuerOperations,
+                                              AuthorizationServerMultitenancyProperties properties) {
+        ClientSetup clientSetup = new ClientSetup();
+        ReflectionTestUtils.setField(clientSetup, "registeredClientRepository", registeredClientRepository);
+        ReflectionTestUtils.setField(clientSetup, "issuerAwareAuthorizationServerOperations", issuerOperations);
+        ReflectionTestUtils.setField(clientSetup, "multitenancyProperties", properties);
+        ReflectionTestUtils.setField(clientSetup, "passwordEncoder", mock(PasswordEncoder.class));
+        ReflectionTestUtils.setField(clientSetup, "base64ClientIdSecret", encodedServiceAccountCredentials());
+        ReflectionTestUtils.setField(clientSetup, "authzManagerId", "authzmanager-id");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerClient", AUTHZ_MANAGER_CLIENT_ID);
+        ReflectionTestUtils.setField(clientSetup, "authzManagerInitialSecret", "initial-secret");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerUri", "https://platform.admin.openissuer.com");
+        ReflectionTestUtils.setField(clientSetup, "authzManagerHostLabel", "admin");
+        return clientSetup;
     }
 
     private RegisteredClient authzManagerClient(String baseUri) {

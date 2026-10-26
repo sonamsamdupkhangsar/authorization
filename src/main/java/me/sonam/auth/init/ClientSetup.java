@@ -20,10 +20,12 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Configuration
 public class ClientSetup {
@@ -55,6 +57,13 @@ public class ClientSetup {
 
     @Value("${authzmanager-admin-label:admin}")
     private String authzManagerHostLabel;
+
+    /** Comma-separated callbacks for local or alternate AuthzManager UI deployments. */
+    @Value("${authzmanager-additional-redirect-uris:}")
+    private String authzManagerAdditionalRedirectUris;
+
+    @Value("${authzmanager-additional-redirect-uris-issuer:}")
+    private String authzManagerAdditionalRedirectIssuer;
 
     @Value("${TENANT_PORTAL_CLIENT_ID:}")
     private String tenantPortalClientId;
@@ -127,43 +136,66 @@ public class ClientSetup {
     private void seedDefaultIssuerAuthzManagerClient() {
         String expectedAuthzManagerUri = authzManagerUri;
         RegisteredClient registeredClient = registeredClientRepository.findByClientId(authzManagerClient);
-        if (registeredClient != null && hasAuthzManagerRedirectUri(registeredClient, expectedAuthzManagerUri)) {
+        if (registeredClient != null && hasAuthzManagerRedirectUris(registeredClient, expectedAuthzManagerUri, null)) {
             LOG.info("authzmanager exists in default issuer store");
             return;
         }
         if (registeredClient != null) {
             LOG.info("updating authzmanager redirect uri in default issuer store to {}", expectedAuthzManagerUri);
         }
-        registeredClientRepository.save(buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri));
+        registeredClientRepository.save(buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri, null));
         LOG.info("saved authzmanager client in default issuer store");
     }
 
     private void seedAuthzManagerClient(String issuer) {
         String expectedAuthzManagerUri = authzManagerUriForIssuer(issuer);
         RegisteredClient registeredClient = issuerAwareAuthorizationServerOperations.findByClientId(issuer, authzManagerClient);
-        if (registeredClient != null && hasAuthzManagerRedirectUri(registeredClient, expectedAuthzManagerUri)) {
+        if (registeredClient != null && hasAuthzManagerRedirectUris(registeredClient, expectedAuthzManagerUri, issuer)) {
             LOG.info("authzmanager exists for issuer {}", issuer);
             return;
         }
         if (registeredClient != null) {
             LOG.info("updating authzmanager redirect uri for issuer {} to {}", issuer, expectedAuthzManagerUri);
         }
-        issuerAwareAuthorizationServerOperations.save(issuer, buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri));
+        issuerAwareAuthorizationServerOperations.save(issuer, buildAuthzManagerClient(registeredClient, expectedAuthzManagerUri, issuer));
         LOG.info("saved authzmanager client for issuer {}", issuer);
     }
 
-    private boolean hasAuthzManagerRedirectUri(RegisteredClient registeredClient, String authzManagerBaseUri) {
-        return registeredClient.getRedirectUris().contains(authzManagerRedirectUri(authzManagerBaseUri));
+    private boolean hasAuthzManagerRedirectUris(RegisteredClient registeredClient, String authzManagerBaseUri,
+                                                String issuer) {
+        Set<String> required = new LinkedHashSet<>();
+        required.add(authzManagerRedirectUri(authzManagerBaseUri));
+        required.addAll(additionalAuthzManagerRedirectUris(issuer));
+        return registeredClient.getRedirectUris().containsAll(required);
     }
 
     private String authzManagerRedirectUri(String authzManagerBaseUri) {
         return authzManagerBaseUri + "/login/oauth2/code/" + authzManagerClient;
     }
 
-    private RegisteredClient buildAuthzManagerClient(RegisteredClient existingClient, String authzManagerBaseUri) {
+    private RegisteredClient buildAuthzManagerClient(RegisteredClient existingClient, String authzManagerBaseUri,
+                                                     String issuer) {
         String id = existingClient == null ? authzManagerId : existingClient.getId();
         String secret = existingClient == null ? passwordEncoder.encode(authzManagerInitialSecret) : existingClient.getClientSecret();
-        return buildAuthzManagerClient(id, secret, authzManagerBaseUri);
+        RegisteredClient.Builder builder = RegisteredClient.withId(id)
+                .clientId(authzManagerClient)
+                .clientSecret(secret)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
+                .scope(OidcScopes.OPENID)
+                .scope(OidcScopes.PROFILE)
+                .redirectUri(authzManagerRedirectUri(authzManagerBaseUri));
+        additionalAuthzManagerRedirectUris(issuer).forEach(builder::redirectUri);
+        if (existingClient != null) {
+            builder.redirectUris(redirects -> redirects.addAll(existingClient.getRedirectUris()))
+                    .postLogoutRedirectUris(redirects -> redirects.addAll(existingClient.getPostLogoutRedirectUris()))
+                    .clientSettings(existingClient.getClientSettings())
+                    .tokenSettings(existingClient.getTokenSettings());
+        } else {
+            builder.tokenSettings(TokenSettings.builder().accessTokenTimeToLive(Duration.ofSeconds(1200)).build());
+        }
+        return builder.build();
     }
 
     private RegisteredClient buildAuthzManagerClient(String authzManagerBaseUri) {
@@ -183,6 +215,19 @@ public class ClientSetup {
                 .redirectUri(authzManagerRedirectUri(authzManagerBaseUri))
                 .tokenSettings(tokenSettings)
                 .build();
+    }
+
+    private Set<String> additionalAuthzManagerRedirectUris(String issuer) {
+        if (!StringUtils.hasText(authzManagerAdditionalRedirectUris)
+                || !StringUtils.hasText(authzManagerAdditionalRedirectIssuer)
+                || !StringUtils.hasText(issuer)
+                || !authzManagerAdditionalRedirectIssuer.equalsIgnoreCase(URI.create(issuer).getHost())) {
+            return Set.of();
+        }
+        return Arrays.stream(authzManagerAdditionalRedirectUris.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private String authzManagerUriForIssuer(String issuer) {
