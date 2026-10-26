@@ -201,6 +201,7 @@ requestFilters:
 authzmanager-id: b4dfe3fb-1692-44b8-92ab-366ccc84b539
 authzmanager-client: b4dfe3fb-1692-44b8-92ab-366ccc84b539-authzmanager
 authzmanager-admin-label: admin
+authzmanager-additional-redirect-uris: ${AUTHZMANAGER_ADDITIONAL_REDIRECT_URIS:}
 tokenExpireSeconds: 180
 
 authIdNotExist: authentication does not exist with authId
