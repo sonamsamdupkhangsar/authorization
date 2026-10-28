@@ -11,3 +11,6 @@ authzmanager: https://platform.admin.openissuer.test:9093
 
 auth-server:
   root: https://platform.openissuer.test:${AUTH_SERVER_PORT}
+auth:
+  admin-return-url:
+    allow-local-ui: true

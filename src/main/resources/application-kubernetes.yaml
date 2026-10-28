@@ -13,3 +13,6 @@ eureka:
 
 allowedOrigins: ${ALLOWED_ORIGINS}  #localhost
 authzmanager: https://platform.admin.openissuer.com
+auth:
+  admin-return-url:
+    allow-local-ui: false
